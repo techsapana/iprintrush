@@ -1,0 +1,452 @@
+// Single Product API - MySQL-backed
+import { NextRequest, NextResponse } from 'next/server';
+import { query, queryOne } from '@/app/lib/db';
+
+async function hasProductVideosTable(): Promise<boolean> {
+  try {
+    const res: any = await query("SHOW TABLES LIKE 'product_videos'");
+    return Array.isArray(res) && res.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeVideoRow(v: any) {
+  if (!v) return null;
+  const videoUrl = v.video_url ?? v.videoUrl ?? v.VIDEO_URL ?? v.url ?? v.videoURL;
+  if (!videoUrl) return null;
+  return {
+    url: String(videoUrl),
+    title: v.video_title != null ? String(v.video_title) : (v.videoTitle != null ? String(v.videoTitle) : ''),
+    description:
+      v.video_description != null
+        ? String(v.video_description)
+        : (v.videoDescription != null ? String(v.videoDescription) : ''),
+  };
+}
+
+function nullableNumber(value: any): number | null {
+  if (value === '' || value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function ensureLCategoryColumn() {
+  const col: any = await queryOne("SHOW COLUMNS FROM products LIKE 'l_category'");
+  if (!col) {
+    await query('ALTER TABLE products ADD COLUMN l_category VARCHAR(191) NULL AFTER category_id');
+  }
+}
+
+async function ensureOutOfStockColumn() {
+  const col: any = await queryOne("SHOW COLUMNS FROM products LIKE 'out_of_stock'");
+  if (!col) {
+    await query('ALTER TABLE products ADD COLUMN out_of_stock TINYINT(1) NOT NULL DEFAULT 0 AFTER enabled');
+  }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } | Promise<{ id: string }> }
+) {
+  try {
+    await ensureLCategoryColumn();
+    await ensureOutOfStockColumn();
+    const resolvedParams = await params;
+    const id = resolvedParams.id;
+
+    const includeVideos = await hasProductVideosTable();
+
+    // Get product with category and features
+    const product = await queryOne(
+      `SELECT 
+        p.*,
+        c.name as category_name,
+        c.slug as category_slug,
+        GROUP_CONCAT(DISTINCT pf.feature ORDER BY pf.display_order SEPARATOR ',') as features
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN product_features pf ON p.id = pf.product_id
+      WHERE p.id = ? OR p.slug = ?
+      GROUP BY p.id`,
+      [id, id]
+    );
+
+    if (!product) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    }
+
+    // Get sizes for this product
+    const sizes = (await query(
+      `SELECT so.id, so.label, so.price_addon
+       FROM product_size_options pso
+       JOIN size_options so ON pso.size_option_id = so.id
+       WHERE pso.product_id = ?
+       ORDER BY so.display_order`,
+      [product.id]
+    )) as any[];
+
+    // Get gallery images for this product
+    const gallery = (await query(
+      `SELECT image_url 
+       FROM product_images 
+       WHERE product_id = ? 
+       ORDER BY display_order, id`,
+      [product.id]
+    )) as any[];
+
+    // Get videos for this product
+    const videosRaw = includeVideos
+      ? ((await query(
+          `SELECT video_url, video_title, video_description
+           FROM product_videos
+           WHERE product_id = ?
+           ORDER BY display_order, id`,
+          [product.id]
+        )) as any[])
+      : ([] as any[]);
+
+    const transformed: any = {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      price: parseFloat(product.price),
+      minQuantity: product.min_quantity != null ? Number(product.min_quantity) : null,
+      maxQuantity: product.max_quantity != null ? Number(product.max_quantity) : null,
+      minWidthIn: product.min_width_in != null ? Number(product.min_width_in) : null,
+      maxWidthIn: product.max_width_in != null ? Number(product.max_width_in) : null,
+      minHeightIn: product.min_height_in != null ? Number(product.min_height_in) : null,
+      maxHeightIn: product.max_height_in != null ? Number(product.max_height_in) : null,
+      pricePerSqInch: product.price_per_sq_inch != null ? Number(product.price_per_sq_inch) : null,
+      mailboxPricePerMonth:
+        product.mailbox_price_per_month != null ? Number(product.mailbox_price_per_month) : null,
+      oldPrice: product.old_price != null ? parseFloat(product.old_price) : null,
+      weightLb: product.weight_lb != null ? Number(product.weight_lb) : null,
+      packageLengthIn: product.package_length_in != null ? Number(product.package_length_in) : null,
+      packageWidthIn: product.package_width_in != null ? Number(product.package_width_in) : null,
+      packageHeightIn: product.package_height_in != null ? Number(product.package_height_in) : null,
+      packageType: product.package_type || 'YOUR_PACKAGING',
+      category: product.category_name || product.category_id,
+      categoryId: product.category_id,
+      linkedCategorySlug: product.l_category || null,
+      categorySlug: product.category_slug,
+      image: product.image || '/placeholder.jpg',
+      sameDayEligible: Boolean(product.same_day_eligible),
+      outOfStock: Boolean(product.out_of_stock),
+      enabled: Boolean(product.enabled),
+      featured: Boolean(product.featured),
+      createdAt: product.created_at || null,
+      features: product.features ? product.features.split(',') : [],
+      sizes: sizes.map((s: any) => s.label),
+      galleryImages: Array.isArray(gallery)
+        ? gallery.map((g: any) => g.image_url).filter((url: string) => url && url.trim().length > 0)
+        : [],
+      ...(includeVideos
+        ? {
+            videos: Array.isArray(videosRaw)
+              ? (videosRaw
+                  .map(normalizeVideoRow)
+                  .filter(Boolean) as Array<{ url: string; title: string; description: string }>)
+              : [],
+          }
+        : {}),
+      couponCodes: [],
+    };
+
+    const coupons = (await query(
+      'SELECT coupon_code, discount_percent, is_active FROM product_coupon_codes WHERE product_id = ? ORDER BY id',
+      [product.id],
+    )) as any[];
+    transformed.couponCodes = Array.isArray(coupons)
+      ? coupons.map((c) => ({
+          code: String(c.coupon_code || ''),
+          discountPercent: Number(c.discount_percent || 0),
+          isActive: c.is_active !== 0,
+        }))
+      : [];
+
+    return NextResponse.json({ product: transformed });
+  } catch (error: any) {
+    console.error('Error fetching product:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch product' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } | Promise<{ id: string }> }
+) {
+  try {
+    await ensureLCategoryColumn();
+    await ensureOutOfStockColumn();
+    const body = await request.json();
+    const resolvedParams = await params;
+    
+    // Ensure we have a valid ID - use params.id, body.id, or generate one
+    const id = resolvedParams.id && resolvedParams.id !== 'undefined' && resolvedParams.id !== 'null' 
+      ? resolvedParams.id 
+      : (body.id || `product-${Date.now()}`);
+
+    // Check if product exists
+    const existing = await queryOne('SELECT id FROM products WHERE id = ?', [id]);
+    
+    // Get category ID if category is provided
+    let categoryId = null;
+    if (body.category) {
+      const cat = await queryOne(
+        'SELECT id FROM categories WHERE slug = ? OR name = ? LIMIT 1',
+        [body.category, body.category]
+      );
+      categoryId = cat?.id || null;
+    }
+
+    if (!existing) {
+      // Product doesn't exist - create it (upsert behavior)
+      const productSlug = body.slug || body.name?.toLowerCase().replace(/\s+/g, '-') || id;
+      
+      await query(
+        `INSERT INTO products (id, name, slug, description, price, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, enabled)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+        [
+          id,
+          body.name || 'Untitled Product',
+          productSlug,
+          body.description || '',
+          nullableNumber(body.price) ?? 0,
+          nullableNumber(body.oldPrice),
+          nullableNumber(body.weightLb),
+          nullableNumber(body.packageLengthIn),
+          nullableNumber(body.packageWidthIn),
+          nullableNumber(body.packageHeightIn),
+          categoryId,
+          body.linkedCategorySlug || body.lCategory || null,
+          body.image || '/placeholder.jpg',
+          body.sameDayEligible ? 1 : 0,
+          body.outOfStock ? 1 : 0,
+          body.featured ? 1 : 0,
+        ]
+      );
+    } else {
+      // Product exists - update it
+      const updates: string[] = [];
+      const values: any[] = [];
+
+      if (body.name !== undefined) {
+        updates.push('name = ?');
+        values.push(body.name);
+      }
+      if (body.slug !== undefined) {
+        updates.push('slug = ?');
+        values.push(body.slug);
+      }
+      if (body.description !== undefined) {
+        updates.push('description = ?');
+        values.push(body.description);
+      }
+      if (body.price !== undefined) {
+        updates.push('price = ?');
+        values.push(nullableNumber(body.price) ?? 0);
+      }
+      if (body.minQuantity !== undefined) {
+        updates.push('min_quantity = ?');
+        values.push(nullableNumber(body.minQuantity));
+      }
+      if (body.maxQuantity !== undefined) {
+        updates.push('max_quantity = ?');
+        values.push(nullableNumber(body.maxQuantity));
+      }
+      if (body.minWidthIn !== undefined) {
+        updates.push('min_width_in = ?');
+        values.push(nullableNumber(body.minWidthIn));
+      }
+      if (body.maxWidthIn !== undefined) {
+        updates.push('max_width_in = ?');
+        values.push(nullableNumber(body.maxWidthIn));
+      }
+      if (body.minHeightIn !== undefined) {
+        updates.push('min_height_in = ?');
+        values.push(nullableNumber(body.minHeightIn));
+      }
+      if (body.maxHeightIn !== undefined) {
+        updates.push('max_height_in = ?');
+        values.push(nullableNumber(body.maxHeightIn));
+      }
+      if (body.pricePerSqInch !== undefined) {
+        updates.push('price_per_sq_inch = ?');
+        values.push(nullableNumber(body.pricePerSqInch));
+      }
+      if (body.mailboxPricePerMonth !== undefined) {
+        updates.push('mailbox_price_per_month = ?');
+        values.push(nullableNumber(body.mailboxPricePerMonth));
+      }
+      if (body.oldPrice !== undefined) {
+        updates.push('old_price = ?');
+        values.push(nullableNumber(body.oldPrice));
+      }
+      if (body.weightLb !== undefined) {
+        updates.push('weight_lb = ?');
+        values.push(nullableNumber(body.weightLb));
+      }
+      if (body.packageLengthIn !== undefined) {
+        updates.push('package_length_in = ?');
+        values.push(nullableNumber(body.packageLengthIn));
+      }
+      if (body.packageWidthIn !== undefined) {
+        updates.push('package_width_in = ?');
+        values.push(nullableNumber(body.packageWidthIn));
+      }
+      if (body.packageHeightIn !== undefined) {
+        updates.push('package_height_in = ?');
+        values.push(nullableNumber(body.packageHeightIn));
+      }
+      if (body.packageType !== undefined) {
+        updates.push('package_type = ?');
+        values.push(String(body.packageType || 'YOUR_PACKAGING'));
+      }
+      if (categoryId !== null) {
+        updates.push('category_id = ?');
+        values.push(categoryId);
+      }
+      if (body.linkedCategorySlug !== undefined || body.lCategory !== undefined) {
+        updates.push('l_category = ?');
+        values.push(body.linkedCategorySlug || body.lCategory || null);
+      }
+      if (body.image !== undefined) {
+        updates.push('image = ?');
+        values.push(body.image);
+      }
+      if (body.sameDayEligible !== undefined) {
+        updates.push('same_day_eligible = ?');
+        values.push(body.sameDayEligible ? 1 : 0);
+      }
+      if (body.outOfStock !== undefined) {
+        updates.push('out_of_stock = ?');
+        values.push(body.outOfStock ? 1 : 0);
+      }
+      if (body.featured !== undefined) {
+        updates.push('featured = ?');
+        values.push(body.featured ? 1 : 0);
+      }
+      if (body.enabled !== undefined) {
+        updates.push('enabled = ?');
+        values.push(body.enabled ? 1 : 0);
+      }
+
+      if (updates.length > 0) {
+        updates.push('updated_at = CURRENT_TIMESTAMP');
+        values.push(id);
+        await query(
+          `UPDATE products SET ${updates.join(', ')} WHERE id = ?`,
+          values
+        );
+      }
+    }
+
+    // Update features if provided
+    if (body.features !== undefined && Array.isArray(body.features)) {
+      await query('DELETE FROM product_features WHERE product_id = ?', [id]);
+      if (body.features.length > 0) {
+        const featureValues = body.features.map((f: string, idx: number) => [
+          id,
+          f.trim(),
+          idx,
+        ]);
+        await query(
+          'INSERT INTO product_features (product_id, feature, display_order) VALUES ?',
+          [featureValues]
+        );
+      }
+    }
+
+    // Update gallery images if provided
+    if (body.galleryImages !== undefined && Array.isArray(body.galleryImages)) {
+      await query('DELETE FROM product_images WHERE product_id = ?', [id]);
+      if (body.galleryImages.length > 0) {
+        const values = body.galleryImages
+          .map((url: string, idx: number) => [id, url, idx])
+          .filter(([_id, url]: [string, string, number]) => url && String(url).trim().length > 0);
+        if (values.length > 0) {
+          await query(
+            'INSERT INTO product_images (product_id, image_url, display_order) VALUES ?',
+            [values]
+          );
+        }
+      }
+    }
+
+    // Update videos if provided (only if table exists)
+    if (body.videos !== undefined && Array.isArray(body.videos)) {
+      const includeVideos = await hasProductVideosTable();
+      if (includeVideos) {
+        await query('DELETE FROM product_videos WHERE product_id = ?', [id]);
+        if (body.videos.length > 0) {
+          const values = body.videos
+            .map((video: any, idx: number) => [
+              id,
+              video?.url,
+              video?.title || `Video ${idx + 1}`,
+              video?.description || '',
+              idx,
+            ])
+            .filter(([_id, url]: [string, string, string, string, number]) =>
+              url && String(url).trim().length > 0
+            );
+          if (values.length > 0) {
+            await query(
+              'INSERT INTO product_videos (product_id, video_url, video_title, video_description, display_order) VALUES ?',
+              [values]
+            );
+          }
+        }
+      }
+    }
+
+    // Update coupon codes if provided
+    if (body.couponCodes !== undefined && Array.isArray(body.couponCodes)) {
+      await query('DELETE FROM product_coupon_codes WHERE product_id = ?', [id]);
+      const values = body.couponCodes
+        .map((c: any) => [
+          id,
+          String(c.code || '').trim().toUpperCase(),
+          Number(c.discountPercent || 0),
+          c.isActive === false ? 0 : 1,
+        ])
+        .filter((x: any[]) => x[1].length > 0 && Number.isFinite(x[2]) && x[2] > 0);
+      if (values.length > 0) {
+        await query(
+          'INSERT INTO product_coupon_codes (product_id, coupon_code, discount_percent, is_active) VALUES ?',
+          [values],
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true, id });
+  } catch (error: any) {
+    console.error('Error updating product:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to update product' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = await params;
+    await query('DELETE FROM products WHERE id = ?', [id]);
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting product:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete product' },
+      { status: 500 }
+    );
+  }
+}

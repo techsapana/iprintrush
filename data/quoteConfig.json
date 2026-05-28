@@ -1,0 +1,201 @@
+{
+  "decorations": [
+    {
+      "id": "7d87d5fc-61db-4998-9d2a-58c033a4432c",
+      "name": "DTF Printed",
+      "priceModifier": 0,
+      "enabled": true
+    },
+    {
+      "id": "03ecf6a3-5119-4c02-b774-58fddf64a01e",
+      "name": "Screen Printed",
+      "priceModifier": 0,
+      "enabled": true
+    },
+    {
+      "id": "d9c32001-4b57-42e4-ae12-dd3fb1e56c95",
+      "name": "Embroidery",
+      "priceModifier": 5,
+      "enabled": true
+    }
+  ],
+  "colors": [
+    {
+      "id": "91869508-66b2-464d-8175-fe27c9d45ec3",
+      "name": "White",
+      "hex": "#ffffff",
+      "enabled": true
+    },
+    {
+      "id": "ca708540-2b60-431c-b6d9-e5bea9714658",
+      "name": "Black",
+      "hex": "#000000",
+      "enabled": true
+    },
+    {
+      "id": "84fa2312-b21d-4ee2-9b6b-b4cd77043f3e",
+      "name": "Red",
+      "hex": "#ef4444",
+      "enabled": true
+    },
+    {
+      "id": "c7a91461-2799-4211-ab52-25844c4b681d",
+      "name": "Royal Blue",
+      "hex": "#2563eb",
+      "enabled": true
+    }
+  ],
+  "quantityTiers": [
+    {
+      "id": "54bc185d-90e0-4483-8068-41cc4f688eb5",
+      "minQty": 1,
+      "maxQty": 5,
+      "unitPrice": 25,
+      "enabled": true
+    },
+    {
+      "id": "24949dd8-1231-497d-ba3f-b700c4a15762",
+      "minQty": 6,
+      "maxQty": 11,
+      "unitPrice": 20,
+      "enabled": true
+    },
+    {
+      "id": "f0dfeb94-80c5-41d3-bad6-3363d2ea9d06",
+      "minQty": 12,
+      "maxQty": 23,
+      "unitPrice": 18,
+      "enabled": true
+    },
+    {
+      "id": "c6a076f2-f8fa-4392-a9f1-582c466aa932",
+      "minQty": 24,
+      "maxQty": 35,
+      "unitPrice": 16,
+      "enabled": true
+    },
+    {
+      "id": "eb3c7d84-debe-4c35-ac3a-5b91a31c2fd4",
+      "minQty": 36,
+      "maxQty": 71,
+      "unitPrice": 14,
+      "enabled": true
+    }
+  ],
+  "sizes": [
+    {
+      "id": "bf87eea8-e3b1-42fb-a1b6-089ef756d0a0",
+      "label": "S",
+      "baseEnabled": true,
+      "priceAddon": 0
+    },
+    {
+      "id": "85dc1209-fd5f-4f85-b786-10daf5c68a87",
+      "label": "M",
+      "baseEnabled": true,
+      "priceAddon": 0
+    },
+    {
+      "id": "2a5fa9e8-c8b7-4ddc-8f92-5ccbaa5e5991",
+      "label": "L",
+      "baseEnabled": true,
+      "priceAddon": 0
+    },
+    {
+      "id": "f0a6c5e1-486b-49b8-9acb-ff19d7090091",
+      "label": "XL",
+      "baseEnabled": true,
+      "priceAddon": 0
+    },
+    {
+      "id": "3d79f51c-0429-4a59-b0a3-aee95e1333d7",
+      "label": "2XL",
+      "baseEnabled": true,
+      "priceAddon": 3
+    },
+    {
+      "id": "8045b971-18ef-4f4f-91b1-d0ad4fa25cd6",
+      "label": "3XL",
+      "baseEnabled": true,
+      "priceAddon": 5
+    },
+    {
+      "id": "b2d4b7df-c603-48a8-a15e-12cc187c02ce",
+      "label": "4XL",
+      "baseEnabled": true,
+      "priceAddon": 5
+    }
+  ],
+  "printLocations": [
+    {
+      "id": "78cb3efd-a887-40e1-bed6-a42fb5d6550e",
+      "name": "Front",
+      "priceModifier": 5,
+      "enabled": true
+    },
+    {
+      "id": "5ee03c39-2743-4340-8adc-8cbcd5bc1678",
+      "name": "Back",
+      "priceModifier": 5,
+      "enabled": true
+    },
+    {
+      "id": "2cf717e4-6416-4cd4-bcb5-4977c173ab5c",
+      "name": "Sleeve",
+      "priceModifier": 5,
+      "enabled": true
+    }
+  ],
+  "turnarounds": [
+    {
+      "id": "0cf968c7-e528-4a47-9f54-4d538edb1b01",
+      "name": "2 Hours (Rush)",
+      "priceModifier": 25,
+      "enabled": true
+    },
+    {
+      "id": "6641e1c5-3202-4d03-9fd8-174eb01362eb",
+      "name": "Same Day",
+      "priceModifier": 0,
+      "enabled": true
+    },
+    {
+      "id": "f7818a36-18dd-4acd-b87d-c706f38e84fc",
+      "name": "Next Day",
+      "priceModifier": 0,
+      "enabled": true
+    },
+    {
+      "id": "3a01110d-9392-4906-a9b8-ce6d907b01c3",
+      "name": "Standard",
+      "priceModifier": 0,
+      "enabled": true
+    }
+  ],
+  "designerHelp": [
+    {
+      "id": "e9520aab-655f-449e-8b26-3e08d1b73799",
+      "name": "Basic Help",
+      "priceModifier": 0,
+      "enabled": true
+    },
+    {
+      "id": "030ce0aa-3823-4387-a372-a8f5b7a86687",
+      "name": "Standard Help",
+      "priceModifier": 10,
+      "enabled": true
+    },
+    {
+      "id": "de060a5c-cfba-4622-a46d-9626c54dae6c",
+      "name": "Premium Help",
+      "priceModifier": 25,
+      "enabled": true
+    }
+  ],
+  "shipping": {
+    "enabled": true,
+    "defaultFlatRate": 15,
+    "rules": []
+  },
+  "productSettings": []
+}
