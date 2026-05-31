@@ -38,7 +38,7 @@ export default function AdminDashboardPage() {
       if (!adminUser) {
         router.push('/admin/login');
       }
-    }, 500); // Give time for auth check to complete
+    }, 500);
     return () => clearTimeout(timer);
   }, [adminUser, router]);
 
@@ -71,7 +71,6 @@ export default function AdminDashboardPage() {
             : [{ question: '', answer: '' }],
         );
       } catch {
-        // no-op
       }
     };
     loadAnnouncement();
@@ -135,7 +134,6 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* Header */}
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
@@ -152,7 +150,6 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-gray-500 text-sm font-medium mb-2">Total Products</h3>
@@ -170,7 +167,6 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Site Announcement Settings */}
         <div className="mb-8 bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-2">Announcement Bar</h2>
           <p className="text-sm text-gray-600 mb-4">
@@ -483,9 +479,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Management Sections */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Products Section */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-[#29b6f6] text-white p-6">
               <h2 className="text-xl font-bold">Products Management</h2>
@@ -511,7 +505,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Categories Section */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-purple-600 text-white p-6">
               <h2 className="text-xl font-bold">Categories Management</h2>
@@ -543,7 +536,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Hero same-day + Navbar order */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-sky-700 text-white p-6">
               <h2 className="text-xl font-bold">Homepage hero — Same day strip</h2>
@@ -596,7 +588,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Orders Section */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-emerald-600 text-white p-6">
               <h2 className="text-xl font-bold">Orders</h2>
@@ -614,7 +605,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Quote Configuration Section */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-orange-600 text-white p-6">
               <h2 className="text-xl font-bold">Quote Configuration</h2>
@@ -644,7 +634,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Users Section */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-cyan-600 text-white p-6">
               <h2 className="text-xl font-bold">Customer Users</h2>
@@ -673,7 +662,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Business Categories Section */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-indigo-600 text-white p-6">
               <h2 className="text-xl font-bold">Business Categories</h2>
@@ -691,7 +679,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Portfolio Gallery Section */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-fuchsia-600 text-white p-6">
               <h2 className="text-xl font-bold">Portfolio Gallery</h2>
@@ -717,7 +704,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Testimonials Section */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-rose-600 text-white p-6">
               <h2 className="text-xl font-bold">Testimonials Management</h2>
@@ -735,7 +721,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Recent Products */}
           <div className="mt-8 bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-gray-800 text-white p-6">
               <h2 className="text-xl font-bold">Recent Products</h2>
@@ -782,6 +767,6 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 }
