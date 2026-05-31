@@ -21,12 +21,13 @@ export function DynamicQuoteBuilder({
   prefillQuote = null,
   onQuoteReady,
 }) {
-  const [loading, setLoading] = useState(true);
-  const [schema, setSchema] = useState(null);
-  const [pools, setPools] = useState([]);
-  const [shipping, setShipping] = useState(null);
-  const [dimensionConfig, setDimensionConfig] = useState(null);
-  const [step, setStep] = useState(0);
+   const [loading, setLoading] = useState(true);
+   const [schema, setSchema] = useState(null);
+   const [pools, setPools] = useState([]);
+   const [shipping, setShipping] = useState(null);
+   const [dimensionConfig, setDimensionConfig] = useState(null);
+   const [allowCustomDimensions, setAllowCustomDimensions] = useState(false);
+   const [step, setStep] = useState(0);
   const customizationSectionRef = useRef(null);
   const skipStepScrollRef = useRef(true);
   const [error, setError] = useState('');
@@ -86,7 +87,8 @@ export function DynamicQuoteBuilder({
         setSchema(json.schema);
         setPools(json.pools || []);
         setShipping(json.shipping || { enabled: true, defaultFlatRate: 0, rules: [] });
-        setDimensionConfig(json.dimensionPricing || null);
+         setDimensionConfig(json.dimensionPricing || null);
+         setAllowCustomDimensions(json.allowCustomDimensions ?? false);
 
         // Initialize selections with first option from each pool
         const initial = {};
@@ -128,6 +130,7 @@ export function DynamicQuoteBuilder({
         if (prefillQuote?.summary) {
           setQuoteSummary(prefillQuote.summary);
           setHasCalculated(true);
+          setStep((json.schema?.groups || []).length + 2);
         }
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to load configuration');
@@ -452,7 +455,7 @@ export function DynamicQuoteBuilder({
         }
 
         customizationsDisplay.Delivery =
-          deliveryMethod === 'pickup' ? 'Store Pickup' : 'Shipping';
+          deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping';
         customizationsDisplay.Artwork =
           artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later';
         onQuoteReady({
@@ -591,16 +594,18 @@ export function DynamicQuoteBuilder({
         );
     }
 
-    if (!shouldShowInlineDimensions) return content;
-    return (
-      <div className="space-y-4">
-        {content}
-        <div>
-          <div className="text-sm font-semibold text-gray-900 mb-2">Enter custom width and height</div>
-          {renderDimensionFields()}
-        </div>
-      </div>
-    );
+     if (!shouldShowInlineDimensions) return content;
+     // Only show custom dimensions if allowed
+     if (!allowCustomDimensions) return content;
+     return (
+       <div className="space-y-4">
+         {content}
+         <div>
+           <div className="text-sm font-semibold text-gray-900 mb-2">Enter custom width and height</div>
+           {renderDimensionFields()}
+         </div>
+       </div>
+     );
   };
 
   const renderQuantityStep = (group, pool, value) => {
@@ -762,14 +767,14 @@ export function DynamicQuoteBuilder({
   };
 
   const renderDimensionStep = (group, pool, value) => {
-    return (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">{pool.name || group.label}</h3>
-        <p className="text-sm text-gray-600">{pool.description || 'Enter your custom dimensions.'}</p>
-        
-        {renderDimensionFields()}
-      </div>
-    );
+     return (
+       <div className="space-y-4">
+         <h3 className="text-lg font-semibold text-gray-900">{pool.name || group.label}</h3>
+         <p className="text-sm text-gray-600">{pool.description || 'Enter your custom dimensions.'}</p>
+         
+         {allowCustomDimensions && renderDimensionFields()}
+       </div>
+     );
   };
 
   const renderDimensionFields = () => {
@@ -922,7 +927,7 @@ export function DynamicQuoteBuilder({
               : 'border-gray-200 hover:border-[#29b6f6]/60'
           }`}
         >
-          <div className="font-semibold text-gray-900">Store Pickup</div>
+          <div className="font-semibold text-gray-900">Store Pickup FREE</div>
           <div className="text-sm text-gray-600">Pickup at our Canadian store location.</div>
         </button>
         <button
@@ -982,7 +987,7 @@ export function DynamicQuoteBuilder({
         selectionLines.push(`- Dimensions: ${w}" × ${h}"`);
       }
     }
-    selectionLines.push(`- Delivery: ${deliveryMethod === 'pickup' ? 'Store Pickup' : 'Shipping'}`);
+    selectionLines.push(`- Delivery: ${deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping'}`);
     selectionLines.push(
       `- Artwork: ${artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—'}`,
     );

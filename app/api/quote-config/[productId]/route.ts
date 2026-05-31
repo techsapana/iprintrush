@@ -4,15 +4,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/app/lib/db';
 
 async function getProductWithCategory(productId: string) {
-  const product = await queryOne(
-    `SELECT p.*, c.id as cat_id, c.customization_schema
-     FROM products p
-     LEFT JOIN categories c ON p.category_id = c.id
-     WHERE p.id = ?`,
-    [productId]
-  );
-  return product;
-}
+   const product = await queryOne(
+     `SELECT p.*, c.id as cat_id, c.customization_schema, p.allow_custom_dimensions
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.id = ?`,
+     [productId]
+   );
+   return product;
+ }
 
 async function getFullConfig() {
   // Fetch all quote configuration from database
@@ -175,15 +175,16 @@ export async function GET(
             }
           : null;
 
-      return NextResponse.json({
-        mode: 'print_product',
-        schema: { mode: 'print_product', groups: groupsForClient },
-        pools,
-        shipping,
-        dimensionPricing,
-        enabled,
-        disabledPoolIds,
-      });
+       return NextResponse.json({
+         mode: 'print_product',
+         schema: { mode: 'print_product', groups: groupsForClient },
+         pools,
+         shipping,
+         dimensionPricing,
+         enabled,
+         disabledPoolIds,
+         allowCustomDimensions: Boolean(productWithCat?.allow_custom_dimensions),
+       });
     }
 
     // Apparel mode: existing flow
@@ -296,30 +297,31 @@ export async function GET(
       });
     }
 
-    const settings = {
-      productId,
-      enabled: Boolean(productSettings.enabled),
-      useCustomQuantityTiers: Boolean(productSettings.use_custom_quantity_tiers),
-      decorationOptionIds: (decorationOptions as any[]).map((r: any) => r.id),
-      colorOptionIds: (colorIds as any[]).map((r: any) => r.id),
-      sizeOptionIds: (sizeOptions as any[]).map((r: any) => r.id),
-      printLocationOptionIds: (printLocationOptions as any[]).map((r: any) => r.id),
-      turnaroundOptionIds: (turnaroundOptions as any[]).map((r: any) => r.id),
-      designerHelpOptionIds: (designerHelpOptions as any[]).map((r: any) => r.id),
-      quantityTierIds: config.quantityTiers
-        .filter((t) => t.enabled)
-        .map((t) => t.id.toString()),
-      customPrices,
-      customQuantityTiers: (customQuantityTiers as any[]).map((t: any) => ({
-        id: t.id.toString(),
-        minQty: t.min_qty,
-        maxQty: t.max_qty,
-        unitPrice: parseFloat(t.unit_price),
-        discountPercent:
-          t.discount_percent != null ? parseFloat(t.discount_percent) : 0,
-        enabled: Boolean(t.enabled),
-      })),
-    };
+     const settings = {
+       productId,
+       enabled: Boolean(productSettings.enabled),
+       useCustomQuantityTiers: Boolean(productSettings.use_custom_quantity_tiers),
+       decorationOptionIds: (decorationOptions as any[]).map((r: any) => r.id),
+       colorOptionIds: (colorIds as any[]).map((r: any) => r.id),
+       sizeOptionIds: (sizeOptions as any[]).map((r: any) => r.id),
+       printLocationOptionIds: (printLocationOptions as any[]).map((r: any) => r.id),
+       turnaroundOptionIds: (turnaroundOptions as any[]).map((r: any) => r.id),
+       designerHelpOptionIds: (designerHelpOptions as any[]).map((r: any) => r.id),
+       quantityTierIds: config.quantityTiers
+         .filter((t) => t.enabled)
+         .map((t) => t.id.toString()),
+       customPrices,
+       customQuantityTiers: (customQuantityTiers as any[]).map((t: any) => ({
+         id: t.id.toString(),
+         minQty: t.min_qty,
+         maxQty: t.max_qty,
+         unitPrice: parseFloat(t.unit_price),
+         discountPercent:
+           t.discount_percent != null ? parseFloat(t.discount_percent) : 0,
+         enabled: Boolean(t.enabled),
+       })),
+       allowCustomDimensions: Boolean(productWithCat?.allow_custom_dimensions),
+     };
 
     return NextResponse.json({
       config,

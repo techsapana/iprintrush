@@ -118,6 +118,7 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
     linkedCategorySlug: initialProduct?.linkedCategorySlug || '',
     sameDayEligible: initialProduct?.sameDayEligible ?? false,
     outOfStock: initialProduct?.outOfStock ?? false,
+    allow_custom_dimensions: initialProduct?.allowCustomDimensions ?? false,
     image: _pendingImage || initialProduct?.image || '/placeholder.jpg',
     galleryImages: _pendingGallery || initialProduct?.galleryImages || [],
     videos: _pendingVideos || initialProduct?.videos || [],
@@ -192,6 +193,7 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
         linkedCategorySlug: snap.linkedCategorySlug || '',
         sameDayEligible: snap.sameDayEligible ?? false,
         outOfStock: snap.outOfStock ?? false,
+        allow_custom_dimensions: snap.allowCustomDimensions ?? false,
         image: snap.image || '/placeholder.jpg',
         galleryImages: snap.galleryImages || [],
         videos: snap.videos || [],
@@ -248,6 +250,7 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
       linkedCategorySlug: initialProduct.linkedCategorySlug ?? current.linkedCategorySlug,
       sameDayEligible: initialProduct.sameDayEligible ?? current.sameDayEligible,
       outOfStock: initialProduct.outOfStock ?? current.outOfStock,
+      allow_custom_dimensions: initialProduct.allowCustomDimensions ?? current.allow_custom_dimensions,
       features: Array.isArray(initialProduct.features)
         ? initialProduct.features.join(', ')
         : (initialProduct.features ?? current.features),
@@ -1347,9 +1350,26 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
                       {cat}
                     </option>
                   ))}
-                </select>
-              </div>
-              {(() => {
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      name="allow_custom_dimensions"
+                      checked={formData.allow_custom_dimensions === true}
+                      onChange={handleChange}
+                      className="rounded"
+                    />
+                    <span className="text-sm text-gray-700">Enable Custom Width &amp; Height</span>
+                  </label>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Allow buyers to enter custom width and height values for this product.
+                  </p>
+                </div>
+
+                {(() => {
                 const selectedCategoryObj = categories.find(
                   (c) =>
                     c.name === formData.category ||

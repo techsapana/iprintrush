@@ -13,12 +13,16 @@ export function CartProvider({ children }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(CART_STORAGE_KEY);
+      let parsed = [];
       if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setItems(parsed);
+        parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          parsed = [];
+        }
       }
+      setItems(parsed);
     } catch {
-      // ignore corrupt storage
+      setItems([]);
     }
     setCartHydrated(true);
   }, []);

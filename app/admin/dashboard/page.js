@@ -716,54 +716,72 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Recent Products */}
-        <div className="mt-8 bg-white rounded-lg shadow overflow-hidden">
-          <div className="bg-gray-800 text-white p-6">
-            <h2 className="text-xl font-bold">Recent Products</h2>
+          {/* Testimonials Section */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-rose-600 text-white p-6">
+              <h2 className="text-xl font-bold">Testimonials Management</h2>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                Manage customer testimonials shown on the homepage. Add, edit, or delete testimonials.
+              </p>
+              <Link
+                href="/admin/testimonials"
+                className="block w-full bg-rose-600 text-white text-center py-2 rounded-lg hover:bg-rose-700 transition font-medium"
+              >
+                Manage Testimonials
+              </Link>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Same-day cat.</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {products.slice(0, 5).map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{product.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">${(product.price || 0).toFixed(2)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{product.category}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        isSameDayPrintingProduct(product)
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {isSameDayPrintingProduct(product) ? 'Yes' : 'No'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <Link
-                        href={`/admin/products/${product.id}/edit`}
-                        className="text-[#29b6f6] hover:text-[#1a7ba3] font-medium"
-                      >
-                        Edit
-                      </Link>
-                    </td>
+
+          {/* Recent Products */}
+          <div className="mt-8 bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-gray-800 text-white p-6">
+              <h2 className="text-xl font-bold">Recent Products</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Price</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Category</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Same-day cat.</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y">
+                  {products.slice(0, 5).map((product) => (
+                    <tr key={product.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{product.name}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">${(product.price || 0).toFixed(2)}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{product.category}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          isSameDayPrintingProduct(product)
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {isSameDayPrintingProduct(product) ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <Link
+                          href={`/admin/products/${product.id}/edit`}
+                          className="text-[#29b6f6] hover:text-[#1a7ba3] font-medium"
+                        >
+                          Edit
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
 }

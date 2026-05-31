@@ -292,7 +292,7 @@ export function QuoteBuilder({
                 .filter((s) => (newQuantities[s.id] || 0) > 0)
                 .map((s) => `${s.label}×${newQuantities[s.id]}`)
                 .join(', '),
-              Delivery: deliveryMethod === 'pickup' ? 'Store Pickup' : 'Shipping',
+              Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping',
               ...(isCustomApparels
                 ? {
                     Fabric:
@@ -427,7 +427,7 @@ export function QuoteBuilder({
                 .filter((s) => (quantities[s.id] || 0) > 0)
                 .map((s) => `${s.label}×${quantities[s.id]}`)
                 .join(', '),
-              Delivery: deliveryMethod === 'pickup' ? 'Store Pickup' : 'Shipping',
+              Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping',
               ...(isCustomApparels
                 ? {
                     Fabric:
@@ -851,7 +851,7 @@ export function QuoteBuilder({
                 : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
             }`}
           >
-            <div className="font-semibold text-gray-900">Store Pickup</div>
+            <div className="font-semibold text-gray-900">Store Pickup FREE</div>
             <div className="text-sm text-gray-600">Pickup at our Canadian store location.</div>
           </button>
           <button
@@ -897,7 +897,7 @@ export function QuoteBuilder({
               .filter(Boolean)
               .join(', ')
       }`,
-      `- Delivery: ${deliveryMethod === 'pickup' ? 'Store Pickup' : 'Shipping'}`,
+      `- Delivery: ${deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping'}`,
       '',
       'Size Breakdown:',
       ...availableSizes

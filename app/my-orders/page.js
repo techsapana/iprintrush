@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { saveQuotePrefill } from '../lib/quotePrefill';
+import { useCart } from '../hooks/useCart';
 
 export default function MyOrdersPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
+  const { addToCart } = useCart();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -93,24 +94,32 @@ export default function MyOrdersPage() {
 
   const handleReorder = (item) => {
     if (!item?.productId) return;
+
     const customization = item.customization || {};
     const payload = customization.quotePayload;
+
     if (!payload) {
       window.alert('This item has no saved customization to reorder.');
       return;
     }
-    saveQuotePrefill({
-      productId: item.productId,
-      payload,
-      summary: customization.quoteSummary,
-      customizationsDisplay: customization.customizationsDisplay || {},
-    });
-    const slug = item.productSlug || item.slug;
-    if (slug) {
-      router.push(`/products/${encodeURIComponent(slug)}?edit=1`);
-      return;
-    }
-    router.push(`/products?reorder=${encodeURIComponent(item.productId)}`);
+
+    const product = {
+      id: item.productId,
+      name: item.name,
+      image: item.image,
+      price: 0
+    };
+
+    const options = {
+      quantity: item.quantity || 1,
+      quotePayload: payload,
+      quoteSummary: customization.quoteSummary,
+      customizationsDisplay: customization.customizationsDisplay || {}
+    };
+
+    addToCart(product, options);
+
+    router.push('/cart');
   };
 
   const handleSaveNote = async (itemId) => {

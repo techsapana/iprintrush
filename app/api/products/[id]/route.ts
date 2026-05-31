@@ -45,6 +45,13 @@ async function ensureOutOfStockColumn() {
   }
 }
 
+async function ensureAllowCustomDimensionsColumn() {
+  const col: any = await queryOne("SHOW COLUMNS FROM products LIKE 'allow_custom_dimensions'");
+  if (!col) {
+    await query('ALTER TABLE products ADD COLUMN allow_custom_dimensions BOOLEAN NOT NULL DEFAULT FALSE AFTER featured');
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } | Promise<{ id: string }> }
@@ -52,25 +59,27 @@ export async function GET(
   try {
     await ensureLCategoryColumn();
     await ensureOutOfStockColumn();
+    await ensureAllowCustomDimensionsColumn();
     const resolvedParams = await params;
     const id = resolvedParams.id;
 
     const includeVideos = await hasProductVideosTable();
 
-    // Get product with category and features
-    const product = await queryOne(
-      `SELECT 
-        p.*,
-        c.name as category_name,
-        c.slug as category_slug,
-        GROUP_CONCAT(DISTINCT pf.feature ORDER BY pf.display_order SEPARATOR ',') as features
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN product_features pf ON p.id = pf.product_id
-      WHERE p.id = ? OR p.slug = ?
-      GROUP BY p.id`,
-      [id, id]
-    );
+     // Get product with category and features
+     const product = await queryOne(
+       `SELECT 
+         p.*,
+         c.name as category_name,
+         c.slug as category_slug,
+         GROUP_CONCAT(DISTINCT pf.feature ORDER BY pf.display_order SEPARATOR ',') as features,
+         p.allow_custom_dimensions
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       LEFT JOIN product_features pf ON p.id = pf.product_id
+       WHERE p.id = ? OR p.slug = ?
+       GROUP BY p.id`,
+       [id, id]
+     );
 
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
@@ -106,53 +115,54 @@ export async function GET(
         )) as any[])
       : ([] as any[]);
 
-    const transformed: any = {
-      id: product.id,
-      name: product.name,
-      slug: product.slug,
-      description: product.description,
-      price: parseFloat(product.price),
-      minQuantity: product.min_quantity != null ? Number(product.min_quantity) : null,
-      maxQuantity: product.max_quantity != null ? Number(product.max_quantity) : null,
-      minWidthIn: product.min_width_in != null ? Number(product.min_width_in) : null,
-      maxWidthIn: product.max_width_in != null ? Number(product.max_width_in) : null,
-      minHeightIn: product.min_height_in != null ? Number(product.min_height_in) : null,
-      maxHeightIn: product.max_height_in != null ? Number(product.max_height_in) : null,
-      pricePerSqInch: product.price_per_sq_inch != null ? Number(product.price_per_sq_inch) : null,
-      mailboxPricePerMonth:
-        product.mailbox_price_per_month != null ? Number(product.mailbox_price_per_month) : null,
-      oldPrice: product.old_price != null ? parseFloat(product.old_price) : null,
-      weightLb: product.weight_lb != null ? Number(product.weight_lb) : null,
-      packageLengthIn: product.package_length_in != null ? Number(product.package_length_in) : null,
-      packageWidthIn: product.package_width_in != null ? Number(product.package_width_in) : null,
-      packageHeightIn: product.package_height_in != null ? Number(product.package_height_in) : null,
-      packageType: product.package_type || 'YOUR_PACKAGING',
-      category: product.category_name || product.category_id,
-      categoryId: product.category_id,
-      linkedCategorySlug: product.l_category || null,
-      categorySlug: product.category_slug,
-      image: product.image || '/placeholder.jpg',
-      sameDayEligible: Boolean(product.same_day_eligible),
-      outOfStock: Boolean(product.out_of_stock),
-      enabled: Boolean(product.enabled),
-      featured: Boolean(product.featured),
-      createdAt: product.created_at || null,
-      features: product.features ? product.features.split(',') : [],
-      sizes: sizes.map((s: any) => s.label),
-      galleryImages: Array.isArray(gallery)
-        ? gallery.map((g: any) => g.image_url).filter((url: string) => url && url.trim().length > 0)
-        : [],
-      ...(includeVideos
-        ? {
-            videos: Array.isArray(videosRaw)
-              ? (videosRaw
-                  .map(normalizeVideoRow)
-                  .filter(Boolean) as Array<{ url: string; title: string; description: string }>)
-              : [],
-          }
-        : {}),
-      couponCodes: [],
-    };
+     const transformed: any = {
+       id: product.id,
+       name: product.name,
+       slug: product.slug,
+       description: product.description,
+       price: parseFloat(product.price),
+       minQuantity: product.min_quantity != null ? Number(product.min_quantity) : null,
+       maxQuantity: product.max_quantity != null ? Number(product.max_quantity) : null,
+       minWidthIn: product.min_width_in != null ? Number(product.min_width_in) : null,
+       maxWidthIn: product.max_width_in != null ? Number(product.max_width_in) : null,
+       minHeightIn: product.min_height_in != null ? Number(product.min_height_in) : null,
+       maxHeightIn: product.max_height_in != null ? Number(product.max_height_in) : null,
+       pricePerSqInch: product.price_per_sq_inch != null ? Number(product.price_per_sq_inch) : null,
+       mailboxPricePerMonth:
+         product.mailbox_price_per_month != null ? Number(product.mailbox_price_per_month) : null,
+       oldPrice: product.old_price != null ? parseFloat(product.old_price) : null,
+       weightLb: product.weight_lb != null ? Number(product.weight_lb) : null,
+       packageLengthIn: product.package_length_in != null ? Number(product.package_length_in) : null,
+       packageWidthIn: product.package_width_in != null ? Number(product.package_width_in) : null,
+       packageHeightIn: product.package_height_in != null ? Number(product.package_height_in) : null,
+       packageType: product.package_type || 'YOUR_PACKAGING',
+       category: product.category_name || product.category_id,
+       categoryId: product.category_id,
+       linkedCategorySlug: product.l_category || null,
+       categorySlug: product.category_slug,
+       image: product.image || '/placeholder.jpg',
+       sameDayEligible: Boolean(product.same_day_eligible),
+       outOfStock: Boolean(product.out_of_stock),
+       enabled: Boolean(product.enabled),
+       featured: Boolean(product.featured),
+       allowCustomDimensions: Boolean(product.allow_custom_dimensions),
+       createdAt: product.created_at || null,
+       features: product.features ? product.features.split(',') : [],
+       sizes: sizes.map((s: any) => s.label),
+       galleryImages: Array.isArray(gallery)
+         ? gallery.map((g: any) => g.image_url).filter((url: string) => url && url.trim().length > 0)
+         : [],
+       ...(includeVideos
+         ? {
+             videos: Array.isArray(videosRaw)
+               ? (videosRaw
+                   .map(normalizeVideoRow)
+                   .filter(Boolean) as Array<{ url: string; title: string; description: string }>)
+               : [],
+           }
+         : {}),
+       couponCodes: [],
+     };
 
     const coupons = (await query(
       'SELECT coupon_code, discount_percent, is_active FROM product_coupon_codes WHERE product_id = ? ORDER BY id',
@@ -183,6 +193,7 @@ export async function PUT(
   try {
     await ensureLCategoryColumn();
     await ensureOutOfStockColumn();
+    await ensureAllowCustomDimensionsColumn();
     const body = await request.json();
     const resolvedParams = await params;
     
@@ -209,8 +220,8 @@ export async function PUT(
       const productSlug = body.slug || body.name?.toLowerCase().replace(/\s+/g, '-') || id;
       
       await query(
-        `INSERT INTO products (id, name, slug, description, price, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, enabled)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+        `INSERT INTO products (id, name, slug, description, price, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, enabled)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
         [
           id,
           body.name || 'Untitled Product',
@@ -228,6 +239,7 @@ export async function PUT(
           body.sameDayEligible ? 1 : 0,
           body.outOfStock ? 1 : 0,
           body.featured ? 1 : 0,
+          body.allow_custom_dimensions ? 1 : 0,
         ]
       );
     } else {
@@ -327,14 +339,18 @@ export async function PUT(
         updates.push('out_of_stock = ?');
         values.push(body.outOfStock ? 1 : 0);
       }
-      if (body.featured !== undefined) {
-        updates.push('featured = ?');
-        values.push(body.featured ? 1 : 0);
-      }
-      if (body.enabled !== undefined) {
-        updates.push('enabled = ?');
-        values.push(body.enabled ? 1 : 0);
-      }
+       if (body.featured !== undefined) {
+         updates.push('featured = ?');
+         values.push(body.featured ? 1 : 0);
+       }
+       if (body.allow_custom_dimensions !== undefined) {
+         updates.push('allow_custom_dimensions = ?');
+         values.push(body.allow_custom_dimensions ? 1 : 0);
+       }
+       if (body.enabled !== undefined) {
+         updates.push('enabled = ?');
+         values.push(body.enabled ? 1 : 0);
+       }
 
       if (updates.length > 0) {
         updates.push('updated_at = CURRENT_TIMESTAMP');

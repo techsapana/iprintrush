@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useAdmin } from '../../hooks/useAdmin';
 import { useCart } from '../../hooks/useCart';
@@ -32,12 +32,14 @@ export default function ProductDetailPage({ params }) {
   const slug = resolvedParams.slug && typeof resolvedParams.slug === 'object' && 'then' in resolvedParams.slug
     ? use(resolvedParams.slug)
     : resolvedParams.slug;
-  const { getProductBySlug, products } = useAdmin();
-  const productFromContext = getProductBySlug(slug);
-  const { addToCart } = useCart();
-  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-  const router = useRouter();
-  const { isAuthenticated } = useAuth();
+   const { getProductBySlug, products } = useAdmin();
+   const productFromContext = getProductBySlug(slug);
+   const { addToCart } = useCart();
+   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+   const router = useRouter();
+   const { isAuthenticated } = useAuth();
+   const path = usePathname();
+   const searchParams = useSearchParams();
 
   const [addedToCart, setAddedToCart] = useState(false);
   const [currentQuote, setCurrentQuote] = useState(null);
@@ -254,17 +256,18 @@ export default function ProductDetailPage({ params }) {
     router.push('/checkout?mode=buyNow');
   };
 
-  const handleProceedToPayment = () => {
-    if (!canProceedToPayment) return;
-    clearBuyNowItems();
-    const entries = buildQuoteCartEntries();
-    saveBuyNowItems(buildBuyNowLines(entries));
-    if (!isAuthenticated) {
-      requireLoginForCheckout(router, '/checkout?mode=buyNow');
-      return;
-    }
-    router.push('/checkout?mode=buyNow');
-  };
+   const handleProceedToPayment = () => {
+     if (!canProceedToPayment) return;
+     clearBuyNowItems();
+     const entries = buildQuoteCartEntries();
+     saveBuyNowItems(buildBuyNowLines(entries));
+     if (!isAuthenticated) {
+       const currentUrl = path + (searchParams.toString() ? '?' + searchParams.toString() : '');
+       requireLoginForCheckout(router, currentUrl);
+       return;
+     }
+     router.push('/checkout?mode=buyNow');
+   };
 
   return (
     <div className="min-h-screen bg-white">
