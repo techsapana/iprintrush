@@ -345,6 +345,33 @@ export async function PUT(
     const body = await req.json();
     const customPrices = body.customPrices || {};
 
+    if (body.customQuantityTiers && Array.isArray(body.customQuantityTiers)) {
+      const bad = (body.customQuantityTiers as any[]).find(
+        (t) => Number(t.unitPrice || 0) > 0 && Number(t.discountPercent || 0) > 0,
+      );
+      if (bad) {
+        return NextResponse.json(
+          { error: 'Each quantity tier must use either Unit Price OR Discount %, not both.' },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (body.poolQuantityTiers && typeof body.poolQuantityTiers === 'object') {
+      for (const tiers of Object.values(body.poolQuantityTiers as Record<string, any[]>)) {
+        if (!Array.isArray(tiers)) continue;
+        const bad = tiers.find(
+          (t) => Number(t.unitPrice || 0) > 0 && Number(t.discountPercent || 0) > 0,
+        );
+        if (bad) {
+          return NextResponse.json(
+            { error: 'Each pool quantity tier must use either Unit Price OR Discount %, not both.' },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
     // Ensure product_quote_settings exists
     await query(
       `INSERT INTO product_quote_settings (product_id, enabled, use_custom_quantity_tiers, disabled_pool_ids_json)

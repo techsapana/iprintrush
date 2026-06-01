@@ -59,7 +59,7 @@ const faqs = [
     items: [
       {
         q: 'Do you offer local pickup?',
-        a: 'Yes! Same-day local pickup is available for orders placed before 2:00 PM. We\'re located at 123 Printing Lane, Dallas, TX 75201.'
+        a: 'Yes! Same-day local pickup is available for orders placed before 2:00 PM. We\'re located at 8506 Madison Ave, Fair Oaks, CA 95628.'
       },
       {
         q: 'How much does shipping cost?',

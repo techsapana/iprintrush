@@ -164,7 +164,18 @@ export default function AdminOrdersPage() {
                   .map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                      {order.orderNumber}
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={
+                            order.items?.[0]?.product?.image ||
+                            order.items?.[0]?.image ||
+                            "/placeholder.png"
+                          }
+                          alt="Product"
+                          className="w-8 h-8 rounded object-cover border"
+                        />
+                        <span>#{order.orderNumber || order.id}</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
                       {formatDate(order.createdAt)}

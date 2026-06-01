@@ -530,9 +530,16 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
   const updatePoolQuantityTier = (poolId, index, field, value) => {
     setPoolQuantityTiers((prev) => ({
       ...prev,
-      [poolId]: (prev[poolId] || []).map((tier, i) =>
-        i === index ? { ...tier, [field]: parseQuantityTierField(field, value) } : tier
-      ),
+      [poolId]: (prev[poolId] || []).map((tier, i) => {
+        if (i !== index) return tier;
+        const next = { ...tier, [field]: parseQuantityTierField(field, value) };
+        if (field === 'unitPrice') {
+          if (next.unitPrice > 0) next.discountPercent = 0;
+        } else if (field === 'discountPercent') {
+          if (next.discountPercent > 0) next.unitPrice = 0;
+        }
+        return next;
+      }),
     }));
   };
 
@@ -869,9 +876,16 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
   // Update custom tier
   const updateCustomTier = (index, field, value) => {
     setCustomQuantityTiers((prev) =>
-      prev.map((tier, i) =>
-        i === index ? { ...tier, [field]: parseQuantityTierField(field, value) } : tier,
-      ),
+      prev.map((tier, i) => {
+        if (i !== index) return tier;
+        const next = { ...tier, [field]: parseQuantityTierField(field, value) };
+        if (field === 'unitPrice') {
+          if (next.unitPrice > 0) next.discountPercent = 0;
+        } else if (field === 'discountPercent') {
+          if (next.discountPercent > 0) next.unitPrice = 0;
+        }
+        return next;
+      }),
     );
   };
 
@@ -1976,57 +1990,62 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
                       <div className="text-sm text-gray-600">
                         Configure product-specific quantity tiers for this pool.
                       </div>
+                      <p className="text-xs text-[#29b6f6]">Choose either Unit Price OR Discount %, not both.</p>
                       <div className="space-y-2">
-                        {(poolQuantityTiers[pool.id] || []).map((tier, idx) => (
-                          <div key={`${pool.id}-tier-${idx}`} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center">
-                            <input
-                              type="number"
-                              placeholder="Min Qty"
-                              value={tier.minQty ?? ''}
-                              disabled={disabledPoolIds.includes(pool.id)}
-                              onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'minQty', e.target.value)}
-                              className="px-2 py-1 text-sm border border-gray-300 rounded"
-                            />
-                            <input
-                              type="number"
-                              placeholder="Max Qty"
-                              value={tier.maxQty ?? ''}
-                              disabled={disabledPoolIds.includes(pool.id)}
-                              onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'maxQty', e.target.value)}
-                              className="px-2 py-1 text-sm border border-gray-300 rounded"
-                            />
-                            <input
-                              type="number"
-                              step="0.01"
-                              placeholder="Unit Price"
-                              value={tier.unitPrice ?? ''}
-                              disabled={disabledPoolIds.includes(pool.id)}
-                              onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'unitPrice', e.target.value)}
-                              className="px-2 py-1 text-sm border border-gray-300 rounded"
-                            />
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              max="100"
-                              placeholder="Discount %"
-                              value={tier.discountPercent ?? ''}
-                              disabled={disabledPoolIds.includes(pool.id)}
-                              onChange={(e) =>
-                                updatePoolQuantityTier(pool.id, idx, 'discountPercent', e.target.value)
-                              }
-                              className="px-2 py-1 text-sm border border-gray-300 rounded"
-                            />
-                            <button
-                              type="button"
-                              disabled={disabledPoolIds.includes(pool.id)}
-                              onClick={() => removePoolQuantityTier(pool.id, idx)}
-                              className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
-                            >
-                              Remove Tier
-                            </button>
-                          </div>
-                        ))}
+                        {(poolQuantityTiers[pool.id] || []).map((tier, idx) => {
+                          const unitPriceDisabled = tier.discountPercent > 0;
+                          const discountDisabled = tier.unitPrice > 0;
+                          return (
+                            <div key={`${pool.id}-tier-${idx}`} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center">
+                              <input
+                                type="number"
+                                placeholder="Min Qty"
+                                value={tier.minQty ?? ''}
+                                disabled={disabledPoolIds.includes(pool.id)}
+                                onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'minQty', e.target.value)}
+                                className="px-2 py-1 text-sm border border-gray-300 rounded"
+                              />
+                              <input
+                                type="number"
+                                placeholder="Max Qty"
+                                value={tier.maxQty ?? ''}
+                                disabled={disabledPoolIds.includes(pool.id)}
+                                onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'maxQty', e.target.value)}
+                                className="px-2 py-1 text-sm border border-gray-300 rounded"
+                              />
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="Unit Price"
+                                value={tier.unitPrice ?? ''}
+                                disabled={disabledPoolIds.includes(pool.id) || unitPriceDisabled}
+                                onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'unitPrice', e.target.value)}
+                                className={`px-2 py-1 text-sm border rounded ${unitPriceDisabled ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-300'}`}
+                              />
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                placeholder="Discount %"
+                                value={tier.discountPercent ?? ''}
+                                disabled={disabledPoolIds.includes(pool.id) || discountDisabled}
+                                onChange={(e) =>
+                                  updatePoolQuantityTier(pool.id, idx, 'discountPercent', e.target.value)
+                                }
+                                className={`px-2 py-1 text-sm border rounded ${discountDisabled ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-300'}`}
+                              />
+                              <button
+                                type="button"
+                                disabled={disabledPoolIds.includes(pool.id)}
+                                onClick={() => removePoolQuantityTier(pool.id, idx)}
+                                className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
+                              >
+                                Remove Tier
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                       <button
                         type="button"
@@ -2093,63 +2112,70 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
           <p className="text-xs text-gray-500 mb-4">
             Quantity tier pricing is product-specific. Configure tiers for this product only.
           </p>
+          <p className="text-xs text-[#29b6f6] mb-4">Choose either Unit Price OR Discount %, not both.</p>
           <div className="space-y-4">
             <div className="grid gap-3">
-              {customQuantityTiers.map((tier, index) => (
-                <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Min Qty</label>
-                      <input
-                        type="number"
-                        value={tier.minQty || ''}
-                        onChange={(e) => updateCustomTier(index, 'minQty', e.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded"
-                      />
+              {customQuantityTiers.map((tier, index) => {
+                const unitPriceDisabled = tier.discountPercent > 0;
+                const discountDisabled = tier.unitPrice > 0;
+                return (
+                  <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Min Qty</label>
+                        <input
+                          type="number"
+                          value={tier.minQty || ''}
+                          onChange={(e) => updateCustomTier(index, 'minQty', e.target.value)}
+                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Max Qty</label>
+                        <input
+                          type="number"
+                          value={tier.maxQty ?? ''}
+                          onChange={(e) => updateCustomTier(index, 'maxQty', e.target.value)}
+                          placeholder="∞"
+                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Unit Price ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={tier.unitPrice || ''}
+                          disabled={unitPriceDisabled}
+                          onChange={(e) => updateCustomTier(index, 'unitPrice', e.target.value)}
+                          className={`w-full px-3 py-1.5 text-sm border rounded ${unitPriceDisabled ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-300'}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Discount %</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={tier.discountPercent ?? ''}
+                          disabled={discountDisabled}
+                          onChange={(e) => updateCustomTier(index, 'discountPercent', e.target.value)}
+                          placeholder="0"
+                          className={`w-full px-3 py-1.5 text-sm border rounded ${discountDisabled ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-300'}`}
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Max Qty</label>
-                      <input
-                        type="number"
-                        value={tier.maxQty ?? ''}
-                        onChange={(e) => updateCustomTier(index, 'maxQty', e.target.value)}
-                        placeholder="∞"
-                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Unit Price ($)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={tier.unitPrice || ''}
-                        onChange={(e) => updateCustomTier(index, 'unitPrice', e.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Discount %</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={tier.discountPercent ?? ''}
-                        onChange={(e) => updateCustomTier(index, 'discountPercent', e.target.value)}
-                        placeholder="0"
-                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded"
-                      />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeCustomTier(index)}
+                      className="text-red-600 hover:text-red-800 text-sm"
+                    >
+                      Remove
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeCustomTier(index)}
-                    className="text-red-600 hover:text-red-800 text-sm"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <button
               type="button"

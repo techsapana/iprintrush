@@ -160,7 +160,7 @@ export default function TermsPage() {
             <div className="mt-4 pl-4">
               <p>Email: legal@iprintrush.com</p>
               <p>Phone: 1-800-PRINT-24</p>
-              <p>Address: 123 Printing Lane, Dallas, TX 75201</p>
+              <p>Address: 8506 Madison Ave, Fair Oaks, CA 95628</p>
             </div>
           </section>
         </div>

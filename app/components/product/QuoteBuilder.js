@@ -37,8 +37,9 @@ export function QuoteBuilder({
   const [emailTo, setEmailTo] = useState('');
   const [showTextForm, setShowTextForm] = useState(false);
   const [countryCode, setCountryCode] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const printableQuoteRef = useRef(null);
+const [phoneNumber, setPhoneNumber] = useState('');
+const [shareFeedback, setShareFeedback] = useState('');
+const printableQuoteRef = useRef(null);
 
   const [decorationId, setDecorationId] = useState(null);
   const [colorId, setColorId] = useState(null);
@@ -852,7 +853,7 @@ export function QuoteBuilder({
             }`}
           >
             <div className="font-semibold text-gray-900">Store Pickup FREE</div>
-            <div className="text-sm text-gray-600">Pickup at our Canadian store location.</div>
+            <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
           </button>
           <button
             type="button"
@@ -953,7 +954,58 @@ export function QuoteBuilder({
             <title>Quote - ${productName}</title>
             ${headHtml}
             <style>
-              body { padding: 24px; background: #fff; }
+              @page {
+                size: 8.5in 11in;
+                margin: 0.5in;
+              }
+              * {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                text-shadow: none !important;
+              }
+              body {
+                padding: 0 !important;
+                margin: 0 !important;
+                background: #fff !important;
+                color: #000 !important;
+              }
+              #printable-quote {
+                overflow: visible !important;
+                box-shadow: none !important;
+                border: none !important;
+                background: #fff !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                page-break-inside: auto;
+              }
+              #printable-quote > div {
+                break-inside: avoid;
+              }
+              #printable-quote p,
+              #printable-quote li,
+              #printable-quote span,
+              #printable-quote div {
+                orphans: 4;
+                widows: 4;
+              }
+              #printable-quote button {
+                display: none !important;
+              }
+              #printable-quote input {
+                border: none !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                -moz-appearance: textfield !important;
+                -webkit-appearance: none !important;
+                appearance: none !important;
+              }
+              #printable-quote h3,
+              #printable-quote h4 {
+                page-break-after: avoid;
+              }
             </style>
           </head>
           <body>
@@ -990,11 +1042,46 @@ export function QuoteBuilder({
       }, 350);
     };
 
+    const generateShareQuoteText = () => {
+      const shareQuoteLines = [
+        ...quoteLines,
+        '',
+        `Store Location: ${deliveryMethod === 'pickup' ? 'Fair Oaks, CA' : '—'}`,
+        '',
+        'Generated from Print & Shipping System',
+      ];
+      return shareQuoteLines.join('\n');
+    };
+
+    const handleShareQuote = async () => {
+      if (!quoteSummary) return;
+      const shareText = generateShareQuoteText();
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: 'Your Quote from Print Shop',
+            text: shareText,
+            url: typeof window !== 'undefined' ? window.location.href : '',
+          });
+        } else {
+          throw new Error('Web Share API not supported');
+        }
+      } catch {
+        try {
+          await navigator.clipboard.writeText(shareText);
+          setShareFeedback('Quote copied to clipboard');
+          setTimeout(() => setShareFeedback(''), 3000);
+        } catch {
+          setError('Unable to share quote. Please try again.');
+        }
+      }
+    };
+
     return (
       <div className="space-y-6">
         <h3 className="text-lg font-semibold text-gray-900">Step 10 – Quote Summary</h3>
 
-        <div ref={printableQuoteRef} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div ref={printableQuoteRef} id="printable-quote" className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-200 bg-gray-50 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <div className="text-sm font-semibold uppercase tracking-wide text-gray-500">
@@ -1168,12 +1255,15 @@ export function QuoteBuilder({
             <Button type="button" variant="outline" onClick={handlePrintQuote}>
               Print Quote
             </Button>
+            <Button type="button" variant="outline" onClick={handleShareQuote}>
+              {shareFeedback || 'Share Quote'}
+            </Button>
           </div>
 
           <div className="text-sm text-gray-600">
             {deliveryMethod === 'pickup' ? (
               <span>
-                <span className="font-semibold">Pickup:</span> Show store location map here.
+                <span className="font-semibold">Pickup:</span> Pickup available at 8506 Madison Ave, Fair Oaks, CA 95628
               </span>
             ) : (
               <span>
