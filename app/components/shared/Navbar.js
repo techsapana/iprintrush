@@ -231,7 +231,7 @@ export function Navbar() {
                 <img
                   src={logoImageUrl || '/logo.png'}
                   alt="iPrintRush"
-                  className="h-10 md:h-12 w-auto max-h-12 md:max-h-14 max-w-[200px] object-contain object-left hover:scale-105 transition-transform block"
+                  className="h-10 md:h-14 w-auto max-h-12 md:max-h-14 max-w-[200px] object-contain object-left hover:scale-105 transition-transform block"
                 />
               )}
             </Link>
