@@ -114,7 +114,9 @@ export default function MyOrdersPage() {
       quantity: item.quantity || 1,
       quotePayload: payload,
       quoteSummary: customization.quoteSummary,
-      customizationsDisplay: customization.customizationsDisplay || {}
+      customizationsDisplay: customization.customizationsDisplay || {},
+      artworkFiles: item.artworkFiles || [],
+      customSizeNote: item.customSizeNote || '',
     };
 
     addToCart(product, options);

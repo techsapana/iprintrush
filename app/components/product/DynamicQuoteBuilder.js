@@ -54,6 +54,8 @@ const printableQuoteRef = useRef(null);
 
   const [artworkReadyChoice, setArtworkReadyChoice] = useState('');
   const [tempArtworkFiles, setTempArtworkFiles] = useState([]);
+  const [artworkFiles, setArtworkFiles] = useState([]);
+  const [customSizeNote, setCustomSizeNote] = useState('');
   const [artworkUploading, setArtworkUploading] = useState(false);
   const [artworkError, setArtworkError] = useState('');
 
@@ -75,6 +77,8 @@ const printableQuoteRef = useRef(null);
         setStep(0);
         setArtworkReadyChoice('');
         setTempArtworkFiles([]);
+        setArtworkFiles([]);
+        setCustomSizeNote('');
         setArtworkError('');
         const res = await fetch(`/api/quote-config/${productId}`);
         if (!res.ok) throw new Error('Failed to load quote configuration');
@@ -127,6 +131,13 @@ const printableQuoteRef = useRef(null);
         if (prefillPayload?.artworkReady) setArtworkReadyChoice('ready');
         if (Array.isArray(prefillPayload?.tempArtworkFiles)) {
           setTempArtworkFiles(prefillPayload.tempArtworkFiles);
+        }
+        if (Array.isArray(prefillQuote?.artworkFiles)) {
+          setArtworkFiles(prefillQuote.artworkFiles);
+          if (!artworkReadyChoice) setArtworkReadyChoice('ready');
+        }
+        if (typeof prefillQuote?.customSizeNote === 'string') {
+          setCustomSizeNote(prefillQuote.customSizeNote);
         }
         if (prefillQuote?.summary) {
           setQuoteSummary(prefillQuote.summary);
@@ -408,10 +419,12 @@ const printableQuoteRef = useRef(null);
         productId,
         mode: 'print_product',
         selections: { ...selections, ...dimensionSelections },
-        size: finalSize, // Use the determined size / label
+        size: finalSize,
         deliveryMethod,
         artworkReady: artworkReadyChoice === 'ready',
         tempArtworkFiles,
+        artworkFiles,
+        customSizeNote,
       };
 
       const res = await fetch('/api/quote/calculate', {
@@ -1388,8 +1401,21 @@ const printableQuoteRef = useRef(null);
           {tempArtworkFiles.length > 0 && (
             <div className="text-xs text-gray-600">{tempArtworkFiles.length} artwork file(s) uploaded.</div>
           )}
+          {artworkFiles.length > 0 && (
+            <div className="text-xs text-gray-600">{artworkFiles.length} existing artwork file(s) will be reused.</div>
+          )}
         </div>
       )}
+      <div className="mt-4 space-y-2">
+        <label className="block text-sm font-medium text-gray-700">Custom size / notes (optional)</label>
+        <textarea
+          value={customSizeNote}
+          onChange={(e) => setCustomSizeNote(e.target.value)}
+          rows={3}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+          placeholder="e.g., 24in x 36in, bleed on all sides..."
+        />
+      </div>
     </div>
   );
 
@@ -1451,7 +1477,7 @@ const printableQuoteRef = useRef(null);
     if (step === artworkStepIndex) {
       return (
         Boolean(artworkReadyChoice) &&
-        (artworkReadyChoice === 'not_ready' || tempArtworkFiles.length > 0)
+        (artworkReadyChoice === 'not_ready' || tempArtworkFiles.length > 0 || artworkFiles.length > 0)
       );
     }
 

@@ -27,6 +27,8 @@ export function QuoteBuilder({
   const [hasCalculated, setHasCalculated] = useState(false);
   const [artworkReadyChoice, setArtworkReadyChoice] = useState('');
   const [tempArtworkFiles, setTempArtworkFiles] = useState([]);
+  const [artworkFiles, setArtworkFiles] = useState([]);
+  const [customSizeNote, setCustomSizeNote] = useState('');
   const [artworkUploading, setArtworkUploading] = useState(false);
   const [artworkError, setArtworkError] = useState('');
   const [estimateZip, setEstimateZip] = useState('');
@@ -158,6 +160,13 @@ const printableQuoteRef = useRef(null);
     if (p.artworkReady) setArtworkReadyChoice('ready');
     else if (p.artworkReady === false) setArtworkReadyChoice('later');
     if (Array.isArray(p.tempArtworkFiles)) setTempArtworkFiles(p.tempArtworkFiles);
+    // Restore artworkFiles and customSizeNote
+    if (Array.isArray(p.artworkFiles)) setArtworkFiles(p.artworkFiles);
+    if (p.customSizeNote) setCustomSizeNote(p.customSizeNote);
+    // If we have restored artworkFiles, treat artwork as already available
+    if (Array.isArray(p.artworkFiles) && p.artworkFiles.length > 0) {
+      setArtworkReadyChoice('ready');
+    }
     if (prefillQuote.summary) {
       setQuoteSummary(prefillQuote.summary);
       setHasCalculated(true);
@@ -263,6 +272,8 @@ const printableQuoteRef = useRef(null);
         useMyCloth: fabricChoice === 'own',
         artworkReady: artworkReadyChoice === 'ready',
         tempArtworkFiles,
+        artworkFiles,
+        customSizeNote,
       };
 
       const res = await fetch('/api/quote/calculate', {
@@ -365,7 +376,7 @@ const printableQuoteRef = useRef(null);
     if (quantityMax != null && totalQuantity > quantityMax) return false;
     if (!deliveryMethod) return false;
     if (!artworkReadyChoice) return false;
-    if (artworkReadyChoice === 'ready' && tempArtworkFiles.length === 0) return false;
+    if (artworkReadyChoice === 'ready' && tempArtworkFiles.length === 0 && artworkFiles.length === 0) return false;
     return true;
   };
 
@@ -381,23 +392,25 @@ const printableQuoteRef = useRef(null);
     try {
       setCalculating(true);
       
-      // Add dimension data if available
-      const payload = {
-        productId,
-        decorationOptionId: decorationId,
-        colorOptionId: colorId,
-        quantities: Object.entries(quantities)
-          .filter(([, qty]) => (qty || 0) > 0)
-          .map(([sizeId, qty]) => ({ sizeId, quantity: qty })),
-        printLocationIds,
-        turnaroundOptionId: turnaroundId,
-        designerHelpOptionId: designerHelpId,
-        deliveryMethod,
-        isCustomApparels,
-        useMyCloth: fabricChoice === 'own',
-        artworkReady: artworkReadyChoice === 'ready',
-        tempArtworkFiles,
-      };
+        // Add dimension data if available
+        const payload = {
+          productId,
+          decorationOptionId: decorationId,
+          colorOptionId: colorId,
+          quantities: Object.entries(quantities)
+            .filter(([, qty]) => (qty || 0) > 0)
+            .map(([sizeId, qty]) => ({ sizeId, quantity: qty })),
+          printLocationIds,
+          turnaroundOptionId: turnaroundId,
+          designerHelpOptionId: designerHelpId,
+          deliveryMethod,
+          isCustomApparels,
+          useMyCloth: fabricChoice === 'own',
+          artworkReady: artworkReadyChoice === 'ready',
+          tempArtworkFiles,
+          artworkFiles,
+          customSizeNote,
+        };
 
       const res = await fetch('/api/quote/calculate', {
         method: 'POST',
@@ -1347,74 +1360,79 @@ const printableQuoteRef = useRef(null);
   };
 
   const renderStepContent = () => {
-    const artworkStep = (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Upload Artwork</h3>
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+  const artworkStep = (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gray-900">Upload Artwork</h3>
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="radio"
+            name="quote-artwork-ready"
+            checked={artworkReadyChoice === 'ready'}
+            onChange={() => setArtworkReadyChoice('ready')}
+          />
+          Upload file now
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="radio"
+            name="quote-artwork-ready"
+            checked={artworkReadyChoice === 'not_ready'}
+            onChange={() => {
+              setArtworkReadyChoice('not_ready');
+              setTempArtworkFiles([]);
+            }}
+          />
+          Upload file later
+        </label>
+      </div>
+      {artworkFiles.length > 0 && (
+        <div className="text-xs text-gray-600">
+          {artworkFiles.length} existing artwork file(s) will be reused.
+        </div>
+      )}
+      {artworkReadyChoice === 'ready' && (
+        <div className="space-y-2">
+          <label className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
+            <span>{artworkUploading ? 'Uploading...' : 'Upload artwork image'}</span>
             <input
-              type="radio"
-              name="quote-artwork-ready"
-              checked={artworkReadyChoice === 'ready'}
-              onChange={() => setArtworkReadyChoice('ready')}
-            />
-            Upload file now
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="radio"
-              name="quote-artwork-ready"
-              checked={artworkReadyChoice === 'not_ready'}
-              onChange={() => {
-                setArtworkReadyChoice('not_ready');
-                setTempArtworkFiles([]);
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              className="hidden"
+              disabled={artworkUploading}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try {
+                  setArtworkUploading(true);
+                  setArtworkError('');
+                  const fd = new FormData();
+                  fd.append('file', file);
+                  const res = await fetch('/api/artwork/temp-upload', { method: 'POST', body: fd });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error(data.error || 'Upload failed');
+                  if (data?.tempId) setTempArtworkFiles((prev) => [...prev, data.tempId]);
+                } catch (err) {
+                  setArtworkError(err.message || 'Failed to upload artwork');
+                } finally {
+                  setArtworkUploading(false);
+                  if (e.target) e.target.value = '';
+                }
               }}
             />
-            Upload file later
           </label>
+          {artworkError && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {artworkError}
+            </div>
+          )}
+          {tempArtworkFiles.length > 0 && (
+            <div className="text-xs text-gray-600">{tempArtworkFiles.length} artwork file(s) uploaded.</div>
+          )}
         </div>
-        {artworkReadyChoice === 'ready' && (
-          <div className="space-y-2">
-            <label className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
-              <span>{artworkUploading ? 'Uploading...' : 'Upload artwork image'}</span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                className="hidden"
-                disabled={artworkUploading}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  try {
-                    setArtworkUploading(true);
-                    setArtworkError('');
-                    const fd = new FormData();
-                    fd.append('file', file);
-                    const res = await fetch('/api/artwork/temp-upload', { method: 'POST', body: fd });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok) throw new Error(data.error || 'Upload failed');
-                    if (data?.tempId) setTempArtworkFiles((prev) => [...prev, data.tempId]);
-                  } catch (err) {
-                    setArtworkError(err.message || 'Failed to upload artwork');
-                  } finally {
-                    setArtworkUploading(false);
-                    if (e.target) e.target.value = '';
-                  }
-                }}
-              />
-            </label>
-            {artworkError && (
-              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                {artworkError}
-              </div>
-            )}
-            {tempArtworkFiles.length > 0 && (
-              <div className="text-xs text-gray-600">{tempArtworkFiles.length} artwork file(s) uploaded.</div>
-            )}
-          </div>
-        )}
-      </div>
-    );
+      )}
+    </div>
+  );
 
     const steps = isCustomApparels
       ? [
@@ -1468,11 +1486,11 @@ const printableQuoteRef = useRef(null);
           return printLocationIds.length > 0;
         case 5:
           return Boolean(turnaroundId);
-        case 6:
-          return (
-            Boolean(artworkReadyChoice) &&
-            (artworkReadyChoice === 'not_ready' || tempArtworkFiles.length > 0)
-          );
+         case 6:
+           return (
+             Boolean(artworkReadyChoice) &&
+             (artworkReadyChoice === 'not_ready' || tempArtworkFiles.length > 0 || artworkFiles.length > 0)
+           );
         case 7:
           return Boolean(designerHelpId);
         case 8:
@@ -1496,11 +1514,11 @@ const printableQuoteRef = useRef(null);
         return printLocationIds.length > 0;
       case 4:
         return Boolean(turnaroundId);
-      case 5:
-        return (
-          Boolean(artworkReadyChoice) &&
-          (artworkReadyChoice === 'not_ready' || tempArtworkFiles.length > 0)
-        );
+       case 5:
+         return (
+           Boolean(artworkReadyChoice) &&
+           (artworkReadyChoice === 'not_ready' || tempArtworkFiles.length > 0 || artworkFiles.length > 0)
+         );
       case 6:
         return Boolean(designerHelpId);
       case 7:

@@ -305,6 +305,8 @@ export default function CheckoutClient() {
             customUnitPrice: i.options?.customUnitPrice,
             artworkReady: i.options?.artworkReady === true,
             tempArtworkFiles: i.options?.tempArtworkFiles || [],
+            artworkFiles: i.options?.artworkFiles || [],
+            customSizeNote: i.options?.customSizeNote || '',
           })),
           customer: {
             ...formData,

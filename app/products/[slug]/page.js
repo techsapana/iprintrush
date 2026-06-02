@@ -210,6 +210,8 @@ export default function ProductDetailPage({ params }) {
           customizationsDisplay: splitDisplay,
           artworkReady: currentQuote.payload?.artworkReady === true,
           tempArtworkFiles: currentQuote.payload?.tempArtworkFiles || [],
+          artworkFiles: currentQuote.payload?.artworkFiles || [],
+          customSizeNote: currentQuote.payload?.customSizeNote || '',
           splitQuote: true,
           splitSizeLabel: s.sizeLabel || 'Selected size',
           customLineTotal: lineTotal,

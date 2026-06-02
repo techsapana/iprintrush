@@ -26,6 +26,8 @@ const CreateCheckoutSessionSchema = z.object({
         customUnitPrice: z.number().nonnegative().optional(),
         artworkReady: z.boolean().optional(),
         tempArtworkFiles: z.array(z.string()).optional(),
+        artworkFiles: z.array(z.string()).optional(),
+        customSizeNote: z.string().optional(),
       })
     )
     .min(1),
@@ -166,6 +168,8 @@ export async function POST(req: NextRequest) {
         customizationJson: string | null;
         artworkReady: boolean;
         tempArtworkFiles: string[];
+        artworkFiles: string[];
+        customSizeNote: string;
       }[] = [];
       let subtotalCents = 0;
       let shippingCents = 0;
@@ -272,6 +276,10 @@ export async function POST(req: NextRequest) {
           tempArtworkFiles: Array.isArray(item.tempArtworkFiles)
             ? item.tempArtworkFiles.filter((x) => typeof x === 'string' && x.trim().length > 0)
             : [],
+          artworkFiles: Array.isArray(item.artworkFiles)
+            ? item.artworkFiles.filter((x) => typeof x === 'string' && x.trim().length > 0)
+            : [],
+          customSizeNote: typeof item.customSizeNote === 'string' ? item.customSizeNote : '',
         });
       }
 
@@ -503,7 +511,10 @@ export async function POST(req: NextRequest) {
 
       for (const row of orderItemRows) {
         const movedArtworkFiles: string[] = [];
-        if (row.artworkReady && row.tempArtworkFiles.length > 0) {
+        const finalArtworkFiles: string[] = [];
+        if (row.artworkFiles.length > 0) {
+          finalArtworkFiles.push(...row.artworkFiles);
+        } else if (row.artworkReady && row.tempArtworkFiles.length > 0) {
           const targetDir = path.join(privateRoot, `order-${orderId}`);
           if (!existsSync(targetDir)) {
             await mkdir(targetDir, { recursive: true });
@@ -522,11 +533,12 @@ export async function POST(req: NextRequest) {
               // ignore individual file move failures
             }
           }
+          finalArtworkFiles.push(...movedArtworkFiles);
         }
 
         await conn.query(
-`INSERT INTO order_items (order_id, product_id, name, unit_price, quantity, line_total, customization_json, artwork_files_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+`INSERT INTO order_items (order_id, product_id, name, unit_price, quantity, line_total, customization_json, artwork_files_json, custom_size_note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             orderId,
             row.productId,
@@ -535,7 +547,8 @@ export async function POST(req: NextRequest) {
             row.qty,
             row.lineTotal,
             row.customizationJson,
-            movedArtworkFiles.length ? JSON.stringify(movedArtworkFiles) : JSON.stringify([]),
+            JSON.stringify(finalArtworkFiles),
+            row.customSizeNote || null,
           ]
         );
       }
