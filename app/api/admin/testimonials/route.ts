@@ -9,9 +9,23 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const testimonials = await query('SELECT * FROM testimonials ORDER BY display_order ASC, id DESC');
-    return NextResponse.json(testimonials);
+    const rows = await query('SELECT * FROM testimonials ORDER BY display_order ASC, id DESC');
+    // Transform snake_case DB fields to camelCase for frontend
+    const testimonials = Array.isArray(rows)
+      ? rows.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          company: r.company,
+          quote: r.quote,
+          rating: r.rating,
+          imageUrl: r.image_url,
+          enabled: r.enabled,
+          displayOrder: r.display_order,
+        }))
+      : [];
+    return NextResponse.json({ testimonials });
   } catch (error: any) {
+    console.error('GET testimonials error:', error);
     return NextResponse.json({ error: error?.message || 'Failed to fetch testimonials' }, { status: 500 });
   }
 }
@@ -45,6 +59,7 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, id: result?.insertId || null });
   } catch (error: any) {
+    console.error('POST testimonial error:', error);
     return NextResponse.json({ error: error?.message || 'Failed to create testimonial' }, { status: 500 });
   }
 }

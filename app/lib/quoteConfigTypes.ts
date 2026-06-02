@@ -48,6 +48,8 @@ export type TurnaroundOption = {
   description?: string;
   priceModifier: number; // per-order surcharge
   enabled: boolean;
+  pricingType?: 'flat' | 'percentage';
+  percentageValue?: number | null;
 };
 
 export type DesignerHelpOption = {
@@ -174,6 +176,8 @@ export type CustomizationOption = {
   value?: string;
   priceModifier: number;
   enabled: boolean;
+  pricingType?: 'flat' | 'percentage';
+  percentageValue?: number | null;
 };
 
 export type CustomizationPool = {

@@ -14,6 +14,8 @@ export async function GET() {
         priceModifier: parseFloat(t.price_modifier),
         enabled: Boolean(t.enabled),
         displayOrder: t.display_order,
+        pricingType: t.pricing_type || 'flat',
+        percentageValue: t.percentage_value != null ? parseFloat(t.percentage_value) : null,
       })),
     });
   } catch (error: any) {
@@ -27,20 +29,22 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name, priceModifier = 0, enabled = true, displayOrder = 0 } = body;
+    const { id, name, priceModifier = 0, pricingType = 'flat', percentageValue = null, enabled = true, displayOrder = 0 } = body;
 
     const turnaroundId = id || `turn-${Date.now()}`;
 
     await query(
-      `INSERT INTO turnaround_options (id, name, price_modifier, enabled, display_order)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO turnaround_options (id, name, price_modifier, pricing_type, percentage_value, enabled, display_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          name = VALUES(name),
          price_modifier = VALUES(price_modifier),
+         pricing_type = VALUES(pricing_type),
+         percentage_value = VALUES(percentage_value),
          enabled = VALUES(enabled),
          display_order = VALUES(display_order),
          updated_at = CURRENT_TIMESTAMP`,
-      [turnaroundId, name, priceModifier, enabled ? 1 : 0, displayOrder]
+      [turnaroundId, name, priceModifier, pricingType, percentageValue, enabled ? 1 : 0, displayOrder]
     );
 
     return NextResponse.json({ success: true, id: turnaroundId });

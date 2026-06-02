@@ -132,7 +132,7 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
   const [useCustomQuantityTiers, setUseCustomQuantityTiers] = useState(true);
   const [selectedColors, setSelectedColors] = useState([]);
   
-  // Options with custom prices: { id: string, customPrice: number | null }
+  // Options with custom prices: { id: string, customPrice: number | null, pricingType?: string, percentageValue?: number | null }
   const [selectedDecorations, setSelectedDecorations] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [selectedPrintLocations, setSelectedPrintLocations] = useState([]);
@@ -317,24 +317,29 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
       if (res.ok) {
         const json = await res.json();
         if (json.schema?.mode === 'print_product' && json.pools?.length > 0) {
-          setCustomizationMode('print_product');
-          setCategoryPools(json.pools);
-          const snap = initialProductRef.current;
-          const isNewOrCategoryChanged = !snap || formData.category !== snap.category;
-          if (isNewOrCategoryChanged) {
-            const initial = {};
-            const quantityInitial = {};
-            json.pools.forEach((pool) => {
-              initial[pool.id] = pool.options?.map((o) => ({ id: o.id, customPrice: null })) || [];
-              if (pool.selectionType === 'quantity') {
-                quantityInitial[pool.id] = (pool.quantityTiers || []).map(mapQuantityTierFromApi);
-              }
-            });
-            setPoolSelections(initial);
-            setPoolQuantityTiers(quantityInitial);
-            setDisabledPoolIds([]);
-          }
-        } else {
+setCustomizationMode('print_product');
+           setCategoryPools(json.pools);
+           const snap = initialProductRef.current;
+           const isNewOrCategoryChanged = !snap || formData.category !== snap.category;
+           if (isNewOrCategoryChanged) {
+             const initial = {};
+             const quantityInitial = {};
+             json.pools.forEach((pool) => {
+               initial[pool.id] = pool.options?.map((o) => ({
+                 id: o.id,
+                 customPrice: null,
+                 pricingType: pool.key === 'production_time' ? 'flat' : undefined,
+                 percentageValue: pool.key === 'production_time' ? null : undefined,
+               })) || [];
+               if (pool.selectionType === 'quantity') {
+                 quantityInitial[pool.id] = (pool.quantityTiers || []).map(mapQuantityTierFromApi);
+               }
+             });
+             setPoolSelections(initial);
+             setPoolQuantityTiers(quantityInitial);
+             setDisabledPoolIds([]);
+           }
+         } else {
           setCustomizationMode('apparel');
           setCategoryPools([]);
         }
@@ -365,7 +370,7 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
             json.config.printLocations.filter((p) => p.enabled).map((p) => ({ id: p.id, customPrice: null }))
           );
           setSelectedTurnarounds(
-            json.config.turnarounds.filter((t) => t.enabled).map((t) => ({ id: t.id, customPrice: null }))
+            json.config.turnarounds.filter((t) => t.enabled).map((t) => ({ id: t.id, customPrice: null, pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null }))
           );
           setSelectedDesignerHelp(
             json.config.designerHelp.filter((d) => d.enabled).map((d) => ({ id: d.id, customPrice: null }))
@@ -402,6 +407,8 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
             selections[pool.id] = (pool.options || []).map((o) => ({
               id: o.id,
               customPrice: o.priceModifier && o.priceModifier !== 0 ? o.priceModifier : null,
+              pricingType: o.pricingType || 'flat',
+              percentageValue: o.percentageValue ?? null,
             }));
             if (pool.selectionType === 'quantity') {
               quantityTiersByPool[pool.id] = (pool.quantityTiers || []).map(mapQuantityTierFromApi);
@@ -451,10 +458,15 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
             }))
           );
           setSelectedTurnarounds(
-            (ps.turnaroundOptionIds || []).map((id) => ({
-              id,
-              customPrice: ps.customPrices?.turnarounds?.[id] ?? null,
-            }))
+            (ps.turnaroundOptionIds || []).map((id) => {
+              const custom = ps.customTurnaroundPricing?.[id];
+              return {
+                id,
+                customPrice: ps.customPrices?.turnarounds?.[id] ?? null,
+                pricingType: custom?.pricingType || 'flat',
+                percentageValue: custom?.percentageValue ?? null,
+              };
+            })
           );
           setSelectedDesignerHelp(
             (ps.designerHelpOptionIds || []).map((id) => ({
@@ -476,13 +488,13 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
     }
   };
 
-  const togglePoolOption = (poolId, optionId, customPrice = null) => {
+  const togglePoolOption = (poolId, optionId, customPrice = null, pricingType = 'flat', percentageValue = null) => {
     setPoolSelections((prev) => {
       const list = prev[poolId] || [];
       const exists = list.find((x) => x.id === optionId);
       const next = exists
         ? list.filter((x) => x.id !== optionId)
-        : [...list, { id: optionId, customPrice }];
+        : [...list, { id: optionId, customPrice, pricingType, percentageValue }];
       return { ...prev, [poolId]: next };
     });
   };
@@ -503,7 +515,7 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
   const selectAllPoolOptions = (poolId, options) => {
     setPoolSelections((prev) => ({
       ...prev,
-      [poolId]: options.map((o) => ({ id: o.id, customPrice: null })),
+      [poolId]: options.map((o) => ({ id: o.id, customPrice: null, pricingType: 'flat', percentageValue: null })),
     }));
   };
 
@@ -999,6 +1011,11 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
           selectedDesignerHelp.filter((d) => d.customPrice !== null).map((d) => [d.id, d.customPrice])
         ),
       };
+      const customTurnaroundPricing = Object.fromEntries(
+        (selectedTurnarounds || [])
+          .filter((t) => t.pricingType)
+          .map((t) => [t.id, { pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null }])
+      );
 
       // Save quote settings
       if (productId) {
@@ -1041,6 +1058,7 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
               designerHelpOptionIds: selectedDesignerHelp.map((d) => d.id),
               customPrices,
               customQuantityTiers: customQuantityTiers.map(normalizeQuantityTierForSave),
+              customTurnaroundPricing,
             }),
           });
           const json = await res.json().catch(() => ({}));
@@ -2080,17 +2098,67 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
                               <span className="text-xs text-gray-500">${(opt.priceModifier || 0).toFixed(2)}</span>
                             </div>
                             {selected && (
-                              <div className="mt-2">
-                                <label className="block text-xs text-gray-600 mb-1">Custom Price (optional)</label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={sel?.customPrice ?? ''}
-                                  disabled={disabledPoolIds.includes(pool.id)}
-                                  onChange={(e) => updatePoolOptionPrice(pool.id, opt.id, e.target.value)}
-                                  placeholder="Use default"
-                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                />
+                              <div className="mt-2 space-y-2">
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">Custom Price (optional)</label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={sel?.customPrice ?? ''}
+                                    disabled={disabledPoolIds.includes(pool.id)}
+                                    onChange={(e) => updatePoolOptionPrice(pool.id, opt.id, e.target.value)}
+                                    placeholder="Use default"
+                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                  />
+                                </div>
+                                {pool.key === 'production_time' && (
+                                  <div className="flex items-center gap-2">
+                                    <label className="block text-xs text-gray-600 whitespace-nowrap">Pricing Type:</label>
+                                    <select
+                                      value={sel?.pricingType || 'flat'}
+                                      disabled={disabledPoolIds.includes(pool.id)}
+                                      onChange={(e) => {
+                                        const newType = e.target.value;
+                                        setPoolSelections((prev) => ({
+                                          ...prev,
+                                          [pool.id]: (prev[pool.id] || []).map((item) =>
+                                            item.id === opt.id
+                                              ? { ...item, pricingType: newType, percentageValue: newType === 'percentage' ? item.percentageValue ?? 0 : null, customPrice: newType === 'flat' ? item.customPrice : null }
+                                              : item
+                                          ),
+                                        }));
+                                      }}
+                                      className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
+                                    >
+                                      <option value="flat">Flat</option>
+                                      <option value="percentage">Percentage</option>
+                                    </select>
+                                  </div>
+                                )}
+                                {pool.key === 'production_time' && sel?.pricingType === 'percentage' && (
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">Percentage Value (%)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      max="100"
+                                      value={sel?.percentageValue ?? ''}
+                                      disabled={disabledPoolIds.includes(pool.id)}
+                                      onChange={(e) => {
+                                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                                        setPoolSelections((prev) => ({
+                                          ...prev,
+                                          [pool.id]: (prev[pool.id] || []).map((item) =>
+                                            item.id === opt.id ? { ...item, percentageValue: val } : item
+                                          ),
+                                        }));
+                                      }}
+                                      placeholder="e.g., 20"
+                                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                    />
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -2271,9 +2339,100 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
             Select available turnaround times and set custom prices per order (leave empty to use global default).
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {quoteConfig.turnarounds.filter((t) => t.enabled).map((turn) =>
-              renderOptionWithPrice(turn, 'turnarounds', selectedTurnarounds, setSelectedTurnarounds)
-            )}
+            {quoteConfig.turnarounds.filter((t) => t.enabled).map((turn) => {
+              const selected = selectedTurnarounds.find((s) => s.id === turn.id);
+              const isSelected = !!selected;
+              const globalPrice = getGlobalPrice('turnarounds', turn.id);
+              const label = turn.name;
+              const pricingType = selected?.pricingType || turn.pricingType || 'flat';
+              const percentageValue = selected?.percentageValue ?? turn.percentageValue ?? null;
+              return (
+                <div
+                  key={turn.id}
+                  className={`p-4 rounded-lg border-2 transition ${
+                    isSelected ? 'border-[#29b6f6] bg-[#29b6f6]/5' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleOptionWithPrice(setSelectedTurnarounds, turn.id, selectedTurnarounds)}
+                        className="rounded"
+                      />
+                      <span className="font-medium text-gray-900">{label}</span>
+                    </label>
+                    <span className="text-xs text-gray-500">
+                      Global: ${globalPrice.toFixed(2)}
+                    </span>
+                  </div>
+                  {isSelected && (
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="block text-xs text-gray-600 whitespace-nowrap">Pricing Type:</label>
+                        <select
+                          value={pricingType || 'flat'}
+                          onChange={(e) => {
+                            const newPricingType = e.target.value;
+                            setSelectedTurnarounds((prev) =>
+                              prev.map((item) =>
+                                item.id === turn.id
+                                  ? { ...item, pricingType: newPricingType, percentageValue: newPricingType === 'percentage' ? (item.percentageValue ?? 0) : null }
+                                  : item
+                              )
+                            );
+                          }}
+                          className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
+                        >
+                          <option value="flat">Flat</option>
+                          <option value="percentage">Percentage</option>
+                        </select>
+                      </div>
+                      {pricingType === 'flat' ? (
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Custom Price (leave empty to use global)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={selected.customPrice ?? ''}
+                            onChange={(e) => updateCustomPrice(setSelectedTurnarounds, selectedTurnarounds, turn.id, e.target.value)}
+                            placeholder={`Default: $${globalPrice.toFixed(2)}`}
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Percentage Value (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={percentageValue ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                              setSelectedTurnarounds((prev) =>
+                                prev.map((item) =>
+                                  item.id === turn.id
+                                    ? { ...item, percentageValue: val, customPrice: null }
+                                    : item
+                                )
+                              );
+                            }}
+                            placeholder="e.g., 15"
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">
+                            Applied on merchandise subtotal + addons
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

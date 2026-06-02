@@ -62,6 +62,8 @@ async function getFullConfig() {
       id: t.id,
       name: t.name,
       priceModifier: parseFloat(t.price_modifier),
+      pricingType: t.pricing_type || 'flat',
+      percentageValue: t.percentage_value != null ? parseFloat(t.percentage_value) : null,
       enabled: Boolean(t.enabled),
     })),
     designerHelp: designerHelp.map((d: any) => ({

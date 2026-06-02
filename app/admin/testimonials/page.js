@@ -87,9 +87,9 @@ export default function AdminTestimonialsPage() {
         company: item.company,
         quote: item.quote,
         rating: item.rating,
-        imageUrl: item.imageUrl,
+        imageUrl: item.imageUrl || item.image_url,
         enabled: item.enabled,
-        displayOrder: item.displayOrder,
+        displayOrder: item.displayOrder || item.display_order,
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -246,7 +246,7 @@ export default function AdminTestimonialsPage() {
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                     />
                     <div className="flex gap-4">
-                      <select
+<select
                         value={item.rating}
                         onChange={(e) =>
                           setTestimonials((prev) =>
@@ -263,7 +263,7 @@ export default function AdminTestimonialsPage() {
                       </select>
                       <input
                         type="number"
-                        value={item.displayOrder}
+                        value={item.displayOrder ?? item.display_order ?? ''}
                         onChange={(e) =>
                           setTestimonials((prev) =>
                             prev.map((x) =>
@@ -277,7 +277,7 @@ export default function AdminTestimonialsPage() {
                     </div>
                     <input
                       type="text"
-                      value={item.imageUrl || ''}
+                      value={item.imageUrl ?? item.image_url ?? ''}
                       onChange={(e) =>
                         setTestimonials((prev) =>
                           prev.map((x) => (x.id === item.id ? { ...x, imageUrl: e.target.value } : x))

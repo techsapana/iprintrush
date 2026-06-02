@@ -23,6 +23,8 @@ export async function GET(
         priceModifier: parseFloat(turnaround.price_modifier),
         enabled: Boolean(turnaround.enabled),
         displayOrder: turnaround.display_order,
+        pricingType: turnaround.pricing_type || 'flat',
+        percentageValue: turnaround.percentage_value != null ? parseFloat(turnaround.percentage_value) : null,
       },
     });
   } catch (error: any) {
@@ -49,6 +51,14 @@ export async function PUT(
     if (body.priceModifier !== undefined) {
       updates.push('price_modifier = ?');
       values.push(body.priceModifier);
+    }
+    if (body.pricingType !== undefined) {
+      updates.push('pricing_type = ?');
+      values.push(body.pricingType);
+    }
+    if (body.percentageValue !== undefined) {
+      updates.push('percentage_value = ?');
+      values.push(body.percentageValue);
     }
     if (body.enabled !== undefined) {
       updates.push('enabled = ?');

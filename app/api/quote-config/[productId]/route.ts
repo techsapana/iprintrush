@@ -71,12 +71,14 @@ async function getFullConfig() {
       priceModifier: parseFloat(p.price_modifier),
       enabled: Boolean(p.enabled),
     })),
-    turnarounds: (turnarounds as any[]).map((t: any) => ({
-      id: t.id,
-      name: t.name,
-      priceModifier: parseFloat(t.price_modifier),
-      enabled: Boolean(t.enabled),
-    })),
+turnarounds: (turnarounds as any[]).map((t: any) => ({
+       id: t.id,
+       name: t.name,
+       priceModifier: parseFloat(t.price_modifier),
+       enabled: Boolean(t.enabled),
+       pricingType: t.pricing_type || 'flat',
+       percentageValue: t.percentage_value != null ? parseFloat(t.percentage_value) : null,
+     })),
     designerHelp: (designerHelp as any[]).map((d: any) => ({
       id: d.id,
       name: d.name,
@@ -222,10 +224,10 @@ export async function GET(
         'SELECT print_location_option_id as id, custom_price FROM product_print_location_options WHERE product_id = ?',
         [productId]
       ),
-      query(
-        'SELECT turnaround_option_id as id, custom_price FROM product_turnaround_options WHERE product_id = ?',
-        [productId]
-      ),
+query(
+         'SELECT turnaround_option_id as id, custom_price, pricing_type, percentage_value FROM product_turnaround_options WHERE product_id = ?',
+         [productId]
+       ),
       query(
         'SELECT designer_help_option_id as id, custom_price FROM product_designer_help_options WHERE product_id = ?',
         [productId]
@@ -236,24 +238,32 @@ export async function GET(
       ),
     ])) as any[];
 
-    // Build custom prices maps
-    const customPrices = {
-      decorations: Object.fromEntries(
-        decorationOptions.map((d: any) => [d.id, d.custom_price !== null ? parseFloat(d.custom_price) : null])
-      ),
-      sizes: Object.fromEntries(
-        sizeOptions.map((s: any) => [s.id, s.custom_price !== null ? parseFloat(s.custom_price) : null])
-      ),
-      printLocations: Object.fromEntries(
-        printLocationOptions.map((p: any) => [p.id, p.custom_price !== null ? parseFloat(p.custom_price) : null])
-      ),
-      turnarounds: Object.fromEntries(
-        turnaroundOptions.map((t: any) => [t.id, t.custom_price !== null ? parseFloat(t.custom_price) : null])
-      ),
-      designerHelp: Object.fromEntries(
-        designerHelpOptions.map((d: any) => [d.id, d.custom_price !== null ? parseFloat(d.custom_price) : null])
-      ),
-    };
+// Build custom prices maps
+     const customPrices = {
+       decorations: Object.fromEntries(
+         decorationOptions.map((d: any) => [d.id, d.custom_price !== null ? parseFloat(d.custom_price) : null])
+       ),
+       sizes: Object.fromEntries(
+         sizeOptions.map((s: any) => [s.id, s.custom_price !== null ? parseFloat(s.custom_price) : null])
+       ),
+       printLocations: Object.fromEntries(
+         printLocationOptions.map((p: any) => [p.id, p.custom_price !== null ? parseFloat(p.custom_price) : null])
+       ),
+       turnarounds: Object.fromEntries(
+         turnaroundOptions.map((t: any) => [t.id, t.custom_price !== null ? parseFloat(t.custom_price) : null])
+       ),
+       designerHelp: Object.fromEntries(
+         designerHelpOptions.map((d: any) => [d.id, d.custom_price !== null ? parseFloat(d.custom_price) : null])
+       ),
+     };
+
+     // Build custom turnaround pricing info
+     const customTurnaroundPricing = Object.fromEntries(
+       turnaroundOptions.map((t: any) => [t.id, {
+         pricingType: t.pricing_type || 'flat',
+         percentageValue: t.percentage_value != null ? parseFloat(t.percentage_value) : null,
+       }])
+     );
 
     // If no settings exist, create default with all enabled options
     if (!productSettings) {
@@ -298,35 +308,36 @@ export async function GET(
     }
 
      const settings = {
-       productId,
-       enabled: Boolean(productSettings.enabled),
-       useCustomQuantityTiers: Boolean(productSettings.use_custom_quantity_tiers),
-       decorationOptionIds: (decorationOptions as any[]).map((r: any) => r.id),
-       colorOptionIds: (colorIds as any[]).map((r: any) => r.id),
-       sizeOptionIds: (sizeOptions as any[]).map((r: any) => r.id),
-       printLocationOptionIds: (printLocationOptions as any[]).map((r: any) => r.id),
-       turnaroundOptionIds: (turnaroundOptions as any[]).map((r: any) => r.id),
-       designerHelpOptionIds: (designerHelpOptions as any[]).map((r: any) => r.id),
-       quantityTierIds: config.quantityTiers
-         .filter((t) => t.enabled)
-         .map((t) => t.id.toString()),
-       customPrices,
-       customQuantityTiers: (customQuantityTiers as any[]).map((t: any) => ({
-         id: t.id.toString(),
-         minQty: t.min_qty,
-         maxQty: t.max_qty,
-         unitPrice: parseFloat(t.unit_price),
-         discountPercent:
-           t.discount_percent != null ? parseFloat(t.discount_percent) : 0,
-         enabled: Boolean(t.enabled),
-       })),
-       allowCustomDimensions: Boolean(productWithCat?.allow_custom_dimensions),
-     };
+        productId,
+        enabled: Boolean(productSettings.enabled),
+        useCustomQuantityTiers: Boolean(productSettings.use_custom_quantity_tiers),
+        decorationOptionIds: (decorationOptions as any[]).map((r: any) => r.id),
+        colorOptionIds: (colorIds as any[]).map((r: any) => r.id),
+        sizeOptionIds: (sizeOptions as any[]).map((r: any) => r.id),
+        printLocationOptionIds: (printLocationOptions as any[]).map((r: any) => r.id),
+        turnaroundOptionIds: (turnaroundOptions as any[]).map((r: any) => r.id),
+        designerHelpOptionIds: (designerHelpOptions as any[]).map((r: any) => r.id),
+        quantityTierIds: config.quantityTiers
+          .filter((t) => t.enabled)
+          .map((t) => t.id.toString()),
+        customPrices,
+        customQuantityTiers: (customQuantityTiers as any[]).map((t: any) => ({
+          id: t.id.toString(),
+          minQty: t.min_qty,
+          maxQty: t.max_qty,
+          unitPrice: parseFloat(t.unit_price),
+          discountPercent:
+            t.discount_percent != null ? parseFloat(t.discount_percent) : 0,
+          enabled: Boolean(t.enabled),
+        })),
+        customTurnaroundPricing,
+        allowCustomDimensions: Boolean(productWithCat?.allow_custom_dimensions),
+      };
 
-    return NextResponse.json({
-      config,
-      productSettings: settings,
-    });
+     return NextResponse.json({
+       config,
+       productSettings: settings,
+     });
   } catch (error: any) {
     console.error('Error fetching product quote config:', error);
     return NextResponse.json(
@@ -458,24 +469,30 @@ export async function PUT(
       }
     }
 
-    // Update turnaround options with custom prices
-    if (body.turnaroundOptionIds) {
-      await query(
-        'DELETE FROM product_turnaround_options WHERE product_id = ?',
-        [productId]
-      );
-      if (body.turnaroundOptionIds.length > 0) {
-        const values = body.turnaroundOptionIds.map((id: string) => [
-          productId,
-          id,
-          customPrices.turnarounds?.[id] ?? null,
-        ]);
-        await query(
-          'INSERT INTO product_turnaround_options (product_id, turnaround_option_id, custom_price) VALUES ?',
-          [values]
-        );
-      }
-    }
+     // Update turnaround options with custom prices
+     if (body.turnaroundOptionIds) {
+       await query(
+         'DELETE FROM product_turnaround_options WHERE product_id = ?',
+         [productId]
+       );
+       if (body.turnaroundOptionIds.length > 0) {
+         const values = body.turnaroundOptionIds.map((id: string) => {
+           const customPrice = customPrices.turnarounds?.[id] ?? null;
+           const turnaroundPricing = body.customTurnaroundPricing?.[id] || {};
+           return [
+             productId,
+             id,
+             customPrice,
+             turnaroundPricing.pricingType ?? 'flat',
+             turnaroundPricing.percentageValue ?? null,
+           ];
+         });
+         await query(
+           'INSERT INTO product_turnaround_options (product_id, turnaround_option_id, custom_price, pricing_type, percentage_value) VALUES ?',
+           [values]
+         );
+       }
+     }
 
     // Update designer help options with custom prices
     if (body.designerHelpOptionIds) {
@@ -522,7 +539,7 @@ export async function PUT(
     // Update product pool options (for print_product categories)
     if (body.poolOptions !== undefined) {
       await query('DELETE FROM product_pool_options WHERE product_id = ?', [productId]);
-      const poolOptions = body.poolOptions as Record<string, Array<{ id: string; customPrice?: number | null }>>;
+      const poolOptions = body.poolOptions as Record<string, Array<{ id: string; customPrice?: number | null; pricingType?: string; percentageValue?: number | null }>>;
       if (poolOptions && typeof poolOptions === 'object') {
         for (const [poolId, opts] of Object.entries(poolOptions)) {
           if (!Array.isArray(opts) || opts.length === 0) continue;
@@ -530,11 +547,14 @@ export async function PUT(
             const optionId = typeof opt === 'object' && opt?.id ? opt.id : opt;
             const customPrice =
               typeof opt === 'object' && opt?.customPrice != null ? opt.customPrice : null;
-            return [productId, poolId, optionId, customPrice, 1, idx];
+            const pricingType = typeof opt === 'object' && opt?.pricingType ? opt.pricingType : 'flat';
+            const percentageValue =
+              typeof opt === 'object' && opt?.percentageValue != null ? opt.percentageValue : null;
+            return [productId, poolId, optionId, customPrice, pricingType, percentageValue, 1, idx];
           });
           if (values.length > 0) {
             await query(
-              'INSERT INTO product_pool_options (product_id, pool_id, option_id, custom_price, enabled, display_order) VALUES ?',
+              'INSERT INTO product_pool_options (product_id, pool_id, option_id, custom_price, pricing_type, percentage_value, enabled, display_order) VALUES ?',
               [values]
             );
           }

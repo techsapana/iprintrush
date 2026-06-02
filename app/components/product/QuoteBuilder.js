@@ -5,6 +5,14 @@ import { Button } from '@/components/ui/button';
 import { DynamicQuoteBuilder } from './DynamicQuoteBuilder';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 
+function debounce(fn, delay) {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+}
+
 export function QuoteBuilder({
   productId,
   productName,
@@ -54,6 +62,8 @@ const printableQuoteRef = useRef(null);
   const [useMyCloth, setUseMyCloth] = useState(false);
   const [fabricChoice, setFabricChoice] = useState('');
   const isCustomApparels = /custom\s*apparel/i.test(String(productCategory || ''));
+
+  const latestCalcRequestIdRef = useRef(0);
 
   const quantityMin = useMemo(() => {
     if (minQuantityProp == null || minQuantityProp === '') return null;
@@ -220,6 +230,7 @@ const printableQuoteRef = useRef(null);
       }
       return next;
     });
+    scheduleRecalculation();
   };
 
   const handleSizeQtyInput = (sizeId, value) => {
@@ -234,10 +245,11 @@ const printableQuoteRef = useRef(null);
       }
       return { ...prev, [sizeId]: nextVal };
     });
+    scheduleRecalculation();
   };
 
-  // Helper function to recalculate quote with new quantities
-  const recalculateQuote = async (newQuantities) => {
+// Helper function to recalculate quote with new quantities
+   const recalculateQuote = async (newQuantities) => {
     // Check if total quantity is still valid
     const newTotal = Object.values(newQuantities).reduce((sum, v) => sum + (v || 0), 0);
     if (newTotal <= 0) {
@@ -255,6 +267,7 @@ const printableQuoteRef = useRef(null);
 
     // Recalculate the quote
     setError('');
+    const requestId = ++latestCalcRequestIdRef.current;
     try {
       setCalculating(true);
       const payload = {
@@ -285,6 +298,7 @@ const printableQuoteRef = useRef(null);
       if (!res.ok) {
         throw new Error(json.error || 'Failed to recalculate quote');
       }
+      if (requestId !== latestCalcRequestIdRef.current) return false;
       setQuoteSummary(json);
       setQuantities(newQuantities);
       if (onQuoteReady && json) {
@@ -296,7 +310,7 @@ const printableQuoteRef = useRef(null);
               'Designer Help': config.designerHelp.find((d) => d.id === designerHelpId)?.name ?? '—',
               'Print Locations': printLocationIds.length
                 ? printLocationIds
-                    .map((id) => config.printLocations.find((p) => p.id === id)?.name)
+                    .map((id) => config.printLocations.find((p) => p.id === id)?.label)
                     .filter(Boolean)
                     .join(', ')
                 : '—',
@@ -320,12 +334,19 @@ const printableQuoteRef = useRef(null);
       }
       return true;
     } catch (err) {
-      setError(err.message || 'Failed to recalculate quote');
+      if (requestId === latestCalcRequestIdRef.current) {
+        setError(err.message || 'Failed to recalculate quote');
+      }
       return false;
     } finally {
       setCalculating(false);
     }
   };
+
+  const scheduleRecalculation = debounce(() => {
+    if (!hasCalculated) return;
+    handleCalculate();
+  }, 300);
 
   // Handler for changing quantity in the summary step - triggers recalculation
   const handleSummaryQtyChange = async (sizeId, delta) => {
@@ -361,6 +382,57 @@ const printableQuoteRef = useRef(null);
     setPrintLocationIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
+    scheduleRecalculation();
+  };
+
+  const handleDecorationChange = (id) => {
+    setDecorationId(id);
+    scheduleRecalculation();
+  };
+
+  const handleColorChange = (id) => {
+    setColorId(id);
+    scheduleRecalculation();
+  };
+
+  const handleTurnaroundChange = (id) => {
+    setTurnaroundId(id);
+    scheduleRecalculation();
+  };
+
+  const handleDesignerHelpChange = (id) => {
+    setDesignerHelpId(id);
+    scheduleRecalculation();
+  };
+
+  const handleDeliveryMethodChange = (method) => {
+    setDeliveryMethod(method);
+    scheduleRecalculation();
+  };
+
+  const handleArtworkReadyChange = (value) => {
+    setArtworkReadyChoice(value);
+    scheduleRecalculation();
+  };
+
+  const handleTempArtworkFilesChange = (files) => {
+    setTempArtworkFiles(files);
+    scheduleRecalculation();
+  };
+
+  const handleArtworkFilesChange = (files) => {
+    setArtworkFiles(files);
+    scheduleRecalculation();
+  };
+
+  const handleCustomSizeNoteChange = (note) => {
+    setCustomSizeNote(note);
+    scheduleRecalculation();
+  };
+
+  const handleFabricChoiceChange = (choice) => {
+    setFabricChoice(choice);
+    scheduleRecalculation();
   };
 
   const isReadyForCalculation = () => {
@@ -380,7 +452,7 @@ const printableQuoteRef = useRef(null);
     return true;
   };
 
-  const handleCalculate = async () => {
+const handleCalculate = async () => {
     setError('');
     setQuoteSummary(null);
 
@@ -391,26 +463,27 @@ const printableQuoteRef = useRef(null);
 
     try {
       setCalculating(true);
-      
-        // Add dimension data if available
-        const payload = {
-          productId,
-          decorationOptionId: decorationId,
-          colorOptionId: colorId,
-          quantities: Object.entries(quantities)
-            .filter(([, qty]) => (qty || 0) > 0)
-            .map(([sizeId, qty]) => ({ sizeId, quantity: qty })),
-          printLocationIds,
-          turnaroundOptionId: turnaroundId,
-          designerHelpOptionId: designerHelpId,
-          deliveryMethod,
-          isCustomApparels,
-          useMyCloth: fabricChoice === 'own',
-          artworkReady: artworkReadyChoice === 'ready',
-          tempArtworkFiles,
-          artworkFiles,
-          customSizeNote,
-        };
+      const requestId = ++latestCalcRequestIdRef.current;
+
+      // Add dimension data if available
+      const payload = {
+        productId,
+        decorationOptionId: decorationId,
+        colorOptionId: colorId,
+        quantities: Object.entries(quantities)
+          .filter(([, qty]) => (qty || 0) > 0)
+          .map(([sizeId, qty]) => ({ sizeId, quantity: qty })),
+        printLocationIds,
+        turnaroundOptionId: turnaroundId,
+        designerHelpOptionId: designerHelpId,
+        deliveryMethod,
+        isCustomApparels,
+        useMyCloth: fabricChoice === 'own',
+        artworkReady: artworkReadyChoice === 'ready',
+        tempArtworkFiles,
+        artworkFiles,
+        customSizeNote,
+      };
 
       const res = await fetch('/api/quote/calculate', {
         method: 'POST',
@@ -421,6 +494,7 @@ const printableQuoteRef = useRef(null);
       if (!res.ok) {
         throw new Error(json.error || 'Failed to calculate quote');
       }
+      if (requestId !== latestCalcRequestIdRef.current) return;
       setQuoteSummary(json);
       setStep(stepTitles.length - 1);
       setHasCalculated(true);
@@ -456,7 +530,9 @@ const printableQuoteRef = useRef(null);
         onQuoteReady({ mode: 'apparel', payload, summary: json, customizationsDisplay });
       }
     } catch (err) {
-      setError(err.message || 'Failed to calculate quote');
+      if (requestId === latestCalcRequestIdRef.current) {
+        setError(err.message || 'Failed to calculate quote');
+      }
     } finally {
       setCalculating(false);
     }
@@ -579,7 +655,7 @@ const printableQuoteRef = useRef(null);
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setDecorationId(opt.id)}
+                onClick={() => handleDecorationChange(opt.id)}
                 className={`rounded-xl border px-4 py-3 text-left transition ${
                   decorationId === opt.id
                     ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'

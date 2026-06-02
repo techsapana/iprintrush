@@ -376,12 +376,9 @@ export function calculateQuote(
 
   let productionTimeTotal = 0;
   let productionTimeLabel = 'Turnaround';
+  let selectedTurnaround: { id: string; name: string; priceModifier: number; pricingType?: string; percentageValue?: number | null } | null = null;
   if (turnaroundOptionId) {
-    const turn = config.turnarounds.find((t) => t.id === turnaroundOptionId && t.enabled);
-    if (turn && turn.priceModifier !== 0) {
-      productionTimeTotal = turn.priceModifier;
-      productionTimeLabel = `Turnaround (${turn.name})`;
-    }
+    selectedTurnaround = config.turnarounds.find((t) => t.id === turnaroundOptionId && t.enabled) || null;
   }
 
   const flatFees: { label: string; amount: number }[] = [];
@@ -398,6 +395,20 @@ export function calculateQuote(
   const tierMerchandise = useMyCloth
     ? { lineItems: [] as QuoteLineItem[], merchandiseSubtotal: 0, merchandisePerUnit: 0 }
     : resolveQuantityTierMerchandise(config.quantityTiers, tier, totalQuantity, null);
+
+  if (selectedTurnaround) {
+    const pricingType = selectedTurnaround.pricingType || 'flat';
+    if (pricingType === 'percentage' && selectedTurnaround.percentageValue != null) {
+      const addonsTotal = addonsPerUnit * totalQuantity;
+      const baseForPct = tierMerchandise.merchandiseSubtotal + addonsTotal;
+      productionTimeTotal = baseForPct * (selectedTurnaround.percentageValue / 100);
+    } else if (selectedTurnaround.priceModifier !== 0) {
+      productionTimeTotal = selectedTurnaround.priceModifier;
+    }
+    if (productionTimeTotal !== 0) {
+      productionTimeLabel = `Turnaround (${selectedTurnaround.name})`;
+    }
+  }
 
   const priced = buildStandardProductPrice({
     merchandiseLineItems: tierMerchandise.lineItems,
@@ -582,23 +593,6 @@ export function calculateDynamicQuote(
 
   const addonsPerUnit = addonBreakdown.reduce((sum, a) => sum + a.perUnit, 0);
 
-  let productionTimeTotal = 0;
-  let productionTimeLabel = 'Production time';
-  const productionSel = selections.production_time;
-  if (productionSel) {
-    const productionPool = poolMap.get('production_time');
-    if (productionPool && productionPool.options) {
-      const id = Array.isArray(productionSel) ? productionSel[0] : productionSel;
-      if (typeof id === 'string') {
-        const opt = productionPool.options.find((o) => o.id === id);
-        if (opt && opt.priceModifier !== 0) {
-          productionTimeTotal = opt.priceModifier * totalQuantity;
-          productionTimeLabel = `${productionPool.name} (${opt.label})`;
-        }
-      }
-    }
-  }
-
   const flatFees: { label: string; amount: number }[] = [];
   const designerSel = selections.designer_help;
   if (designerSel) {
@@ -623,6 +617,32 @@ export function calculateDynamicQuote(
     totalQuantity,
     catalogBaseUnitPrice,
   );
+
+  let productionTimeTotal = 0;
+  let productionTimeLabel = 'Production time';
+  const productionSel = selections.production_time;
+  if (productionSel) {
+    const productionPool = poolMap.get('production_time');
+    if (productionPool && productionPool.options) {
+      const id = Array.isArray(productionSel) ? productionSel[0] : productionSel;
+      if (typeof id === 'string') {
+        const opt = productionPool.options.find((o) => o.id === id);
+        if (opt) {
+          const pricingType = opt.pricingType || 'flat';
+          if (pricingType === 'percentage' && opt.percentageValue != null) {
+            const addonsTotal = addonsPerUnit * totalQuantity;
+            const baseForPct = tierMerchandise.merchandiseSubtotal + addonsTotal;
+            productionTimeTotal = baseForPct * (opt.percentageValue / 100);
+          } else if (opt.priceModifier !== 0) {
+            productionTimeTotal = opt.priceModifier * totalQuantity;
+          }
+          if (productionTimeTotal !== 0) {
+            productionTimeLabel = `${productionPool.name} (${opt.label})`;
+          }
+        }
+      }
+    }
+  }
 
   const priced = buildStandardProductPrice({
     merchandiseLineItems: tierMerchandise.lineItems,

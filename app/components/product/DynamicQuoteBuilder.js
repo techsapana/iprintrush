@@ -4,6 +4,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 
+function debounce(fn, delay) {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+}
+
 function normalizeSelectionType(value) {
   const raw = String(value || '').toLowerCase();
   if (raw === 'single' || raw === 'one' || raw === 'radio' || raw === 'single_select') return 'single';
@@ -50,7 +58,7 @@ export function DynamicQuoteBuilder({
 const [phoneNumber, setPhoneNumber] = useState('');
 const [shareFeedback, setShareFeedback] = useState('');
 const printableQuoteRef = useRef(null);
-  const artworkFileRef = useRef(null);
+const artworkFileRef = useRef(null);
 
   const [artworkReadyChoice, setArtworkReadyChoice] = useState('');
   const [tempArtworkFiles, setTempArtworkFiles] = useState([]);
@@ -58,6 +66,8 @@ const printableQuoteRef = useRef(null);
   const [customSizeNote, setCustomSizeNote] = useState('');
   const [artworkUploading, setArtworkUploading] = useState(false);
   const [artworkError, setArtworkError] = useState('');
+
+  const latestCalcRequestIdRef = useRef(0);
 
   const poolKeySet = useMemo(
     () => new Set((pools || []).map((p) => String(p.key))),
@@ -223,6 +233,32 @@ const printableQuoteRef = useRef(null);
 
   const handleSelectionChange = (poolKey, value) => {
     setSelections((prev) => ({ ...prev, [poolKey]: value }));
+    scheduleRecalculation();
+  };
+
+  const scheduleRecalculation = debounce(() => {
+    if (!hasCalculated) return;
+    handleCalculate();
+  }, 300);
+
+  const handleArtworkReadyChange = (value) => {
+    setArtworkReadyChoice(value);
+    scheduleRecalculation();
+  };
+
+  const handleTempArtworkFilesChange = (newFiles) => {
+    setTempArtworkFiles(newFiles);
+    scheduleRecalculation();
+  };
+
+  const handleArtworkFilesChange = (files) => {
+    setArtworkFiles(files);
+    scheduleRecalculation();
+  };
+
+  const handleCustomSizeNoteChange = (note) => {
+    setCustomSizeNote(note);
+    scheduleRecalculation();
   };
 
   const getPrintSizePoolKey = () => {
@@ -405,8 +441,9 @@ const printableQuoteRef = useRef(null);
       }
     }
 
-    try {
+try {
       setCalculating(true);
+      const requestId = ++latestCalcRequestIdRef.current;
     const dimensionSelections =
       shouldUseCustomDimensions
           ? {
@@ -434,6 +471,7 @@ const printableQuoteRef = useRef(null);
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to calculate quote');
+      if (requestId !== latestCalcRequestIdRef.current) return;
       setQuoteSummary(json);
       setStep(stepTitles.length - 1);
       setHasCalculated(true);
@@ -480,7 +518,9 @@ const printableQuoteRef = useRef(null);
         });
       }
     } catch (err) {
-      setError(err.message || 'Failed to calculate quote');
+      if (++latestCalcRequestIdRef.current === requestId) {
+        setError(err.message || 'Failed to calculate quote');
+      }
     } finally {
       setCalculating(false);
     }
@@ -863,6 +903,7 @@ const printableQuoteRef = useRef(null);
                   const printSizePoolKey = getPrintSizePoolKey();
                   if (printSizePoolKey) handleSelectionChange(printSizePoolKey, null);
                 }
+                scheduleRecalculation();
               }}
               className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
               placeholder="e.g., 24"
@@ -883,6 +924,7 @@ const printableQuoteRef = useRef(null);
                   const printSizePoolKey = getPrintSizePoolKey();
                   if (printSizePoolKey) handleSelectionChange(printSizePoolKey, null);
                 }
+                scheduleRecalculation();
               }}
               className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
               placeholder="e.g., 36"
@@ -928,13 +970,18 @@ const printableQuoteRef = useRef(null);
     );
   };
 
+const handleDeliveryMethodChange = (method) => {
+    setDeliveryMethod(method);
+    scheduleRecalculation();
+  };
+
   const renderDeliveryStep = () => (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900">Delivery Option</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <button
           type="button"
-          onClick={() => setDeliveryMethod('pickup')}
+          onClick={() => handleDeliveryMethodChange('pickup')}
           className={`rounded-xl border px-4 py-3 text-left transition ${
             deliveryMethod === 'pickup'
               ? 'border-[#29b6f6] bg-[#29b6f6]/5'
@@ -946,7 +993,7 @@ const printableQuoteRef = useRef(null);
         </button>
         <button
           type="button"
-          onClick={() => setDeliveryMethod('shipping')}
+          onClick={() => handleDeliveryMethodChange('shipping')}
           className={`rounded-xl border px-4 py-3 text-left transition ${
             deliveryMethod === 'shipping'
               ? 'border-[#29b6f6] bg-[#29b6f6]/5'
@@ -955,7 +1002,7 @@ const printableQuoteRef = useRef(null);
         >
           <div className="font-semibold text-gray-900">Shipping</div>
           <div className="text-sm text-gray-600">
-            We’ll ship your order to your address.
+            We'll ship your order to your address.
           </div>
         </button>
       </div>
@@ -1337,7 +1384,7 @@ const printableQuoteRef = useRef(null);
             type="radio"
             name="dq-artwork-ready"
             checked={artworkReadyChoice === 'ready'}
-            onChange={() => setArtworkReadyChoice('ready')}
+            onChange={() => handleArtworkReadyChange('ready')}
           />
           Upload file now
         </label>
@@ -1346,10 +1393,7 @@ const printableQuoteRef = useRef(null);
             type="radio"
             name="dq-artwork-ready"
             checked={artworkReadyChoice === 'not_ready'}
-            onChange={() => {
-              setArtworkReadyChoice('not_ready');
-              setTempArtworkFiles([]);
-            }}
+            onChange={() => handleArtworkReadyChange('not_ready')}
           />
           Upload file later
         </label>
@@ -1373,25 +1417,25 @@ const printableQuoteRef = useRef(null);
             tabIndex={-1}
             aria-hidden={true}
             disabled={artworkUploading}
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              try {
-                setArtworkUploading(true);
-                setArtworkError('');
-                const fd = new FormData();
-                fd.append('file', file);
-                const res = await fetch('/api/artwork/temp-upload', { method: 'POST', body: fd });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.error || 'Upload failed');
-                if (data?.tempId) setTempArtworkFiles((prev) => [...prev, data.tempId]);
-              } catch (err) {
-                setArtworkError(err.message || 'Failed to upload artwork');
-              } finally {
-                setArtworkUploading(false);
-                if (e.target) e.target.value = '';
-              }
-            }}
+onChange={async (e) => {
+               const file = e.target.files?.[0];
+               if (!file) return;
+               try {
+                 setArtworkUploading(true);
+                 setArtworkError('');
+                 const fd = new FormData();
+                 fd.append('file', file);
+                 const res = await fetch('/api/artwork/temp-upload', { method: 'POST', body: fd });
+                 const data = await res.json().catch(() => ({}));
+                 if (!res.ok) throw new Error(data.error || 'Upload failed');
+                 if (data?.tempId) handleTempArtworkFilesChange([...tempArtworkFiles, data.tempId]);
+               } catch (err) {
+                 setArtworkError(err.message || 'Failed to upload artwork');
+               } finally {
+                 setArtworkUploading(false);
+                 if (e.target) e.target.value = '';
+               }
+             }}
           />
           {artworkError && (
             <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -1410,7 +1454,7 @@ const printableQuoteRef = useRef(null);
         <label className="block text-sm font-medium text-gray-700">Custom size / notes (optional)</label>
         <textarea
           value={customSizeNote}
-          onChange={(e) => setCustomSizeNote(e.target.value)}
+          onChange={(e) => handleCustomSizeNoteChange(e.target.value)}
           rows={3}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
           placeholder="e.g., 24in x 36in, bleed on all sides..."

@@ -46,7 +46,7 @@ export async function getDynamicConfig(
         [pool.id]
       ),
       query(
-        'SELECT option_id, custom_price FROM product_pool_options WHERE product_id = ? AND pool_id = ? AND enabled = TRUE',
+        'SELECT option_id, custom_price, pricing_type, percentage_value FROM product_pool_options WHERE product_id = ? AND pool_id = ? AND enabled = TRUE',
         [productId, pool.id]
       ),
       query(
@@ -66,19 +66,34 @@ export async function getDynamicConfig(
         .filter((o: any) => o.custom_price != null)
         .map((o: any) => [o.option_id, parseFloat(o.custom_price)])
     );
+    const overridePricingType = Object.fromEntries(
+      overrideRows
+        .filter((o: any) => o.pricing_type != null)
+        .map((o: any) => [o.option_id, o.pricing_type])
+    );
+    const overridePercentageValue = Object.fromEntries(
+      overrideRows
+        .filter((o: any) => o.percentage_value != null)
+        .map((o: any) => [o.option_id, parseFloat(o.percentage_value)])
+    );
 
     // If product-specific rows exist for this pool, treat them as the allowed options list.
     // Otherwise, expose all enabled pool options (default behavior for new products).
     const shouldFilterByProductSelection = selectedOptionIds.size > 0;
     const opts = (options as any[])
       .filter((o: any) => !shouldFilterByProductSelection || selectedOptionIds.has(String(o.id)))
-      .map((o: any) => ({
-      id: o.id,
-      label: o.label,
-      value: o.value,
-      priceModifier: overrideMap[o.id] ?? parseFloat(o.price_modifier || 0),
-      enabled: true,
-      }));
+      .map((o: any) => {
+        const hasOverride = selectedOptionIds.has(String(o.id));
+        return {
+          id: o.id,
+          label: o.label,
+          value: o.value,
+          priceModifier: overrideMap[o.id] ?? parseFloat(o.price_modifier || 0),
+          pricingType: hasOverride ? (overridePricingType[o.id] || o.pricing_type || 'flat') : (o.pricing_type || 'flat'),
+          percentageValue: hasOverride ? (overridePercentageValue[o.id] ?? o.percentage_value ?? null) : (o.percentage_value ?? null),
+          enabled: true,
+        };
+      });
 
     const tiersToUse = (productQtyTiers as any[]).length > 0 ? productQtyTiers : qtyTiers;
     const quantityTiers = (tiersToUse as any[]).map((t: any) => ({
