@@ -1332,7 +1332,7 @@ setCustomizationMode('print_product');
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  FedEx package type
+                  Packaging Type
                 </label>
                 <select
                   name="packageType"
