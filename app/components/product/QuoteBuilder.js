@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DynamicQuoteBuilder } from './DynamicQuoteBuilder';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
+import { buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
 
 function debounce(fn, delay) {
   let timeoutId;
@@ -901,41 +902,35 @@ const printableQuoteRef = useRef(null);
 
   const renderSummaryStep = () => {
     if (!quoteSummary) return null;
-    const quoteLines = [
-      `Quote for: ${productName}`,
-      `Total Quantity: ${quoteSummary.totalQuantity} pcs`,
-      `Unit Price: $${quoteSummary.unitPrice.toFixed(2)}`,
-      `Subtotal: $${quoteSummary.subtotal.toFixed(2)}`,
-      `Shipping: $${quoteSummary.shipping.toFixed(2)}`,
-      `Grand Total: $${quoteSummary.grandTotal.toFixed(2)}`,
-      "",
-      "Selections:",
-      `- Color: ${config.colors.find((c) => c.id === colorId)?.name ?? '—'}`,
-      `- Decoration: ${config.decorations.find((d) => d.id === decorationId)?.name ?? '—'}`,
-      `- Turnaround: ${config.turnarounds.find((t) => t.id === turnaroundId)?.name ?? '—'}`,
-      `- Designer Help: ${config.designerHelp.find((d) => d.id === designerHelpId)?.name ?? '—'}`,
-      `- Print Locations: ${
-        printLocationIds.length === 0
-          ? 'Not selected'
-          : printLocationIds
-              .map((id) => config.printLocations.find((p) => p.id === id)?.name)
-              .filter(Boolean)
-              .join(', ')
-      }`,
-      `- Delivery: ${deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping'}`,
-      '',
-      'Size Breakdown:',
-      ...availableSizes
+    
+    const customizationsDisplay = {
+      Color: config.colors.find((c) => c.id === colorId)?.name ?? '—',
+      Decoration: config.decorations.find((d) => d.id === decorationId)?.name ?? '—',
+      Turnaround: config.turnarounds.find((t) => t.id === turnaroundId)?.name ?? '—',
+      'Designer Help': config.designerHelp.find((d) => d.id === designerHelpId)?.name ?? '—',
+      'Print Locations': printLocationIds.length
+        ? printLocationIds
+            .map((id) => config.printLocations.find((p) => p.id === id)?.name)
+            .filter(Boolean)
+            .join(', ')
+        : '—',
+      'Size Breakdown': availableSizes
         .filter((size) => (quantities[size.id] || 0) > 0)
-        .map((size) => `- ${size.label}: ${quantities[size.id] || 0}`),
-      '',
-      'Charges Breakdown:',
-      ...quoteSummary.lineItems.map((item) => {
-        const formatted = formatAmount(item.amount);
-        return `- ${item.label}: ${formatted}`;
-      }),
-    ];
-    const quoteText = quoteLines.join('\n');
+        .map((size) => `${size.label}: ${quantities[size.id] || 0}`)
+        .join(', '),
+      Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping',
+      ...(isCustomApparels
+        ? {
+            Fabric: fabricChoice === 'own'
+              ? 'I have my own fabric'
+              : "I don't have my own fabric",
+          }
+        : {}),
+      Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+    };
+    
+    const quoteForInvoice = { ...quoteSummary, ...customizationsDisplay, productName, deliveryMethod };
+    const quoteText = buildInvoiceText(quoteForInvoice, { productName });
     const emailSubject = `Quote - ${productName}`;
 
     const handleEmailQuote = () => {
@@ -963,139 +958,60 @@ const printableQuoteRef = useRef(null);
     };
 
     const handlePrintQuote = () => {
-      if (!printableQuoteRef.current) return;
-      const printWindow = window.open('', '_blank', 'noopener,noreferrer');
-      if (!printWindow) {
-        setError('Unable to open print window. Please allow pop-ups and try again.');
+      if (!quoteSummary) {
+        setError('No quote data to print');
         return;
       }
-      const headHtml = Array.from(document.head.querySelectorAll('style, link[rel="stylesheet"]'))
-        .map((el) => el.outerHTML)
-        .join('\n');
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <base href="${window.location.origin}/" />
-            <title>Quote - ${productName}</title>
-            ${headHtml}
-            <style>
-              @page {
-                size: 8.5in 11in;
-                margin: 0.5in;
-              }
-              * {
-                box-shadow: none !important;
-                border-radius: 0 !important;
-                text-shadow: none !important;
-              }
-              body {
-                padding: 0 !important;
-                margin: 0 !important;
-                background: #fff !important;
-                color: #000 !important;
-              }
-              #printable-quote {
-                overflow: visible !important;
-                box-shadow: none !important;
-                border: none !important;
-                background: #fff !important;
-                max-width: 100% !important;
-                width: 100% !important;
-                page-break-inside: auto;
-              }
-              #printable-quote > div {
-                break-inside: avoid;
-              }
-              #printable-quote p,
-              #printable-quote li,
-              #printable-quote span,
-              #printable-quote div {
-                orphans: 4;
-                widows: 4;
-              }
-              #printable-quote button {
-                display: none !important;
-              }
-              #printable-quote input {
-                border: none !important;
-                background: transparent !important;
-                box-shadow: none !important;
-                border-radius: 0 !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                -moz-appearance: textfield !important;
-                -webkit-appearance: none !important;
-                appearance: none !important;
-              }
-              #printable-quote h3,
-              #printable-quote h4 {
-                page-break-after: avoid;
-              }
-            </style>
-          </head>
-          <body>
-            ${printableQuoteRef.current.outerHTML}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      const tryPrint = async () => {
-        try {
-          const doc = printWindow.document;
-          if (doc?.fonts?.ready) {
-            await doc.fonts.ready;
-          }
-          const imgs = Array.from(doc.images || []);
-          await Promise.all(
-            imgs.map((img) => {
-              if (img.complete) return Promise.resolve();
-              return new Promise((resolve) => {
-                img.onload = () => resolve();
-                img.onerror = () => resolve();
-              });
-            }),
-          );
-        } catch {
-          // ignore
-        }
-        printWindow.print();
+      const customizationsDisplay = {
+        Color: config?.colors?.find((c) => c.id === colorId)?.name ?? '—',
+        Decoration: config?.decorations?.find((d) => d.id === decorationId)?.name ?? '—',
+        Turnaround: config?.turnarounds?.find((t) => t.id === turnaroundId)?.name ?? '—',
+        'Designer Help': config?.designerHelp?.find((d) => d.id === designerHelpId)?.name ?? '—',
+        'Print Locations': printLocationIds.length
+          ? printLocationIds.map((id) => config?.printLocations?.find((p) => p.id === id)?.name).filter(Boolean).join(', ')
+          : '—',
+        'Size Breakdown': availableSizes.filter((s) => (quantities[s.id] || 0) > 0).map((s) => `${s.label}: ${quantities[s.id] || 0}`).join(', '),
+        Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping',
+        ...(isCustomApparels ? { Fabric: fabricChoice === 'own' ? 'I have my own fabric' : "I don't have my own fabric" } : {}),
+        Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+        productName,
       };
-      // Ensure stylesheets have a moment to apply.
-      setTimeout(() => {
-        tryPrint();
-      }, 350);
-    };
-
-    const generateShareQuoteText = () => {
-      const shareQuoteLines = [
-        ...quoteLines,
-        '',
-        `Store Location: ${deliveryMethod === 'pickup' ? 'Fair Oaks, CA' : '—'}`,
-        '',
-        'Generated from Print & Shipping System',
-      ];
-      return shareQuoteLines.join('\n');
+      const quoteForInvoice = { ...quoteSummary, ...customizationsDisplay, deliveryMethod, productName };
+      const encoded = btoa(encodeURIComponent(JSON.stringify(quoteForInvoice)));
+      window.location.href = `/quote/print?data=${encoded}`;
     };
 
     const handleShareQuote = async () => {
       if (!quoteSummary) return;
-      const shareText = generateShareQuoteText();
+      const customizationsDisplay = {
+        Color: config?.colors?.find((c) => c.id === colorId)?.name ?? '—',
+        Decoration: config?.decorations?.find((d) => d.id === decorationId)?.name ?? '—',
+        Turnaround: config?.turnarounds?.find((t) => t.id === turnaroundId)?.name ?? '—',
+        'Designer Help': config?.designerHelp?.find((d) => d.id === designerHelpId)?.name ?? '—',
+        'Print Locations': printLocationIds.length
+          ? printLocationIds.map((id) => config?.printLocations?.find((p) => p.id === id)?.name).filter(Boolean).join(', ')
+          : '—',
+        'Size Breakdown': availableSizes.filter((s) => (quantities[s.id] || 0) > 0).map((s) => `${s.label}×${quantities[s.id]}`).join(', '),
+        Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping',
+        ...(isCustomApparels ? { Fabric: fabricChoice === 'own' ? 'I have my own fabric' : "I don't have my own fabric" } : {}),
+        Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+        productName,
+      };
+      const quoteForInvoice = { ...quoteSummary, ...customizationsDisplay, deliveryMethod };
+      const payload = buildInvoiceSharePayload(quoteForInvoice, { productName });
       try {
         if (navigator.share) {
           await navigator.share({
-            title: 'Your Quote from Print Shop',
-            text: shareText,
-            url: typeof window !== 'undefined' ? window.location.href : '',
+            title: payload.title,
+            text: payload.text,
+            url: payload.url,
           });
         } else {
           throw new Error('Web Share API not supported');
         }
       } catch {
         try {
-          await navigator.clipboard.writeText(shareText);
+          await navigator.clipboard.writeText(payload.fallbackText);
           setShareFeedback('Quote copied to clipboard');
           setTimeout(() => setShareFeedback(''), 3000);
         } catch {

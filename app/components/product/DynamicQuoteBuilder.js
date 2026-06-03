@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
+import { buildInvoiceHTML, buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
 
 function debounce(fn, delay) {
   let timeoutId;
@@ -939,139 +940,171 @@ try {
       window.open(url, '_blank', 'noopener,noreferrer');
     };
     const handlePrintQuote = () => {
-      if (!printableQuoteRef.current) return;
-      const printWindow = window.open('', '_blank', 'noopener,noreferrer');
-      if (!printWindow) {
-        setError('Unable to open print window. Please allow pop-ups and try again.');
-        return;
-      }
-      const headHtml = Array.from(document.head.querySelectorAll('style, link[rel="stylesheet"]'))
-        .map((el) => el.outerHTML)
-        .join('\n');
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <base href="${window.location.origin}/" />
-            <title>Quote - ${productName}</title>
-            ${headHtml}
-            <style>
-              @page {
-                size: 8.5in 11in;
-                margin: 0.5in;
-              }
-              * {
-                box-shadow: none !important;
-                border-radius: 0 !important;
-                text-shadow: none !important;
-              }
-              body {
-                padding: 0 !important;
-                margin: 0 !important;
-                background: #fff !important;
-                color: #000 !important;
-              }
-              #printable-quote {
-                overflow: visible !important;
-                box-shadow: none !important;
-                border: none !important;
-                background: #fff !important;
-                max-width: 100% !important;
-                width: 100% !important;
-                page-break-inside: auto;
-              }
-              #printable-quote > div {
-                break-inside: avoid;
-              }
-              #printable-quote p,
-              #printable-quote li,
-              #printable-quote span,
-              #printable-quote div {
-                orphans: 4;
-                widows: 4;
-              }
-              #printable-quote button {
-                display: none !important;
-              }
-              #printable-quote input {
-                border: none !important;
-                background: transparent !important;
-                box-shadow: none !important;
-                border-radius: 0 !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                -moz-appearance: textfield !important;
-                -webkit-appearance: none !important;
-                appearance: none !important;
-              }
-              #printable-quote h3,
-              #printable-quote h4 {
-                page-break-after: avoid;
-              }
-            </style>
-          </head>
-          <body>
-            ${printableQuoteRef.current.outerHTML}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      const tryPrint = async () => {
-        try {
-          const doc = printWindow.document;
-          if (doc?.fonts?.ready) {
-            await doc.fonts.ready;
-          }
-          const imgs = Array.from(doc.images || []);
-          await Promise.all(
-            imgs.map((img) => {
-              if (img.complete) return Promise.resolve();
-              return new Promise((resolve) => {
-                img.onload = () => resolve();
-                img.onerror = () => resolve();
-              });
-            }),
-          );
-        } catch {
-          // ignore
-        }
-        printWindow.print();
+      if (!quoteSummary) return;
+      const quoteForInvoice = {
+        ...quoteSummary,
+        productName,
+        deliveryMethod,
+        selections: {},
       };
-      // Ensure stylesheets have a moment to apply.
-      setTimeout(() => {
-        tryPrint();
-      }, 350);
-    };
-
-    const generateShareQuoteText = () => {
-      const shareQuoteLines = [
-        ...quoteLines,
-        '',
-        `Store Location: ${deliveryMethod === 'pickup' ? 'Fair Oaks, CA' : '—'}`,
-        '',
-        'Generated from Print & Shipping System',
-      ];
-      return shareQuoteLines.join('\n');
+      activeGroups.forEach((g) => {
+        const pool = poolMap.get(g.poolKey);
+        if (!pool) return;
+        const val = selections[g.poolKey];
+        if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) return;
+        if (pool.selectionType === 'quantity') {
+          quoteForInvoice.selections[g.label] = String(val);
+        } else if (pool.selectionType === 'single') {
+          quoteForInvoice.selections[g.label] = pool.options?.find((o) => o.id === val)?.label ?? String(val);
+        } else if (pool.selectionType === 'multi') {
+          const labels = val.map((id) => pool.options?.find((o) => o.id === id)?.label ?? id).filter(Boolean);
+          quoteForInvoice.selections[g.label] = labels.join(', ');
+        }
+      });
+      if (widthIn && heightIn) {
+        const w = parseFloat(widthIn);
+        const h = parseFloat(heightIn);
+        if (Number.isFinite(w) && Number.isFinite(h)) {
+          quoteForInvoice.selections['Dimensions'] = `${w}" × ${h}"`;
+        }
+      }
+      quoteForInvoice.selections['Delivery'] = deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping';
+      quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
+      const encoded = btoa(encodeURIComponent(JSON.stringify(quoteForInvoice)));
+      window.location.href = `/quote/print?data=${encoded}`;
     };
 
     const handleShareQuote = async () => {
       if (!quoteSummary) return;
-      const shareText = generateShareQuoteText();
+      const quoteForInvoice = {
+        ...quoteSummary,
+        productName,
+        deliveryMethod,
+        selections: {},
+      };
+      activeGroups.forEach((g) => {
+        const pool = poolMap.get(g.poolKey);
+        if (!pool) return;
+        const val = selections[g.poolKey];
+        if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) return;
+        if (pool.selectionType === 'quantity') {
+          quoteForInvoice.selections[g.label] = String(val);
+        } else if (pool.selectionType === 'single') {
+          quoteForInvoice.selections[g.label] = pool.options?.find((o) => o.id === val)?.label ?? String(val);
+        } else if (pool.selectionType === 'multi') {
+          const labels = val.map((id) => pool.options?.find((o) => o.id === id)?.label ?? id).filter(Boolean);
+          quoteForInvoice.selections[g.label] = labels.join(', ');
+        }
+      });
+      if (widthIn && heightIn) {
+        const w = parseFloat(widthIn);
+        const h = parseFloat(heightIn);
+        if (Number.isFinite(w) && Number.isFinite(h)) {
+          quoteForInvoice.selections['Dimensions'] = `${w}" × ${h}"`;
+        }
+      }
+      quoteForInvoice.selections['Delivery'] = deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping';
+      quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
+      const payload = buildInvoiceSharePayload(quoteForInvoice, { productName });
       try {
         if (navigator.share) {
           await navigator.share({
-            title: 'Your Quote from Print Shop',
-            text: shareText,
-            url: typeof window !== 'undefined' ? window.location.href : '',
+            title: payload.title,
+            text: payload.text,
+            url: payload.url,
           });
         } else {
           throw new Error('Web Share API not supported');
         }
       } catch {
         try {
-          await navigator.clipboard.writeText(shareText);
+          await navigator.clipboard.writeText(payload.fallbackText);
+          setShareFeedback('Quote copied to clipboard');
+          setTimeout(() => setShareFeedback(''), 3000);
+        } catch {
+          setError('Unable to share quote. Please try again.');
+        }
+      }
+    };
+      activeGroups.forEach((g) => {
+        const pool = poolMap.get(g.poolKey);
+        if (!pool) return;
+        const val = selections[g.poolKey];
+        if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) return;
+        if (pool.selectionType === 'quantity') {
+          quoteForInvoice.selections[g.label] = String(val);
+        } else if (pool.selectionType === 'single') {
+          quoteForInvoice.selections[g.label] = pool.options?.find((o) => o.id === val)?.label ?? String(val);
+        } else if (pool.selectionType === 'multi') {
+          const labels = val.map((id) => pool.options?.find((o) => o.id === id)?.label ?? id).filter(Boolean);
+          quoteForInvoice.selections[g.label] = labels.join(', ');
+        }
+      });
+      if (widthIn && heightIn) {
+        const w = parseFloat(widthIn);
+        const h = parseFloat(heightIn);
+        if (Number.isFinite(w) && Number.isFinite(h)) {
+          quoteForInvoice.selections['Dimensions'] = `${w}" × ${h}"`;
+        }
+      }
+      quoteForInvoice.selections['Color'] = '—';
+      quoteForInvoice.selections['Decoration'] = '—';
+      quoteForInvoice.selections['Turnaround'] = '—';
+      quoteForInvoice.selections['Designer Help'] = '—';
+      quoteForInvoice.selections['Print Locations'] = '—';
+      quoteForInvoice.selections['Size Breakdown'] = '—';
+      quoteForInvoice.selections['Delivery'] = deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping';
+      quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
+      quoteForInvoice.selections['Fabric'] = '—';
+      const encoded = btoa(encodeURIComponent(JSON.stringify(quoteForInvoice)));
+      window.location.href = `/quote/print?data=${encoded}`;
+    };
+
+    const handleShareQuote = async () => {
+      if (!quoteSummary) return;
+      const quoteForInvoice = {
+        ...quoteSummary,
+        productName,
+        deliveryMethod,
+        selections: {},
+      };
+      activeGroups.forEach((g) => {
+        const pool = poolMap.get(g.poolKey);
+        if (!pool) return;
+        const val = selections[g.poolKey];
+        if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) return;
+        if (pool.selectionType === 'quantity') {
+          quoteForInvoice.selections[g.label] = String(val);
+        } else if (pool.selectionType === 'single') {
+          quoteForInvoice.selections[g.label] = pool.options?.find((o) => o.id === val)?.label ?? String(val);
+        } else if (pool.selectionType === 'multi') {
+          const labels = val.map((id) => pool.options?.find((o) => o.id === id)?.label ?? id).filter(Boolean);
+          quoteForInvoice.selections[g.label] = labels.join(', ');
+        }
+      });
+      if (widthIn && heightIn) {
+        const w = parseFloat(widthIn);
+        const h = parseFloat(heightIn);
+        if (Number.isFinite(w) && Number.isFinite(h)) {
+          quoteForInvoice.selections['Dimensions'] = `${w}" × ${h}"`;
+        }
+      }
+      quoteForInvoice.selections['Delivery'] = deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping';
+      quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
+      const payload = buildInvoiceSharePayload(quoteForInvoice, { productName });
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: payload.title,
+            text: payload.text,
+            url: payload.url,
+          });
+        } else {
+          throw new Error('Web Share API not supported');
+        }
+      } catch {
+        try {
+          await navigator.clipboard.writeText(payload.fallbackText);
           setShareFeedback('Quote copied to clipboard');
           setTimeout(() => setShareFeedback(''), 3000);
         } catch {
