@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { buildInvoiceHTML } from '../../lib/invoiceBuilder';
 
-export default function QuoteSharePage() {
+function QuoteShareContent() {
   const searchParams = useSearchParams();
   const [quoteData, setQuoteData] = useState(null);
   const [error, setError] = useState('');
@@ -59,5 +59,13 @@ export default function QuoteSharePage() {
 
   return (
     <div dangerouslySetInnerHTML={{ __html: buildInvoiceHTML(quoteData, productInfo) }} />
+  );
+}
+
+export default function QuoteSharePage() {
+  return (
+    <Suspense>
+      <QuoteShareContent />
+    </Suspense>
   );
 }

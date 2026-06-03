@@ -350,11 +350,9 @@ const printableQuoteRef = useRef(null);
     } finally {
       setCalculating(false);
     }
-  };
+};
 
-  const hasEverCalculatedRef = useRef(false);
-
-  const invalidateQuote = () => {
+   const invalidateQuote = () => {
     if (!hasCalculated) return;
     setQuoteSummary(null);
     setHasCalculated(false);
@@ -730,7 +728,7 @@ const printableQuoteRef = useRef(null);
     );
   };
 
-  const renderSizesStep = () => {
+const renderSizesStep = () => {
     const adultSizes = availableSizes.filter(
       (size) => !String(size.id).toLowerCase().startsWith('youth-'),
     );
@@ -742,17 +740,22 @@ const printableQuoteRef = useRef(null);
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {sizes.map((size) => {
           const qty = quantities[size.id] || 0;
+
           return (
             <div
               key={size.id}
               className="flex flex-col items-center rounded-xl border border-gray-200 bg-white px-3 py-3"
             >
-              <div className="text-base font-semibold text-gray-900">{size.label}</div>
+              <div className="text-base font-semibold text-gray-900">
+                {size.label}
+              </div>
+
               {size.priceAddon !== 0 && (
                 <div className="text-xs text-gray-500">
                   +${size.priceAddon.toFixed(2)} each
                 </div>
               )}
+
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
@@ -761,6 +764,7 @@ const printableQuoteRef = useRef(null);
                 >
                   −
                 </button>
+
                 <input
                   type="number"
                   min="0"
@@ -768,6 +772,7 @@ const printableQuoteRef = useRef(null);
                   onChange={(e) => handleSizeQtyInput(size.id, e.target.value)}
                   className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
                 />
+
                 <button
                   type="button"
                   onClick={() => handleSizeQtyChange(size.id, 1)}
@@ -775,6 +780,60 @@ const printableQuoteRef = useRef(null);
                 >
                   +
                 </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+
+    return (
+      <div className="space-y-6">
+        <h3 className="text-lg font-semibold text-gray-900">Step 4 – Select Sizes & Quantities</h3>
+        {adultSizes.length > 0 && (
+          <div>
+            <div className="text-sm font-medium text-gray-700 mb-2">Adult Sizes</div>
+            {renderSizeGrid(adultSizes)}
+          </div>
+        )}
+        {youthSizes.length > 0 && (
+          <div>
+            <div className="text-sm font-medium text-gray-700 mb-2">Youth Sizes</div>
+            {renderSizeGrid(youthSizes)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderPrintLocationsStep = () => {
+    const options = config.printLocations.filter((p) =>
+      productSettings.printLocationOptionIds.includes(p.id),
+    );
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Step 5 – Select Printing Location</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {options.map((opt) => {
+            const active = printLocationIds.includes(opt.id);
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => togglePrintLocation(opt.id)}
+                className={`rounded-xl border px-4 py-3 text-left transition ${
+                  active
+                    ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
+                    : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
+                }`}
+              >
+                <div className="font-semibold text-gray-900">{opt.name}</div>
+                {opt.priceAddon !== 0 && (
+                  <div className="text-sm text-gray-600">
+                    +${opt.priceAddon.toFixed(2)} per piece
+                  </div>
+                )}
+              </button>
             );
           })}
         </div>
@@ -1270,7 +1329,7 @@ const printableQuoteRef = useRef(null);
         )}
 
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <h4 className="text-sm font-semibold text-gray-900 mb-2">Estimated FedEx Price</h4>
+          <h4 className="text-sm font-semibold text-gray-900 mb-2">Estimated Shipping Price</h4>
           <p className="text-xs text-gray-600 mb-3">Enter ZIP code to get estimated shipping price.</p>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
@@ -1300,80 +1359,80 @@ const printableQuoteRef = useRef(null);
     );
   };
 
-  const renderStepContent = () => {
-  const artworkStep = (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900">Upload Artwork</h3>
-      <div className="space-y-3">
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input
-            type="radio"
-            name="quote-artwork-ready"
-            checked={artworkReadyChoice === 'ready'}
-            onChange={() => setArtworkReadyChoice('ready')}
-          />
-          Upload file now
-        </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input
-            type="radio"
-            name="quote-artwork-ready"
-            checked={artworkReadyChoice === 'not_ready'}
-            onChange={() => {
-              setArtworkReadyChoice('not_ready');
-              setTempArtworkFiles([]);
-            }}
-          />
-          Upload file later
-        </label>
-      </div>
-      {artworkFiles.length > 0 && (
-        <div className="text-xs text-gray-600">
-          {artworkFiles.length} existing artwork file(s) will be reused.
-        </div>
-      )}
-      {artworkReadyChoice === 'ready' && (
-        <div className="space-y-2">
-          <label className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
-            <span>{artworkUploading ? 'Uploading...' : 'Upload artwork image'}</span>
+const renderStepContent = () => {
+    const artworkStep = (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Upload Artwork</h3>
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
-              type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
-              className="hidden"
-              disabled={artworkUploading}
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                try {
-                  setArtworkUploading(true);
-                  setArtworkError('');
-                  const fd = new FormData();
-                  fd.append('file', file);
-                  const res = await fetch('/api/artwork/temp-upload', { method: 'POST', body: fd });
-                  const data = await res.json().catch(() => ({}));
-                  if (!res.ok) throw new Error(data.error || 'Upload failed');
-                  if (data?.tempId) setTempArtworkFiles((prev) => [...prev, data.tempId]);
-                } catch (err) {
-                  setArtworkError(err.message || 'Failed to upload artwork');
-                } finally {
-                  setArtworkUploading(false);
-                  if (e.target) e.target.value = '';
-                }
+              type="radio"
+              name="quote-artwork-ready"
+              checked={artworkReadyChoice === 'ready'}
+              onChange={() => setArtworkReadyChoice('ready')}
+            />
+            Upload file now
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="radio"
+              name="quote-artwork-ready"
+              checked={artworkReadyChoice === 'not_ready'}
+              onChange={() => {
+                setArtworkReadyChoice('not_ready');
+                setTempArtworkFiles([]);
               }}
             />
+            Upload file later
           </label>
-          {artworkError && (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {artworkError}
-            </div>
-          )}
-          {tempArtworkFiles.length > 0 && (
-            <div className="text-xs text-gray-600">{tempArtworkFiles.length} artwork file(s) uploaded.</div>
-          )}
         </div>
-      )}
-    </div>
-  );
+        {artworkFiles.length > 0 && (
+          <div className="text-xs text-gray-600">
+            {artworkFiles.length} existing artwork file(s) will be reused.
+          </div>
+        )}
+        {artworkReadyChoice === 'ready' && (
+          <div className="space-y-2">
+            <label className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
+              <span>{artworkUploading ? 'Uploading...' : 'Upload artwork image'}</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                className="hidden"
+                disabled={artworkUploading}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    setArtworkUploading(true);
+                    setArtworkError('');
+                    const fd = new FormData();
+                    fd.append('file', file);
+                    const res = await fetch('/api/artwork/temp-upload', { method: 'POST', body: fd });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || 'Upload failed');
+                    if (data?.tempId) setTempArtworkFiles((prev) => [...prev, data.tempId]);
+                  } catch (err) {
+                    setArtworkError(err.message || 'Failed to upload artwork');
+                  } finally {
+                    setArtworkUploading(false);
+                    if (e.target) e.target.value = '';
+                  }
+                }}
+              />
+            </label>
+            {artworkError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {artworkError}
+              </div>
+            )}
+            {tempArtworkFiles.length > 0 && (
+              <div className="text-xs text-gray-600">{tempArtworkFiles.length} artwork file(s) uploaded.</div>
+            )}
+          </div>
+        )}
+      </div>
+    );
 
     const steps = isCustomApparels
       ? [
@@ -1557,4 +1616,3 @@ const printableQuoteRef = useRef(null);
     </section>
   );
 }
-
