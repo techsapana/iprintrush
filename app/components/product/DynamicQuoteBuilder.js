@@ -844,202 +844,25 @@ try {
          
          {allowCustomDimensions && renderDimensionFields()}
        </div>
-     );
-  };
-
-  const renderDimensionFields = () => {
-    const printSizePoolKey = getPrintSizePoolKey();
-    const selectedPrintSize = printSizePoolKey ? selections[printSizePoolKey] : null;
-    const hasPredefinedPrintSize =
-      selectedPrintSize !== undefined &&
-      selectedPrintSize !== null &&
-      selectedPrintSize !== '' &&
-      (!Array.isArray(selectedPrintSize) || selectedPrintSize.length > 0);
-
-    if (!dimensionConfig) {
-      return (
-        <div className="space-y-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3">
-          <div className="text-sm font-semibold text-gray-900">Custom Dimensions (inches)</div>
-          <div className="text-xs text-gray-600">Custom size pricing is not configured for this product.</div>
-        </div>
-      );
-    }
-
-    const w = parseFloat(widthIn);
-    const h = parseFloat(heightIn);
-    const widthTooLow =
-      Number.isFinite(w) && dimensionConfig?.minWidthIn != null && w < Number(dimensionConfig.minWidthIn);
-    const widthTooHigh =
-      Number.isFinite(w) && dimensionConfig?.maxWidthIn != null && w > Number(dimensionConfig.maxWidthIn);
-    const heightTooLow =
-      Number.isFinite(h) && dimensionConfig?.minHeightIn != null && h < Number(dimensionConfig.minHeightIn);
-    const heightTooHigh =
-      Number.isFinite(h) && dimensionConfig?.maxHeightIn != null && h > Number(dimensionConfig.maxHeightIn);
-
-    return (
-      <div className="space-y-3 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <div className="text-sm font-semibold text-gray-900">Custom Dimensions (inches)</div>
-            <p className="text-xs text-gray-500">
-              Enter your required width and height. Price is calculated by area (width × height).
-            </p>
-          </div>
-          <div className="text-xs text-gray-600">
-            {dimensionConfig.minWidthIn != null && dimensionConfig.maxWidthIn != null && (
-              <div>
-                Width: {dimensionConfig.minWidthIn}" – {dimensionConfig.maxWidthIn}"
-              </div>
-            )}
-            {dimensionConfig.minHeightIn != null && dimensionConfig.maxHeightIn != null && (
-              <div>
-                Height: {dimensionConfig.minHeightIn}" – {dimensionConfig.maxHeightIn}"
-              </div>
-            )}
-            {dimensionConfig.pricePerSqInch != null && (
-              <div>
-                Rate: ${dimensionConfig.pricePerSqInch.toFixed(4)} per sq. in
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 max-w-sm">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Width (inches)</label>
-            <input
-              type="number"
-              step="0.01"
-              min={dimensionConfig.minWidthIn || 0.01}
-              max={dimensionConfig.maxWidthIn || undefined}
-              value={widthIn}
-              onChange={(e) => {
-                invalidateQuote();
-                const next = e.target.value;
-                setWidthIn(next);
-                if (next !== '' || heightIn !== '') {
-                  const printSizePoolKey = getPrintSizePoolKey();
-                  if (printSizePoolKey) handleSelectionChange(printSizePoolKey, null);
-                }
-                scheduleRecalculation();
-              }}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
-              placeholder="e.g., 24"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Height (inches)</label>
-            <input
-              type="number"
-              step="0.01"
-              min={dimensionConfig.minHeightIn || 0.01}
-              max={dimensionConfig.maxHeightIn || undefined}
-              value={heightIn}
-              onChange={(e) => {
-                invalidateQuote();
-                const next = e.target.value;
-                setHeightIn(next);
-                if (next !== '' || widthIn !== '') {
-                  const printSizePoolKey = getPrintSizePoolKey();
-                  if (printSizePoolKey) handleSelectionChange(printSizePoolKey, null);
-                }
-                scheduleRecalculation();
-              }}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
-              placeholder="e.g., 36"
-            />
-          </div>
-        </div>
-        {hasPredefinedPrintSize && (
-          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-            Predefined print size is selected. Start typing width/height to switch to custom size.
-          </div>
-        )}
-        
-        {/* Area Calculation Display */}
-        {widthIn && heightIn && (
-          <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="text-xs font-medium text-blue-900">
-              Area: {(parseFloat(widthIn) * parseFloat(heightIn)).toFixed(2)} sq. inches
-            </div>
-            {dimensionConfig.pricePerSqInch != null ? (
-              <div className="text-xs text-blue-700">
-                Area price: ${(
-                  parseFloat(widthIn) * parseFloat(heightIn) * dimensionConfig.pricePerSqInch
-                ).toFixed(2)}
-                <span className="ml-2 text-[11px] text-blue-800">
-                  Rate: ${Number(dimensionConfig.pricePerSqInch).toFixed(2)} per sq. in · $
-                  {(Number(dimensionConfig.pricePerSqInch) * 144).toFixed(2)} per sq. ft
-                </span>
-              </div>
-            ) : (
-              <div className="text-xs text-blue-700">Price per sq. inch not configured.</div>
-            )}
-          </div>
-        )}
-        {(widthTooLow || widthTooHigh || heightTooLow || heightTooHigh) && (
-          <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-            {widthTooLow && <div>Width is below minimum ({dimensionConfig.minWidthIn} in).</div>}
-            {widthTooHigh && <div>Width exceeds maximum ({dimensionConfig.maxWidthIn} in).</div>}
-            {heightTooLow && <div>Height is below minimum ({dimensionConfig.minHeightIn} in).</div>}
-            {heightTooHigh && <div>Height exceeds maximum ({dimensionConfig.maxHeightIn} in).</div>}
-          </div>
-        )}
-      </div>
     );
   };
 
-const handleDeliveryMethodChange = (method) => {
-  invalidateQuote();
-  setDeliveryMethod(method);
-  scheduleRecalculation();
-};
+  const getLineItemType = (item) => {
+    const label = (item.label || "").toLowerCase();
+    if (item.amount < 0) return "discount";
+    if (
+      label.includes("rush") ||
+      label.includes("2 hour") ||
+      label.includes("turnaround")
+    )
+      return "rush";
+    return "normal";
+  };
 
-  const renderDeliveryStep = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900">Delivery Option</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <button
-          type="button"
-          onClick={() => handleDeliveryMethodChange('pickup')}
-          className={`rounded-xl border px-4 py-3 text-left transition ${
-            deliveryMethod === 'pickup'
-              ? 'border-[#29b6f6] bg-[#29b6f6]/5'
-              : 'border-gray-200 hover:border-[#29b6f6]/60'
-          }`}
-        >
-          <div className="font-semibold text-gray-900">Store Pickup FREE</div>
-          <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
-        </button>
-        <button
-          type="button"
-          onClick={() => handleDeliveryMethodChange('shipping')}
-          className={`rounded-xl border px-4 py-3 text-left transition ${
-            deliveryMethod === 'shipping'
-              ? 'border-[#29b6f6] bg-[#29b6f6]/5'
-              : 'border-gray-200 hover:border-[#29b6f6]/60'
-          }`}
-        >
-          <div className="font-semibold text-gray-900">Shipping</div>
-          <div className="text-sm text-gray-600">
-            We'll ship your order to your address.
-          </div>
-        </button>
-      </div>
-      {deliveryMethod === 'pickup' && (
-        <div className="space-y-1 text-sm text-gray-600">
-          <a
-            href="https://www.google.com/maps/search/?api=1&query=8506+Madison+Ave,+Fair+Oaks,+CA+95628"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#29b6f6] hover:underline font-medium"
-          >
-            📍 View store location on Google Maps
-          </a>
-          <p>The location of the store will appear in your orders page.</p>
-        </div>
-      )}
-    </div>
-  );
+  const formatAmount = (amount) => {
+    const abs = Math.abs(amount).toFixed(2);
+    return amount < 0 ? `- $${abs}` : `$${abs}`;
+  };
 
   const renderSummaryStep = () => {
     if (!quoteSummary) return null;
@@ -1084,7 +907,10 @@ const handleDeliveryMethodChange = (method) => {
       ...selectionLines,
       '',
       'Charges Breakdown:',
-      ...quoteSummary.lineItems.map((item) => `- ${item.label}: $${item.amount.toFixed(2)}`),
+      ...quoteSummary.lineItems.map((item) => {
+        const formatted = formatAmount(item.amount);
+        return `- ${item.label}: ${formatted}`;
+      }),
     ];
     const quoteText = quoteLines.join('\n');
     const emailSubject = `Quote - ${productName}`;
@@ -1273,19 +1099,30 @@ const handleDeliveryMethodChange = (method) => {
           <div className="px-4 sm:px-6 py-4">
             <div className="text-xs font-semibold uppercase text-gray-500 mb-2">Charges Breakdown</div>
             <ul className="space-y-1 text-sm text-gray-900">
-              {quoteSummary.lineItems.map((item, idx) => (
-                <li key={`${item.label}-${idx}`} className="flex justify-between">
-                  <span>{item.label}</span>
-                  <span>${item.amount.toFixed(2)}</span>
-                </li>
-              ))}
+              {quoteSummary.lineItems.map((item, idx) => {
+                const type = getLineItemType(item);
+                const colorClass =
+                  type === "discount"
+                    ? "text-emerald-700 font-medium"
+                    : type === "rush"
+                    ? "text-amber-700 font-medium"
+                    : "text-gray-900";
+                return (
+                  <li key={`${item.label}-${idx}`} className="flex justify-between">
+                    <span className={colorClass}>{item.label}</span>
+                    <span className={colorClass}>{formatAmount(item.amount)}</span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
           <div className="px-4 sm:px-6 py-4 border-t space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal</span>
-              <span>${quoteSummary.subtotal.toFixed(2)}</span>
-            </div>
+            {!quoteSummary.lineItems.some((it) => it.amount < 0) && (
+              <div className="flex justify-between text-sm">
+                <span>Subtotal</span>
+                <span>${quoteSummary.subtotal.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span>Shipping</span>
               <span>${quoteSummary.shipping.toFixed(2)}</span>

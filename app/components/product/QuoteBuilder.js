@@ -769,20 +769,11 @@ const printableQuoteRef = useRef(null);
                 />
                 <button
                   type="button"
-                  onClick={() => handleDesignerHelpChange(opt.id)}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${
-                    active
-                    ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                    : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-                }`}
-              >
-                <div className="font-semibold text-gray-900">{opt.name}</div>
-                {effectivePrice !== 0 && (
-                  <div className="text-sm text-gray-600">
-                    +${effectivePrice.toFixed(2)} per piece
-                  </div>
-                )}
-              </button>
+                  onClick={() => handleSizeQtyChange(size.id, 1)}
+                  className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100"
+                >
+                  +
+                </button>
             );
           })}
         </div>
@@ -891,6 +882,23 @@ const printableQuoteRef = useRef(null);
     );
   };
 
+  const getLineItemType = (item) => {
+    const label = (item.label || "").toLowerCase();
+    if (item.amount < 0) return "discount";
+    if (
+      label.includes("rush") ||
+      label.includes("2 hour") ||
+      label.includes("turnaround")
+    )
+      return "rush";
+    return "normal";
+  };
+
+  const formatAmount = (amount) => {
+    const abs = Math.abs(amount).toFixed(2);
+    return amount < 0 ? `- $${abs}` : `$${abs}`;
+  };
+
   const renderSummaryStep = () => {
     if (!quoteSummary) return null;
     const quoteLines = [
@@ -900,8 +908,8 @@ const printableQuoteRef = useRef(null);
       `Subtotal: $${quoteSummary.subtotal.toFixed(2)}`,
       `Shipping: $${quoteSummary.shipping.toFixed(2)}`,
       `Grand Total: $${quoteSummary.grandTotal.toFixed(2)}`,
-      '',
-      'Selections:',
+      "",
+      "Selections:",
       `- Color: ${config.colors.find((c) => c.id === colorId)?.name ?? '—'}`,
       `- Decoration: ${config.decorations.find((d) => d.id === decorationId)?.name ?? '—'}`,
       `- Turnaround: ${config.turnarounds.find((t) => t.id === turnaroundId)?.name ?? '—'}`,
@@ -922,7 +930,10 @@ const printableQuoteRef = useRef(null);
         .map((size) => `- ${size.label}: ${quantities[size.id] || 0}`),
       '',
       'Charges Breakdown:',
-      ...quoteSummary.lineItems.map((item) => `- ${item.label}: $${item.amount.toFixed(2)}`),
+      ...quoteSummary.lineItems.map((item) => {
+        const formatted = formatAmount(item.amount);
+        return `- ${item.label}: ${formatted}`;
+      }),
     ];
     const quoteText = quoteLines.join('\n');
     const emailSubject = `Quote - ${productName}`;
@@ -1221,20 +1232,31 @@ const printableQuoteRef = useRef(null);
               Charges Breakdown
             </div>
             <ul className="space-y-1 text-sm text-gray-900">
-              {quoteSummary.lineItems.map((item) => (
-                <li key={item.label} className="flex justify-between">
-                  <span>{item.label}</span>
-                  <span>${item.amount.toFixed(2)}</span>
-                </li>
-              ))}
+              {quoteSummary.lineItems.map((item) => {
+                const type = getLineItemType(item);
+                const colorClass =
+                  type === "discount"
+                    ? "text-emerald-700 font-medium"
+                    : type === "rush"
+                    ? "text-amber-700 font-medium"
+                    : "text-gray-900";
+                return (
+                  <li key={item.label} className="flex justify-between">
+                    <span className={colorClass}>{item.label}</span>
+                    <span className={colorClass}>{formatAmount(item.amount)}</span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
           <div className="px-4 sm:px-6 py-4 space-y-2">
-            <div className="flex justify-between text-sm text-gray-900">
-              <span>Subtotal</span>
-              <span>${quoteSummary.subtotal.toFixed(2)}</span>
-            </div>
+            {!quoteSummary.lineItems.some((it) => it.amount < 0) && (
+              <div className="flex justify-between text-sm text-gray-900">
+                <span>Subtotal</span>
+                <span>${quoteSummary.subtotal.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm text-gray-900">
               <span>Shipping</span>
               <span>${quoteSummary.shipping.toFixed(2)}</span>
