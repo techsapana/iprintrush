@@ -469,6 +469,24 @@ CREATE TABLE IF NOT EXISTS notary_request_documents (
     INDEX idx_document_type (document_type_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+-- ============================================
+-- TESTIMONIALS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS testimonials (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    company VARCHAR(255) NULL,
+    quote TEXT NOT NULL,
+    rating INT NOT NULL DEFAULT 5,
+    image_url VARCHAR(500) NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    display_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- ============================================
 -- INITIAL DATA SEEDING
 -- ============================================
