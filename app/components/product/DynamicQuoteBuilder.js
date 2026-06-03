@@ -68,6 +68,11 @@ const artworkFileRef = useRef(null);
   const [artworkError, setArtworkError] = useState('');
 
   const latestCalcRequestIdRef = useRef(0);
+  const hasEverCalculatedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasCalculated) hasEverCalculatedRef.current = true;
+  }, [hasCalculated]);
 
   const poolKeySet = useMemo(
     () => new Set((pools || []).map((p) => String(p.key))),
@@ -232,31 +237,42 @@ const artworkFileRef = useRef(null);
   }, [step]);
 
   const handleSelectionChange = (poolKey, value) => {
+    invalidateQuote();
     setSelections((prev) => ({ ...prev, [poolKey]: value }));
     scheduleRecalculation();
   };
 
-  const scheduleRecalculation = debounce(() => {
+  const invalidateQuote = () => {
     if (!hasCalculated) return;
+    setQuoteSummary(null);
+    setHasCalculated(false);
+  };
+
+  const scheduleRecalculation = debounce(() => {
+    if (!hasCalculated && !hasEverCalculatedRef.current) return;
     handleCalculate();
   }, 300);
 
   const handleArtworkReadyChange = (value) => {
+    invalidateQuote();
     setArtworkReadyChoice(value);
     scheduleRecalculation();
   };
 
   const handleTempArtworkFilesChange = (newFiles) => {
+    invalidateQuote();
     setTempArtworkFiles(newFiles);
     scheduleRecalculation();
   };
 
   const handleArtworkFilesChange = (files) => {
+    invalidateQuote();
     setArtworkFiles(files);
     scheduleRecalculation();
   };
 
   const handleCustomSizeNoteChange = (note) => {
+    invalidateQuote();
     setCustomSizeNote(note);
     scheduleRecalculation();
   };
@@ -897,6 +913,7 @@ try {
               max={dimensionConfig.maxWidthIn || undefined}
               value={widthIn}
               onChange={(e) => {
+                invalidateQuote();
                 const next = e.target.value;
                 setWidthIn(next);
                 if (next !== '' || heightIn !== '') {
@@ -918,6 +935,7 @@ try {
               max={dimensionConfig.maxHeightIn || undefined}
               value={heightIn}
               onChange={(e) => {
+                invalidateQuote();
                 const next = e.target.value;
                 setHeightIn(next);
                 if (next !== '' || widthIn !== '') {
@@ -971,9 +989,10 @@ try {
   };
 
 const handleDeliveryMethodChange = (method) => {
-    setDeliveryMethod(method);
-    scheduleRecalculation();
-  };
+  invalidateQuote();
+  setDeliveryMethod(method);
+  scheduleRecalculation();
+};
 
   const renderDeliveryStep = () => (
     <div className="space-y-4">

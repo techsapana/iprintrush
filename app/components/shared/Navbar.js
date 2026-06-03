@@ -228,11 +228,13 @@ export function Navbar() {
                   iprint
                 </span>
               ) : (
-                <img
-                  src={logoImageUrl || '/logo.png'}
-                  alt="iPrintRush"
-                  className="h-10 md:h-14 w-auto max-h-12 md:max-h-14 max-w-[200px] object-contain object-left hover:scale-105 transition-transform block"
-                />
+                <div className="h-10 md:h-14 flex items-center justify-center">
+                  <img
+                    src={logoImageUrl || '/logo.png'}
+                    alt="iPrintRush"
+                    className="h-full w-auto max-h-full object-contain hover:scale-105 transition-transform"
+                  />
+                </div>
               )}
             </Link>
 

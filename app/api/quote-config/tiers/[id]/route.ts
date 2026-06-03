@@ -4,11 +4,18 @@ import { query, queryOne } from '@/app/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Missing ID param" },
+        { status: 400 }
+      );
+    }
     const tier = await queryOne('SELECT * FROM quantity_tiers WHERE id = ?', [
-      parseInt(params.id),
+      parseInt(id),
     ]);
 
     if (!tier) {
@@ -37,9 +44,16 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Missing ID param" },
+        { status: 400 }
+      );
+    }
     const body = await request.json();
     const updates: string[] = [];
     const values: any[] = [];
@@ -72,7 +86,7 @@ export async function PUT(
 
     if (updates.length > 0) {
       updates.push('updated_at = CURRENT_TIMESTAMP');
-      values.push(parseInt(params.id));
+      values.push(parseInt(id));
       await query(`UPDATE quantity_tiers SET ${updates.join(', ')} WHERE id = ?`, values);
     }
 
@@ -87,10 +101,17 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await query('DELETE FROM quantity_tiers WHERE id = ?', [parseInt(params.id)]);
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Missing ID param" },
+        { status: 400 }
+      );
+    }
+    await query('DELETE FROM quantity_tiers WHERE id = ?', [parseInt(id)]);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json(

@@ -4,12 +4,19 @@ import { query, queryOne } from '@/app/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Missing ID param" },
+        { status: 400 }
+      );
+    }
     const location = await queryOne(
       'SELECT * FROM print_location_options WHERE id = ?',
-      [params.id]
+      [id]
     );
 
     if (!location) {
@@ -35,9 +42,16 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Missing ID param" },
+        { status: 400 }
+      );
+    }
     const body = await request.json();
     const updates: string[] = [];
     const values: any[] = [];
@@ -61,7 +75,7 @@ export async function PUT(
 
     if (updates.length > 0) {
       updates.push('updated_at = CURRENT_TIMESTAMP');
-      values.push(params.id);
+      values.push(id);
       await query(
         `UPDATE print_location_options SET ${updates.join(', ')} WHERE id = ?`,
         values
@@ -79,10 +93,17 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await query('DELETE FROM print_location_options WHERE id = ?', [params.id]);
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Missing ID param" },
+        { status: 400 }
+      );
+    }
+    await query('DELETE FROM print_location_options WHERE id = ?', [id]);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json(

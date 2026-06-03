@@ -64,6 +64,11 @@ const printableQuoteRef = useRef(null);
   const isCustomApparels = /custom\s*apparel/i.test(String(productCategory || ''));
 
   const latestCalcRequestIdRef = useRef(0);
+  const hasEverCalculatedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasCalculated) hasEverCalculatedRef.current = true;
+  }, [hasCalculated]);
 
   const quantityMin = useMemo(() => {
     if (minQuantityProp == null || minQuantityProp === '') return null;
@@ -215,6 +220,7 @@ const printableQuoteRef = useRef(null);
   }, [step]);
 
   const handleSizeQtyChange = (sizeId, delta) => {
+    invalidateQuote();
     setQuantities((prev) => {
       const current = prev[sizeId] || 0;
       const proposed = Math.max(0, current + delta);
@@ -234,6 +240,7 @@ const printableQuoteRef = useRef(null);
   };
 
   const handleSizeQtyInput = (sizeId, value) => {
+    invalidateQuote();
     const numValue = parseInt(value, 10) || 0;
     setQuantities((prev) => {
       const others = Object.entries(prev)
@@ -249,7 +256,8 @@ const printableQuoteRef = useRef(null);
   };
 
 // Helper function to recalculate quote with new quantities
-   const recalculateQuote = async (newQuantities) => {
+  const recalculateQuote = async (newQuantities) => {
+    invalidateQuote();
     // Check if total quantity is still valid
     const newTotal = Object.values(newQuantities).reduce((sum, v) => sum + (v || 0), 0);
     if (newTotal <= 0) {
@@ -343,8 +351,16 @@ const printableQuoteRef = useRef(null);
     }
   };
 
-  const scheduleRecalculation = debounce(() => {
+  const hasEverCalculatedRef = useRef(false);
+
+  const invalidateQuote = () => {
     if (!hasCalculated) return;
+    setQuoteSummary(null);
+    setHasCalculated(false);
+  };
+
+  const scheduleRecalculation = debounce(() => {
+    if (!hasCalculated && !hasEverCalculatedRef.current) return;
     handleCalculate();
   }, 300);
 
@@ -379,6 +395,7 @@ const printableQuoteRef = useRef(null);
   };
 
   const togglePrintLocation = (id) => {
+    invalidateQuote();
     setPrintLocationIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
@@ -386,52 +403,63 @@ const printableQuoteRef = useRef(null);
   };
 
   const handleDecorationChange = (id) => {
+    invalidateQuote();
     setDecorationId(id);
     scheduleRecalculation();
   };
 
   const handleColorChange = (id) => {
+    invalidateQuote();
     setColorId(id);
     scheduleRecalculation();
   };
 
   const handleTurnaroundChange = (id) => {
+    invalidateQuote();
     setTurnaroundId(id);
     scheduleRecalculation();
   };
 
   const handleDesignerHelpChange = (id) => {
+    invalidateQuote();
     setDesignerHelpId(id);
     scheduleRecalculation();
   };
 
   const handleDeliveryMethodChange = (method) => {
+    invalidateQuote();
     setDeliveryMethod(method);
     scheduleRecalculation();
   };
 
   const handleArtworkReadyChange = (value) => {
+    invalidateQuote();
     setArtworkReadyChoice(value);
     scheduleRecalculation();
   };
 
   const handleTempArtworkFilesChange = (files) => {
+    invalidateQuote();
     setTempArtworkFiles(files);
     scheduleRecalculation();
   };
 
   const handleArtworkFilesChange = (files) => {
+    invalidateQuote();
     setArtworkFiles(files);
     scheduleRecalculation();
   };
 
   const handleCustomSizeNoteChange = (note) => {
+    invalidateQuote();
     setCustomSizeNote(note);
     scheduleRecalculation();
   };
 
   const handleFabricChoiceChange = (choice) => {
+    invalidateQuote();
     setFabricChoice(choice);
+    setUseMyCloth(choice === 'own');
     scheduleRecalculation();
   };
 
@@ -452,9 +480,9 @@ const printableQuoteRef = useRef(null);
     return true;
   };
 
-const handleCalculate = async () => {
+ const handleCalculate = async () => {
+    invalidateQuote();
     setError('');
-    setQuoteSummary(null);
 
     if (!isReadyForCalculation()) {
       setError('Please complete all customization steps before calculating your price.');
@@ -617,10 +645,7 @@ const handleCalculate = async () => {
               type="radio"
               name="fabricChoice"
               checked={fabricChoice === 'own'}
-              onChange={() => {
-                setFabricChoice('own');
-                setUseMyCloth(true);
-              }}
+              onChange={() => handleFabricChoiceChange('own')}
             />
             I have my own fabric
           </label>
@@ -629,10 +654,7 @@ const handleCalculate = async () => {
               type="radio"
               name="fabricChoice"
               checked={fabricChoice === 'need'}
-              onChange={() => {
-                setFabricChoice('need');
-                setUseMyCloth(false);
-              }}
+              onChange={() => handleFabricChoiceChange('need')}
             />
             I don&apos;t have my own fabric
           </label>
@@ -688,7 +710,7 @@ const handleCalculate = async () => {
             <button
               key={opt.id}
               type="button"
-              onClick={() => setColorId(opt.id)}
+              onClick={() => handleColorChange(opt.id)}
               className={`flex flex-col items-center gap-2 ${
                 colorId === opt.id ? 'text-gray-900' : 'text-gray-600'
               }`}
@@ -747,92 +769,9 @@ const handleCalculate = async () => {
                 />
                 <button
                   type="button"
-                  onClick={() => handleSizeQtyChange(size.id, 1)}
-                  className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-
-    return (
-        <div className="space-y-6">
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Step 4 – Select Sizes &amp; Quantities
-          </h3>
-          <p className="text-sm text-gray-600">
-            Use the + and − buttons to set how many pieces you need in each size. Adult and Youth
-            sizes are tracked together in one total.
-          </p>
-        </div>
-
-        {fabricChoice === 'own' && (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-            Base garment cost is excluded because you selected customer-supplied fabric.
-          </div>
-        )}
-
-        {(quantityMin != null || quantityMax != null) && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            {quantityMin != null && <span>Minimum order: {quantityMin} pieces. </span>}
-            {quantityMax != null && <span>Maximum order: {quantityMax} pieces.</span>}
-          </div>
-        )}
-
-        {adultSizes.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-gray-900">Adult Sizes</h4>
-            </div>
-            {renderSizeGrid(adultSizes)}
-          </div>
-        )}
-
-        {youthSizes.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-gray-900">
-                Youth Sizes <span className="font-normal text-gray-500">(up to 2XL)</span>
-              </h4>
-            </div>
-            {renderSizeGrid(youthSizes)}
-          </div>
-        )}
-
-        <div className="text-sm text-gray-700">
-          Total quantity:{' '}
-          <span className="font-semibold text-gray-900">{totalQuantity}</span>
-        </div>
-      </div>
-    );
-  };
-
-  const renderPrintLocationsStep = () => {
-    const options = config.printLocations.filter((p) =>
-      productSettings.printLocationOptionIds.includes(p.id),
-    );
-    return (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Step 5 – Select Printing Location
-        </h3>
-        <p className="text-sm text-gray-600">You can select more than one location.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {options.map((opt) => {
-            const active = printLocationIds.includes(opt.id);
-            const effectivePrice = getEffectivePrice('printLocations', opt.id, opt.priceModifier);
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => togglePrintLocation(opt.id)}
-                className={`rounded-xl border px-4 py-3 text-left transition ${
-                  active
+                  onClick={() => handleDesignerHelpChange(opt.id)}
+                  className={`rounded-xl border px-4 py-3 text-left transition ${
+                    active
                     ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
                     : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
                 }`}
@@ -868,7 +807,7 @@ const handleCalculate = async () => {
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setTurnaroundId(opt.id)}
+                onClick={() => handleTurnaroundChange(opt.id)}
                 className={`rounded-xl border px-4 py-3 text-left transition ${
                   active
                     ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
@@ -905,7 +844,7 @@ const handleCalculate = async () => {
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setDesignerHelpId(opt.id)}
+                onClick={() => handleDesignerHelpChange(opt.id)}
                 className={`rounded-xl border px-4 py-3 text-left transition ${
                   active
                     ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
@@ -934,7 +873,7 @@ const handleCalculate = async () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <button
             type="button"
-            onClick={() => setDeliveryMethod('pickup')}
+            onClick={() => handleDeliveryMethodChange('pickup')}
             className={`rounded-xl border px-4 py-3 text-left transition ${
               deliveryMethod === 'pickup'
                 ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
@@ -943,18 +882,6 @@ const handleCalculate = async () => {
           >
             <div className="font-semibold text-gray-900">Store Pickup FREE</div>
             <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setDeliveryMethod('shipping')}
-            className={`rounded-xl border px-4 py-3 text-left transition ${
-              deliveryMethod === 'shipping'
-                ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-            }`}
-          >
-            <div className="font-semibold text-gray-900">Shipping</div>
-            <div className="text-sm text-gray-600">We’ll ship your order to your address.</div>
           </button>
         </div>
 

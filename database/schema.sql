@@ -141,6 +141,8 @@ CREATE TABLE IF NOT EXISTS turnaround_options (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     price_modifier DECIMAL(10, 2) DEFAULT 0.00 COMMENT 'Price per order',
+    pricing_type ENUM('flat', 'percentage') DEFAULT 'flat',
+    percentage_value DECIMAL(5, 2) NULL,
     enabled BOOLEAN DEFAULT TRUE,
     display_order INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
