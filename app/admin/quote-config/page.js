@@ -263,14 +263,15 @@ function QuoteConfigAdminPageInner() {
               />
             )}
 
-            {/* Shipping Tab */}
-            {activeTab === 'shipping' && (
-              <ShippingSection
-                shipping={config?.shipping}
-                onSave={handleSave}
-                setError={setError}
-              />
-            )}
+{/* Shipping Tab */}
+             {activeTab === 'shipping' && (
+               <ShippingSection
+                 shipping={config?.shipping}
+                 onSave={handleSave}
+                 setError={setError}
+                 loadConfig={loadConfig}
+               />
+             )}
 
             {/* Dynamic Pools Tab */}
             {activeTab === 'pools' && (
@@ -565,7 +566,7 @@ function DesignerHelpSection({ items, editing, formData, onEdit, onSave, onDelet
   );
 }
 
-function ShippingSection({ shipping, onSave, setError }) {
+function ShippingSection({ shipping, onSave, setError, loadConfig }) {
   const [formData, setFormData] = useState({
     enabled: shipping?.enabled ?? true,
     defaultFlatRate: shipping?.defaultFlatRate ?? 0,
@@ -586,7 +587,7 @@ function ShippingSection({ shipping, onSave, setError }) {
         throw new Error(err.error || 'Failed to save');
       }
 
-      alert('Shipping configuration saved successfully!');
+      await loadConfig();
     } catch (err) {
       setError(err.message || 'Failed to save shipping configuration');
     }

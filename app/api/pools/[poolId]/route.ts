@@ -6,14 +6,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ pool
   try {
     const { poolId } = await params;
     const body = await req.json();
-    const { key, name, description, selectionType, priceType, displayOrder } = body;
+    const { key, name, description, selectionType, priceType, displayOrder, enabled } = body;
 
     // Update pool
     await queryOne(
       `UPDATE customization_option_pools 
-       SET \`key\` = ?, name = ?, description = ?, selection_type = ?, price_type = ?, display_order = ? 
+       SET \`key\` = ?, name = ?, description = ?, selection_type = ?, price_type = ?, display_order = ?, enabled = ? 
        WHERE id = ?`,
-      [key, name, description, selectionType, priceType, displayOrder, poolId]
+      [key, name, description, selectionType, priceType, displayOrder, enabled !== false ? 1 : 0, poolId]
     );
 
     return NextResponse.json({ success: true });

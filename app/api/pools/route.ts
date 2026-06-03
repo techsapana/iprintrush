@@ -42,16 +42,16 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { key, name, description, selectionType, priceType, displayOrder } = body;
+    const { key, name, description, selectionType, priceType, displayOrder, enabled = true } = body;
 
     // Generate unique pool ID
     const poolId = `pool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Insert new pool
     await queryOne(
-      `INSERT INTO customization_option_pools (id, \`key\`, name, description, selection_type, price_type, display_order) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [poolId, key, name, description, selectionType, priceType, displayOrder]
+      `INSERT INTO customization_option_pools (id, \`key\`, name, description, selection_type, price_type, display_order, enabled) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [poolId, key, name, description, selectionType, priceType, displayOrder, enabled ? 1 : 0]
     );
 
     return NextResponse.json({ 
@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
         description, 
         selectionType, 
         priceType, 
-        displayOrder, 
+        displayOrder,
+        enabled,
       } 
     });
   } catch (error: any) {
@@ -78,14 +79,14 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, key, name, description, selectionType, priceType, displayOrder } = body;
+    const { id, key, name, description, selectionType, priceType, displayOrder, enabled } = body;
 
     // Update pool
     await queryOne(
       `UPDATE customization_option_pools 
-       SET \`key\` = ?, name = ?, description = ?, selection_type = ?, price_type = ?, display_order = ? 
+       SET \`key\` = ?, name = ?, description = ?, selection_type = ?, price_type = ?, display_order = ?, enabled = ? 
        WHERE id = ?`,
-      [key, name, description, selectionType, priceType, displayOrder, id]
+      [key, name, description, selectionType, priceType, displayOrder, enabled !== false ? 1 : 0, id]
     );
 
     return NextResponse.json({ success: true });
