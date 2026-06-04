@@ -6,17 +6,18 @@ import { CategoryForm } from '../../../../components/admin/CategoryForm';
 import { useEffect, useState } from 'react';
 
 export default function EditCategoryPage() {
-  const router = useRouter();
-  const params = useParams();
-  const { adminUser, categories } = useAdmin();
-  const [category, setCategory] = useState(null);
-  const [loading, setLoading] = useState(true);
+   const router = useRouter();
+   const params = useParams();
+   const { adminUser, adminLoading, categories } = useAdmin();
+   const [category, setCategory] = useState(null);
+   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!adminUser) {
-      router.push('/admin/login');
-      return;
-    }
+   useEffect(() => {
+     if (!adminLoading && !adminUser) {
+       router.push('/admin/login');
+       return;
+     }
+     if (adminLoading) return;
 
     const foundCategory = categories.find(c => c.id === params.id);
     if (foundCategory) {
@@ -25,7 +26,7 @@ export default function EditCategoryPage() {
       router.push('/admin/categories');
     }
     setLoading(false);
-  }, [adminUser, params.id, categories, router]);
+  }, [adminUser, adminLoading, params.id, categories, router]);
 
   if (loading || !category) {
     return (

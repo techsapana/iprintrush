@@ -6,15 +6,15 @@ import { useAdmin } from '../../hooks/useAdmin';
 import Link from 'next/link';
 
 export default function AdminCategoriesPage() {
-  const router = useRouter();
-  const { adminUser, categories, deleteCategory } = useAdmin();
-  const [searchTerm, setSearchTerm] = useState('');
+   const router = useRouter();
+   const { adminUser, adminLoading, categories, deleteCategory } = useAdmin();
+   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
-  if (!adminUser) return null;
+   if (adminLoading || !adminUser) return null;
 
   const filteredCategories = categories.filter((cat) =>
     cat.name.toLowerCase().includes(searchTerm.toLowerCase())

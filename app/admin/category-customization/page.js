@@ -5,17 +5,17 @@ import { useRouter } from 'next/navigation';
 import { useAdmin } from '../../hooks/useAdmin';
 
 export default function CategoryCustomizationPage() {
-  const router = useRouter();
-  const { adminUser, categories, updateCategory, refreshCategories } = useAdmin();
-  const [pools, setPools] = useState([]);
-  const [expandedId, setExpandedId] = useState(null);
-  const [editingSchema, setEditingSchema] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+   const router = useRouter();
+   const { adminUser, adminLoading, categories, updateCategory, refreshCategories } = useAdmin();
+   const [pools, setPools] = useState([]);
+   const [expandedId, setExpandedId] = useState(null);
+   const [editingSchema, setEditingSchema] = useState(null);
+   const [saving, setSaving] = useState(false);
+   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
   useEffect(() => {
     const loadPools = async () => {
@@ -120,7 +120,7 @@ export default function CategoryCustomizationPage() {
     }
   };
 
-  if (!adminUser) return null;
+  if (adminLoading || !adminUser) return null;
 
   return (
     <div className="bg-gray-50 min-h-screen">

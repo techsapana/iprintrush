@@ -7,23 +7,24 @@ import { useAdmin } from '../../hooks/useAdmin';
 import PoolsSection from './PoolsSection.js';
 
 function QuoteConfigAdminPageInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { adminUser } = useAdmin();
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'decorations');
-  const [loading, setLoading] = useState(true);
-  const [config, setConfig] = useState(null);
-  const [error, setError] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [formData, setFormData] = useState({});
+   const router = useRouter();
+   const searchParams = useSearchParams();
+   const { adminUser, adminLoading } = useAdmin();
+   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'decorations');
+   const [loading, setLoading] = useState(true);
+   const [config, setConfig] = useState(null);
+   const [error, setError] = useState('');
+   const [editing, setEditing] = useState(null);
+   const [formData, setFormData] = useState({});
 
-  useEffect(() => {
-    if (!adminUser) {
-      router.push('/admin/login');
-      return;
-    }
-    loadConfig();
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) {
+       router.push('/admin/login');
+       return;
+     }
+     if (adminLoading) return;
+     loadConfig();
+   }, [adminUser, adminLoading, router]);
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
@@ -118,10 +119,10 @@ function QuoteConfigAdminPageInner() {
     { id: 'pools', label: 'Dynamic Pools', key: 'pools', description: 'Manage all customization pools and options dynamically' },
   ];
 
-  if (!adminUser) {
+  if (adminLoading || !adminUser) {
     return (
       <div className="bg-gray-50 min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Redirecting to admin login…</p>
+        <p className="text-gray-600">Checking authentication…</p>
       </div>
     );
   }

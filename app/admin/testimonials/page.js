@@ -5,25 +5,25 @@ import { useRouter } from 'next/navigation';
 import { useAdmin } from '../../hooks/useAdmin';
 
 export default function AdminTestimonialsPage() {
-  const router = useRouter();
-  const { adminUser } = useAdmin();
-  const [testimonials, setTestimonials] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  const [form, setForm] = useState({
-    name: '',
-    company: '',
-    quote: '',
-    rating: 5,
-    imageUrl: '',
-    enabled: true,
-    displayOrder: 0,
-  });
+   const router = useRouter();
+   const { adminUser, adminLoading } = useAdmin();
+   const [testimonials, setTestimonials] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [saving, setSaving] = useState(false);
+   const [message, setMessage] = useState('');
+   const [form, setForm] = useState({
+     name: '',
+     company: '',
+     quote: '',
+     rating: 5,
+     imageUrl: '',
+     enabled: true,
+     displayOrder: 0,
+   });
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
    const loadTestimonials = async () => {
      try {
@@ -43,7 +43,7 @@ export default function AdminTestimonialsPage() {
     if (adminUser) loadTestimonials();
   }, [adminUser]);
 
-  if (!adminUser) return null;
+  if (adminLoading || !adminUser) return null;
 
   const onUploadImage = async (file) => {
     if (!file) return;

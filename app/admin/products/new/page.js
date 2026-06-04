@@ -6,14 +6,14 @@ import { useAdmin } from '../../../hooks/useAdmin';
 import { ProductForm } from '../../../components/admin/ProductForm';
 
 export default function NewProductPage() {
-  const router = useRouter();
-  const { adminUser, loading } = useAdmin();
+   const router = useRouter();
+   const { adminUser, adminLoading } = useAdmin();
 
-  useEffect(() => {
-    if (!loading && !adminUser) router.push('/admin/login');
-  }, [adminUser, loading, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
-  if (loading || !adminUser) return null;
+   if (adminLoading || !adminUser) return null;
 
   return (
     <div className="bg-gray-50 min-h-screen">

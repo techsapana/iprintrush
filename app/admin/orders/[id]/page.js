@@ -6,25 +6,25 @@ import { useAdmin } from '../../../hooks/useAdmin';
 import Link from 'next/link';
 
 export default function AdminOrderDetailPage() {
-  const router = useRouter();
-  const params = useParams();
-  const { adminUser } = useAdmin();
-  const [order, setOrder] = useState(null);
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [updatingArtworkItemId, setUpdatingArtworkItemId] = useState(null);
-  const [deletingOrder, setDeletingOrder] = useState(false);
-  const [creatingShipment, setCreatingShipment] = useState(false);
-  const [shipmentServiceType, setShipmentServiceType] = useState('FEDEX_GROUND');
-  const [shipmentError, setShipmentError] = useState('');
+   const router = useRouter();
+   const params = useParams();
+   const { adminUser, adminLoading } = useAdmin();
+   const [order, setOrder] = useState(null);
+   const [items, setItems] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [saving, setSaving] = useState(false);
+   const [updatingArtworkItemId, setUpdatingArtworkItemId] = useState(null);
+   const [deletingOrder, setDeletingOrder] = useState(false);
+   const [creatingShipment, setCreatingShipment] = useState(false);
+   const [shipmentServiceType, setShipmentServiceType] = useState('FEDEX_GROUND');
+   const [shipmentError, setShipmentError] = useState('');
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
-  useEffect(() => {
-    if (!adminUser || !params?.id) return;
+   useEffect(() => {
+     if (!adminUser || !params?.id) return;
     const fetchOrder = async () => {
       setLoading(true);
       try {
@@ -47,7 +47,7 @@ export default function AdminOrderDetailPage() {
     fetchOrder();
   }, [adminUser, params?.id]);
 
-  if (!adminUser) return null;
+  if (adminLoading || !adminUser) return null;
 
   const formatDate = (d) => {
     if (!d) return '—';

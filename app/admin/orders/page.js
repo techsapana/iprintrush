@@ -6,19 +6,19 @@ import { useAdmin } from '../../hooks/useAdmin';
 import Link from 'next/link';
 
 export default function AdminOrdersPage() {
-  const router = useRouter();
-  const { adminUser } = useAdmin();
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch] = useState('');
+   const router = useRouter();
+   const { adminUser, adminLoading } = useAdmin();
+   const [orders, setOrders] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [statusFilter, setStatusFilter] = useState('');
+   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
-  useEffect(() => {
-    if (!adminUser) return;
+   useEffect(() => {
+     if (!adminUser) return;
     const fetchOrders = async () => {
       setLoading(true);
       try {
@@ -41,7 +41,7 @@ export default function AdminOrdersPage() {
     fetchOrders();
   }, [adminUser, statusFilter]);
 
-  if (!adminUser) return null;
+  if (adminLoading || !adminUser) return null;
 
   const formatDate = (d) => {
     if (!d) return '—';

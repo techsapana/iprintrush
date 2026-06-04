@@ -10,6 +10,7 @@ export function AdminProvider({ children }) {
   const [categories, setCategories] = useState([]);
   const [adminUser, setAdminUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [adminLoading, setAdminLoading] = useState(true);
 
   // Fetch products from API
   const fetchProducts = useCallback(async () => {
@@ -260,38 +261,35 @@ export function AdminProvider({ children }) {
     }
   }, []);
 
-  // Check auth on mount and whenever window gains focus (in case tab was restored)
-  useEffect(() => {
-    checkAdminAuth();
-    const handleFocus = () => checkAdminAuth();
-    if (typeof window !== 'undefined') {
-      window.addEventListener('focus', handleFocus);
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('focus', handleFocus);
-      }
-    };
-  }, [checkAdminAuth]);
-
-  // Initialize admin state from localStorage before server check
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('iprintrush_admin_session');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setAdminUser(parsed);
-          // Don't trigger server check immediately, let it happen naturally
-          return;
-        }
-      } catch {
-        localStorage.removeItem('iprintrush_admin_session');
-      }
-    }
-    // Always check server auth on load
-    checkAdminAuth();
-  }, []); // No dependencies, run only once
+// Check auth on mount and whenever window gains focus (in case tab was restored)
+   useEffect(() => {
+     const checkAndRestore = async () => {
+       // First, try to restore from localStorage synchronously
+       if (typeof window !== 'undefined') {
+         try {
+           const stored = localStorage.getItem('iprintrush_admin_session');
+           if (stored) {
+             setAdminUser(JSON.parse(stored));
+           }
+         } catch {
+           localStorage.removeItem('iprintrush_admin_session');
+         }
+       }
+       // Then verify with server
+       await checkAdminAuth();
+       setAdminLoading(false);
+     };
+     checkAndRestore();
+     const handleFocus = () => checkAdminAuth();
+     if (typeof window !== 'undefined') {
+       window.addEventListener('focus', handleFocus);
+     }
+     return () => {
+       if (typeof window !== 'undefined') {
+         window.removeEventListener('focus', handleFocus);
+       }
+     };
+   }, [checkAdminAuth]);
 
   const value = {
     // Products
@@ -315,6 +313,7 @@ export function AdminProvider({ children }) {
     
     // Admin
     adminUser,
+    adminLoading,
     loginAdmin,
     logoutAdmin,
     checkAdminAuth,

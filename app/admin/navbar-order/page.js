@@ -6,42 +6,42 @@ import Link from 'next/link';
 import { useAdmin } from '../../hooks/useAdmin';
 
 export default function AdminNavbarOrderPage() {
-  const router = useRouter();
-  const { adminUser, refreshCategories } = useAdmin();
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState('');
-  const [message, setMessage] = useState('');
-  const [tableMissing, setTableMissing] = useState(false);
+   const router = useRouter();
+   const { adminUser, adminLoading, refreshCategories } = useAdmin();
+   const [rows, setRows] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [busyId, setBusyId] = useState('');
+   const [message, setMessage] = useState('');
+   const [tableMissing, setTableMissing] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      setMessage('');
-      const res = await fetch('/api/admin/navbar-category-order', { credentials: 'include' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Failed to load');
-      if (data.tableMissing) {
-        setTableMissing(true);
-        setRows([]);
-        return;
-      }
-      setTableMissing(false);
-      setRows(Array.isArray(data.categories) ? data.categories : []);
-    } catch (e) {
-      setMessage(e?.message || 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+   const load = useCallback(async () => {
+     try {
+       setLoading(true);
+       setMessage('');
+       const res = await fetch('/api/admin/navbar-category-order', { credentials: 'include' });
+       const data = await res.json().catch(() => ({}));
+       if (!res.ok) throw new Error(data.error || 'Failed to load');
+       if (data.tableMissing) {
+         setTableMissing(true);
+         setRows([]);
+         return;
+       }
+       setTableMissing(false);
+       setRows(Array.isArray(data.categories) ? data.categories : []);
+     } catch (e) {
+       setMessage(e?.message || 'Failed to load');
+     } finally {
+       setLoading(false);
+     }
+   }, []);
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
-  useEffect(() => {
-    if (adminUser) load();
-  }, [adminUser, load]);
+   useEffect(() => {
+     if (adminUser && !adminLoading) load();
+   }, [adminUser, adminLoading, load]);
 
   const swap = async (categoryId, direction) => {
     try {
@@ -64,7 +64,7 @@ export default function AdminNavbarOrderPage() {
     }
   };
 
-  if (!adminUser) return null;
+  if (adminLoading || !adminUser) return null;
 
   return (
     <div className="bg-gray-50 min-h-screen">

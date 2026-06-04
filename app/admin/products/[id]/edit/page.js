@@ -6,20 +6,20 @@ import { ProductForm } from '../../../../components/admin/ProductForm';
 import { useEffect, useState, useRef } from 'react';
 
 export default function EditProductPage() {
-  const router = useRouter();
-  const params = useParams();
-  const { adminUser, getProductById, loading: adminLoading } = useAdmin();
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const getProductByIdRef = useRef(getProductById);
-  getProductByIdRef.current = getProductById;
+   const router = useRouter();
+   const params = useParams();
+   const { adminUser, adminLoading, getProductById } = useAdmin();
+   const [product, setProduct] = useState(null);
+   const [loading, setLoading] = useState(true);
+   const getProductByIdRef = useRef(getProductById);
+   getProductByIdRef.current = getProductById;
 
-  useEffect(() => {
-    if (!adminLoading && !adminUser) {
-      router.push('/admin/login');
-      return;
-    }
-    if (adminLoading) return;
+   useEffect(() => {
+     if (!adminLoading && !adminUser) {
+       router.push('/admin/login');
+       return;
+     }
+     if (adminLoading) return;
 
     const loadProduct = async () => {
       try {

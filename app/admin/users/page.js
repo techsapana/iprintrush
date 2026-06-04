@@ -4,16 +4,16 @@ import { useState, useEffect } from 'react';
 import { useAdmin } from '../../hooks/useAdmin';
 
 export default function UsersPage() {
-  const { adminUser, loading } = useAdmin();
-  const [users, setUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+   const { adminUser, adminLoading } = useAdmin();
+   const [users, setUsers] = useState([]);
+   const [filteredUsers, setFilteredUsers] = useState([]);
+   const [usersLoading, setUsersLoading] = useState(false);
+   const [error, setError] = useState('');
+   const [searchTerm, setSearchTerm] = useState('');
+   const [statusFilter, setStatusFilter] = useState('all');
 
-  const isAdmin = !!adminUser;
-  const isLoading = loading;
+   const isAdmin = !!adminUser;
+   const isLoading = adminLoading;
 
   useEffect(() => {
     if (isAdmin && !isLoading) {

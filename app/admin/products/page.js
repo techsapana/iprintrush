@@ -7,16 +7,16 @@ import Link from 'next/link';
 import { isSameDayPrintingProduct } from '../../lib/siteConstants';
 
 export default function AdminProductsPage() {
-  const router = useRouter();
-  const { adminUser, products, deleteProduct, categories } = useAdmin();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('all');
+   const router = useRouter();
+   const { adminUser, adminLoading, products, deleteProduct, categories } = useAdmin();
+   const [searchTerm, setSearchTerm] = useState('');
+   const [filterCategory, setFilterCategory] = useState('all');
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
-  if (!adminUser) return null;
+   if (adminLoading || !adminUser) return null;
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

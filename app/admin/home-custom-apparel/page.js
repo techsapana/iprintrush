@@ -8,58 +8,58 @@ import { useAdmin } from '../../hooks/useAdmin';
 const CUSTOM_APPAREL_SLUG = 'custom-apparels';
 
 export default function AdminHomeCustomApparelPage() {
-  const router = useRouter();
-  const { adminUser, products, refreshProducts } = useAdmin();
-  const [orderedIds, setOrderedIds] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  const [addId, setAddId] = useState('');
+   const router = useRouter();
+   const { adminUser, adminLoading, products, refreshProducts } = useAdmin();
+   const [orderedIds, setOrderedIds] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [saving, setSaving] = useState(false);
+   const [message, setMessage] = useState('');
+   const [addId, setAddId] = useState('');
 
-  const apparelPool = useMemo(
-    () =>
-      (products || []).filter(
-        (p) =>
-          p.enabled !== false &&
-          (p.categorySlug === CUSTOM_APPAREL_SLUG || p.category === 'Custom Apparels'),
-      ),
-    [products],
-  );
+   const apparelPool = useMemo(
+     () =>
+       (products || []).filter(
+         (p) =>
+           p.enabled !== false &&
+           (p.categorySlug === CUSTOM_APPAREL_SLUG || p.category === 'Custom Apparels'),
+       ),
+     [products],
+   );
 
-  const idToProduct = useMemo(() => {
-    const m = new Map();
-    for (const p of apparelPool) m.set(String(p.id), p);
-    return m;
-  }, [apparelPool]);
+   const idToProduct = useMemo(() => {
+     const m = new Map();
+     for (const p of apparelPool) m.set(String(p.id), p);
+     return m;
+   }, [apparelPool]);
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch('/api/admin/home-custom-apparel-products', {
-          credentials: 'include',
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Failed to load');
-        if (!cancelled) {
-          setOrderedIds(Array.isArray(data.productIds) ? data.productIds.map(String) : []);
-        }
-      } catch (e) {
-        if (!cancelled) setMessage(e?.message || 'Failed to load picks');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    if (adminUser) load();
-    return () => {
-      cancelled = true;
-    };
-  }, [adminUser]);
+   useEffect(() => {
+     let cancelled = false;
+     const load = async () => {
+       try {
+         setLoading(true);
+         const res = await fetch('/api/admin/home-custom-apparel-products', {
+           credentials: 'include',
+         });
+         const data = await res.json().catch(() => ({}));
+         if (!res.ok) throw new Error(data.error || 'Failed to load');
+         if (!cancelled) {
+           setOrderedIds(Array.isArray(data.productIds) ? data.productIds.map(String) : []);
+         }
+       } catch (e) {
+         if (!cancelled) setMessage(e?.message || 'Failed to load picks');
+       } finally {
+         if (!cancelled) setLoading(false);
+       }
+     };
+     if (adminUser && !adminLoading) load();
+     return () => {
+       cancelled = true;
+     };
+   }, [adminUser, adminLoading]);
 
   const move = (index, dir) => {
     const j = index + dir;
@@ -111,7 +111,7 @@ export default function AdminHomeCustomApparelPage() {
     }
   };
 
-  if (!adminUser) return null;
+  if (adminLoading || !adminUser) return null;
 
   const addOptions = apparelPool.filter((p) => !orderedIds.includes(String(p.id)));
 

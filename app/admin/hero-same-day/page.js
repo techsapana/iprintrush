@@ -7,49 +7,49 @@ import { useAdmin } from '../../hooks/useAdmin';
 import { isSameDayPrintingProduct } from '../../lib/siteConstants';
 
 export default function AdminHeroSameDayPage() {
-  const router = useRouter();
-  const { adminUser, products, refreshProducts } = useAdmin();
-  const [orderedIds, setOrderedIds] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  const [addId, setAddId] = useState('');
+   const router = useRouter();
+   const { adminUser, adminLoading, products, refreshProducts } = useAdmin();
+   const [orderedIds, setOrderedIds] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [saving, setSaving] = useState(false);
+   const [message, setMessage] = useState('');
+   const [addId, setAddId] = useState('');
 
-  const sameDayPool = useMemo(
-    () => (products || []).filter((p) => isSameDayPrintingProduct(p) && p.enabled !== false),
-    [products],
-  );
+   const sameDayPool = useMemo(
+     () => (products || []).filter((p) => isSameDayPrintingProduct(p) && p.enabled !== false),
+     [products],
+   );
 
-  const idToProduct = useMemo(() => {
-    const m = new Map();
-    for (const p of sameDayPool) m.set(String(p.id), p);
-    return m;
-  }, [sameDayPool]);
+   const idToProduct = useMemo(() => {
+     const m = new Map();
+     for (const p of sameDayPool) m.set(String(p.id), p);
+     return m;
+   }, [sameDayPool]);
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch('/api/admin/hero-same-day-products', { credentials: 'include' });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Failed to load');
-        if (!cancelled) setOrderedIds(Array.isArray(data.productIds) ? data.productIds.map(String) : []);
-      } catch (e) {
-        if (!cancelled) setMessage(e?.message || 'Failed to load picks');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    if (adminUser) load();
-    return () => {
-      cancelled = true;
-    };
-  }, [adminUser]);
+   useEffect(() => {
+     let cancelled = false;
+     const load = async () => {
+       try {
+         setLoading(true);
+         const res = await fetch('/api/admin/hero-same-day-products', { credentials: 'include' });
+         const data = await res.json().catch(() => ({}));
+         if (!res.ok) throw new Error(data.error || 'Failed to load');
+         if (!cancelled) setOrderedIds(Array.isArray(data.productIds) ? data.productIds.map(String) : []);
+       } catch (e) {
+         if (!cancelled) setMessage(e?.message || 'Failed to load picks');
+       } finally {
+         if (!cancelled) setLoading(false);
+       }
+     };
+     if (adminUser && !adminLoading) load();
+     return () => {
+       cancelled = true;
+     };
+   }, [adminUser, adminLoading]);
 
   const move = (index, dir) => {
     const j = index + dir;
@@ -101,7 +101,7 @@ export default function AdminHeroSameDayPage() {
     }
   };
 
-  if (!adminUser) return null;
+  if (adminLoading || !adminUser) return null;
 
   const addOptions = sameDayPool.filter((p) => !orderedIds.includes(String(p.id)));
 

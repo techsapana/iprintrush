@@ -6,14 +6,14 @@ import { useAdmin } from '../../../hooks/useAdmin';
 import { CategoryForm } from '../../../components/admin/CategoryForm';
 
 export default function NewCategoryPage() {
-  const router = useRouter();
-  const { adminUser } = useAdmin();
+   const router = useRouter();
+   const { adminUser, adminLoading } = useAdmin();
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
-  if (!adminUser) return null;
+   if (adminLoading || !adminUser) return null;
 
   return (
     <div className="bg-gray-50 min-h-screen">

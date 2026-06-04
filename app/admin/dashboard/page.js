@@ -8,9 +8,9 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 export default function AdminDashboardPage() {
-  const router = useRouter();
-  const { adminUser, logoutAdmin, products, categories } = useAdmin();
-  const [announcementText, setAnnouncementText] = useState('');
+   const router = useRouter();
+   const { adminUser, adminLoading, logoutAdmin, products, categories } = useAdmin();
+   const [announcementText, setAnnouncementText] = useState('');
   const [announcementEnabled, setAnnouncementEnabled] = useState(true);
   const [announcementLoading, setAnnouncementLoading] = useState(false);
   const [announcementMessage, setAnnouncementMessage] = useState('');
@@ -33,14 +33,11 @@ export default function AdminDashboardPage() {
     { question: '', answer: '' },
   ]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!adminUser) {
-        router.push('/admin/login');
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [adminUser, router]);
+useEffect(() => {
+     if (!adminLoading && !adminUser) {
+       router.push('/admin/login');
+     }
+   }, [adminUser, adminLoading, router]);
 
   useEffect(() => {
     const loadAnnouncement = async () => {
@@ -76,7 +73,7 @@ export default function AdminDashboardPage() {
     loadAnnouncement();
   }, []);
 
-  if (!adminUser) return null;
+  if (adminLoading || !adminUser) return null;
 
   const handleLogout = () => {
     logoutAdmin();

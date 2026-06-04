@@ -5,21 +5,21 @@ import { useRouter } from 'next/navigation';
 import { useAdmin } from '../../hooks/useAdmin';
 
 export default function AdminPortfolioPage() {
-  const router = useRouter();
-  const { adminUser } = useAdmin();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  const [form, setForm] = useState({
-    label: '',
-    imageUrl: '',
-    displayOrder: 0,
-  });
+   const router = useRouter();
+   const { adminUser, adminLoading } = useAdmin();
+   const [items, setItems] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [saving, setSaving] = useState(false);
+   const [message, setMessage] = useState('');
+   const [form, setForm] = useState({
+     label: '',
+     imageUrl: '',
+     displayOrder: 0,
+   });
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
   const loadItems = async () => {
     try {
@@ -39,7 +39,7 @@ export default function AdminPortfolioPage() {
     if (adminUser) loadItems();
   }, [adminUser]);
 
-  if (!adminUser) return null;
+  if (adminLoading || !adminUser) return null;
 
   const onUploadImage = async (file) => {
     if (!file) return;

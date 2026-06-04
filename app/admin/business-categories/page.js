@@ -5,24 +5,25 @@ import { useRouter } from 'next/navigation';
 import { useAdmin } from '../../hooks/useAdmin';
 
 export default function BusinessCategoriesAdminPage() {
-  const router = useRouter();
-  const { adminUser, products } = useAdmin();
-  const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState([]);
-  const [error, setError] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [editingProducts, setEditingProducts] = useState(null);
-  const [formData, setFormData] = useState({});
-  const [selectedProducts, setSelectedProducts] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+   const router = useRouter();
+   const { adminUser, adminLoading, products } = useAdmin();
+   const [loading, setLoading] = useState(true);
+   const [categories, setCategories] = useState([]);
+   const [error, setError] = useState('');
+   const [editing, setEditing] = useState(null);
+   const [editingProducts, setEditingProducts] = useState(null);
+   const [formData, setFormData] = useState({});
+   const [selectedProducts, setSelectedProducts] = useState([]);
+   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    if (!adminUser) {
-      router.push('/admin/login');
-      return;
-    }
-    loadCategories();
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) {
+       router.push('/admin/login');
+       return;
+     }
+     if (adminLoading) return;
+     loadCategories();
+   }, [adminUser, adminLoading, router]);
 
   const loadCategories = async () => {
     try {
@@ -146,10 +147,10 @@ export default function BusinessCategoriesAdminPage() {
     p.id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (!adminUser) {
+  if (adminLoading || !adminUser) {
     return (
       <div className="bg-gray-50 min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Redirecting to admin login…</p>
+        <p className="text-gray-600">Checking authentication…</p>
       </div>
     );
   }

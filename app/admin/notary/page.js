@@ -5,19 +5,19 @@ import { useRouter } from 'next/navigation';
 import { useAdmin } from '../../hooks/useAdmin';
 
 export default function AdminNotaryPage() {
-  const router = useRouter();
-  const { adminUser, logoutAdmin } = useAdmin();
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+   const router = useRouter();
+   const { adminUser, adminLoading, logoutAdmin } = useAdmin();
+   const [requests, setRequests] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!adminUser) router.push('/admin/login');
-  }, [adminUser, router]);
+   useEffect(() => {
+     if (!adminLoading && !adminUser) router.push('/admin/login');
+   }, [adminUser, adminLoading, router]);
 
-  useEffect(() => {
-    if (adminUser) fetchRequests();
-  }, [adminUser]);
+   useEffect(() => {
+     if (adminUser && !adminLoading) fetchRequests();
+   }, [adminUser, adminLoading]);
 
   const fetchRequests = async () => {
     try {
@@ -64,7 +64,7 @@ export default function AdminNotaryPage() {
     );
   };
 
-  if (!adminUser) return null;
+  if (adminLoading || !adminUser) return null;
 
   return (
     <div className="bg-gray-50 min-h-screen">
