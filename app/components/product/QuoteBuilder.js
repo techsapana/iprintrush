@@ -1351,7 +1351,7 @@ const renderSizesStep = () => {
           {estimateError && <div className="mt-2 text-xs text-red-700">{estimateError}</div>}
           {estimatedShipping != null && estimatedShipping > 0 && !estimateError && (
             <div className="mt-2 text-sm text-gray-900">
-              Estimated shipping: <span className="font-semibold">${Number(estimatedShipping).toFixed(2)}</span>
+              Estimated Shipping Price: <span className="font-semibold">${Number(estimatedShipping).toFixed(2)}</span>
             </div>
           )}
         </div>
