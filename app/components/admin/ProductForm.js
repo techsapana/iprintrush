@@ -1341,15 +1341,15 @@ setCustomizationMode('print_product');
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
                 >
                   <option value="YOUR_PACKAGING">Your packaging (custom box)</option>
-                  <option value="FEDEX_BOX">FedEx Box</option>
-                  <option value="FEDEX_PAK">FedEx Pak</option>
-                  <option value="FEDEX_ENVELOPE">FedEx Envelope</option>
-                  <option value="FEDEX_SMALL_BOX">FedEx Small Box</option>
-                  <option value="FEDEX_MEDIUM_BOX">FedEx Medium Box</option>
-                  <option value="FEDEX_LARGE_BOX">FedEx Large Box</option>
+                  <option value="FEDEX_BOX"> Box</option>
+                  <option value="FEDEX_PAK"> Pak</option>
+                  <option value="FEDEX_ENVELOPE">Envelope</option>
+                  <option value="FEDEX_SMALL_BOX"> Small Box</option>
+                  <option value="FEDEX_MEDIUM_BOX"> Medium Box</option>
+                  <option value="FEDEX_LARGE_BOX"> Large Box</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
-                  Required for accurate FedEx rate quotes at checkout.
+                  Required for accurate Shipping rate quotes at checkout.
                 </p>
               </div>
 
