@@ -31,7 +31,7 @@ export default function AdminTestimonialsPage() {
        const res = await fetch('/api/admin/testimonials', { cache: 'no-store' });
        const data = await res.json().catch(() => ({}));
        if (!res.ok) throw new Error(data?.error || 'Failed to load testimonials');
-       setTestimonials(Array.isArray(data.testimonials) ? data.testimonials : []);
+        setTestimonials(Array.isArray(data.testimonials) ? data.testimonials : Array.isArray(data) ? data : []);
      } catch (err) {
        setMessage(err?.message || 'Failed to load testimonials');
      } finally {
