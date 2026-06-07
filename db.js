@@ -1,18 +1,42 @@
 // MySQL Database Connection Utility
 import mysql from 'mysql2/promise';
 
+const fs = require("fs");
+const path = require("path");
+const schemaPath = path.join(__dirname, "./database/schema.sql");
+
+const initDB = async () => {
+  try {
+    const schema = fs.readFileSync(schemaPath, "utf8");
+
+    await pool.query(schema);
+
+    console.log("✅ Database schema auto-initialized");
+  } catch (err) {
+    console.log("⚠️ Schema already exists or error:", err.message);
+  }
+};
+
+initDB();
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'iprintrush',
+  // host: process.env.DB_HOST || 'localhost',
+  // user: process.env.DB_USER || 'root',
+  // password: process.env.DB_PASSWORD || '',
+  // database: process.env.DB_NAME || 'iprintrush',
+  host: process.env.MYSQLHOST || process.env.DB_HOST,
+user: process.env.MYSQLUSER || process.env.DB_USER,
+password: process.env.MYSQLPASSWORD || process.env.DB_PASSWORD,
+database: process.env.MYSQLDATABASE || process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
 });
-
+console.log("DB ENV CHECK:", {
+  MYSQLHOST: process.env.MYSQLHOST,
+  DB_HOST: process.env.DB_HOST,
+});
 // Helper function to execute queries (uses query() for compatibility with bulk inserts)
 export async function query(sql, params = []) {
   try {

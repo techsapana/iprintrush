@@ -260,6 +260,12 @@ const artworkFileRef = useRef(null);
     scheduleRecalculation();
   };
 
+  const handleDeliveryMethodChange = (method) => {
+    invalidateQuote();
+    setDeliveryMethod(method);
+    scheduleRecalculation();
+  };
+
   const handleTempArtworkFilesChange = (newFiles) => {
     invalidateQuote();
     setTempArtworkFiles(newFiles);
@@ -837,14 +843,45 @@ try {
     );
   };
 
-  const renderDimensionStep = (group, pool, value) => {
-     return (
-       <div className="space-y-4">
-         <h3 className="text-lg font-semibold text-gray-900">{pool.name || group.label}</h3>
-         <p className="text-sm text-gray-600">{pool.description || 'Enter your custom dimensions.'}</p>
-         
-         {allowCustomDimensions && renderDimensionFields()}
-       </div>
+const renderDimensionStep = (group, pool, value) => {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">{pool.name || group.label}</h3>
+        <p className="text-sm text-gray-600">{pool.description || 'Enter your custom dimensions.'}</p>
+        
+        {allowCustomDimensions && renderDimensionFields()}
+      </div>
+    );
+  };
+
+  const renderDimensionFields = () => {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Width (inches)</label>
+          <input
+            type="number"
+            value={widthIn}
+            onChange={(e) => setWidthIn(e.target.value)}
+            min={dimensionConfig?.minWidthIn || 1}
+            max={dimensionConfig?.maxWidthIn || 999}
+            step="0.1"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Height (inches)</label>
+          <input
+            type="number"
+            value={heightIn}
+            onChange={(e) => setHeightIn(e.target.value)}
+            min={dimensionConfig?.minHeightIn || 1}
+            max={dimensionConfig?.maxHeightIn || 999}
+            step="0.1"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          />
+        </div>
+      </div>
     );
   };
 
@@ -1248,7 +1285,7 @@ onChange={async (e) => {
           {tempArtworkFiles.length > 0 && (
             <div className="text-xs text-gray-600">{tempArtworkFiles.length} artwork file(s) uploaded.</div>
           )}
-          {artworkFiles.length > 0 && (
+{artworkFiles.length > 0 && (
             <div className="text-xs text-gray-600">{artworkFiles.length} existing artwork file(s) will be reused.</div>
           )}
         </div>
@@ -1265,6 +1302,42 @@ onChange={async (e) => {
       </div>
     </div>
   );
+
+  const renderDeliveryStep = () => {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Delivery Option</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<button
+             type="button"
+             onClick={() => handleDeliveryMethodChange('pickup')}
+             className={`rounded-xl border px-4 py-3 text-left transition ${
+               deliveryMethod === 'pickup'
+                 ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
+                 : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
+             }`}
+           >
+             <div className="font-semibold text-gray-900">Store Pickup FREE</div>
+             <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
+           </button>
+          {shipping?.enabled !== false && (
+            <button
+              type="button"
+              onClick={() => handleDeliveryMethodChange('shipping')}
+              className={`rounded-xl border px-4 py-3 text-left transition ${
+                deliveryMethod === 'shipping'
+                  ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
+                  : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
+              }`}
+            >
+              <div className="font-semibold text-gray-900">Shipping</div>
+              <div className="text-sm text-gray-600">Delivered via FedEx.</div>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const artworkStepIndex = activeGroups.length;
   const deliveryStepIndex = activeGroups.length + 1;

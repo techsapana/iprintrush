@@ -922,20 +922,33 @@ const renderSizesStep = () => {
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Step 9 – Delivery Option</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <button
-            type="button"
-            onClick={() => handleDeliveryMethodChange('pickup')}
-            className={`rounded-xl border px-4 py-3 text-left transition ${
-              deliveryMethod === 'pickup'
-                ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-            }`}
-          >
-            <div className="font-semibold text-gray-900">Store Pickup FREE</div>
-            <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
-          </button>
+<button
+             type="button"
+             onClick={() => handleDeliveryMethodChange('pickup')}
+             className={`rounded-xl border px-4 py-3 text-left transition ${
+               deliveryMethod === 'pickup'
+                 ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
+                 : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
+             }`}
+           >
+             <div className="font-semibold text-gray-900">Store Pickup FREE</div>
+             <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
+           </button>
+          {config?.shipping?.enabled !== false && (
+            <button
+              type="button"
+              onClick={() => handleDeliveryMethodChange('shipping')}
+              className={`rounded-xl border px-4 py-3 text-left transition ${
+                deliveryMethod === 'shipping'
+                  ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
+                  : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
+              }`}
+            >
+              <div className="font-semibold text-gray-900">Shipping</div>
+              <div className="text-sm text-gray-600">Delivered via FedEx.</div>
+            </button>
+          )}
         </div>
-
 
 
       </div>
