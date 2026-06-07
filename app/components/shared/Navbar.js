@@ -228,7 +228,7 @@ export function Navbar() {
                   iprint
                 </span>
               ) : (
-                <div className="h-10 md:h-14 flex items-center justify-center">
+                <div className="h-12 md:h-16 flex items-center justify-center">
                   <img
                     src={logoImageUrl || '/logo.png'}
                     alt="iPrintRush"
