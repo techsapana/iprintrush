@@ -1245,7 +1245,9 @@ const renderSizesStep = () => {
             {!quoteSummary.lineItems.some((it) => it.amount < 0) && (
               <div className="flex justify-between text-sm text-gray-900">
                 <span>Subtotal</span>
-                <span">${(typeof quoteSummary.subtotal === 'number' ? quoteSummary.subtotal : 0).toFixed(2)}</span>
+                <span>${(typeof quoteSummary.subtotal === 'number'
+  ? quoteSummary.subtotal
+  : 0).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm text-gray-900">
