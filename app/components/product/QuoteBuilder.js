@@ -196,7 +196,9 @@ const printableQuoteRef = useRef(null);
       .map((s) => ({
         ...s,
         // Use custom price if available, otherwise use global
-        priceAddon: productSettings.customPrices?.sizes?.[s.id] ?? s.priceAddon,
+        priceAddon: typeof (productSettings.customPrices?.sizes?.[s.id] ?? s.priceAddon) === 'number' 
+          ? productSettings.customPrices?.sizes?.[s.id] ?? s.priceAddon 
+          : 0,
       }));
   }, [config, productSettings]);
 
@@ -319,7 +321,7 @@ const printableQuoteRef = useRef(null);
               'Designer Help': config.designerHelp.find((d) => d.id === designerHelpId)?.name ?? '—',
               'Print Locations': printLocationIds.length
                 ? printLocationIds
-                    .map((id) => config.printLocations.find((p) => p.id === id)?.label)
+                    .map((id) => config.printLocations.find((p) => p.id === id)?.name)
                     .filter(Boolean)
                     .join(', ')
                 : '—',
@@ -684,7 +686,7 @@ const printableQuoteRef = useRef(null);
                 }`}
               >
                 <div className="font-semibold text-gray-900">{opt.name}</div>
-                {effectivePrice !== 0 && (
+                {typeof effectivePrice === 'number' && effectivePrice !== 0 && (
                   <div className="text-sm text-gray-600">
                     +${effectivePrice.toFixed(2)} per piece
                   </div>
@@ -750,7 +752,7 @@ const renderSizesStep = () => {
                 {size.label}
               </div>
 
-              {size.priceAddon !== 0 && (
+              {typeof size.priceAddon === 'number' && size.priceAddon !== 0 && (
                 <div className="text-xs text-gray-500">
                   +${size.priceAddon.toFixed(2)} each
                 </div>
@@ -828,9 +830,9 @@ const renderSizesStep = () => {
                 }`}
               >
                 <div className="font-semibold text-gray-900">{opt.name}</div>
-                {opt.priceAddon !== 0 && (
+                {typeof opt.priceModifier === 'number' && opt.priceModifier !== 0 && (
                   <div className="text-sm text-gray-600">
-                    +${opt.priceAddon.toFixed(2)} per piece
+                    +${opt.priceModifier.toFixed(2)} per piece
                   </div>
                 )}
               </button>
@@ -866,7 +868,7 @@ const renderSizesStep = () => {
                 }`}
               >
                 <div className="font-semibold text-gray-900">{opt.name}</div>
-                {effectivePrice !== 0 && (
+                {typeof effectivePrice === 'number' && effectivePrice !== 0 && (
                   <div className="text-sm text-gray-600">
                     {effectivePrice > 0 ? '+' : '-'}$
                     {Math.abs(effectivePrice).toFixed(2)} per order
@@ -903,7 +905,7 @@ const renderSizesStep = () => {
                 }`}
               >
                 <div className="font-semibold text-gray-900">{opt.name}</div>
-                {effectivePrice !== 0 && (
+                {typeof effectivePrice === 'number' && effectivePrice !== 0 && (
                   <div className="text-sm text-gray-600">
                     {effectivePrice > 0 ? '+' : '-'}$
                     {Math.abs(effectivePrice).toFixed(2)} per order
@@ -968,7 +970,8 @@ const renderSizesStep = () => {
   };
 
   const formatAmount = (amount) => {
-    const abs = Math.abs(amount).toFixed(2);
+    const numAmount = typeof amount === 'number' ? amount : 0;
+    const abs = Math.abs(numAmount).toFixed(2);
     return amount < 0 ? `- $${abs}` : `$${abs}`;
   };
 
@@ -1106,11 +1109,11 @@ const renderSizesStep = () => {
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-gray-900">
-                ${quoteSummary.grandTotal.toFixed(2)}
+                ${(typeof quoteSummary.grandTotal === 'number' ? quoteSummary.grandTotal : 0).toFixed(2)}
               </div>
               <div className="text-xs text-gray-500">
                 {quoteSummary.totalQuantity} pcs · $
-                {quoteSummary.unitPrice.toFixed(2)} per piece
+                {(typeof quoteSummary.unitPrice === 'number' ? quoteSummary.unitPrice : 0).toFixed(2)} per piece
               </div>
             </div>
           </div>
@@ -1242,16 +1245,16 @@ const renderSizesStep = () => {
             {!quoteSummary.lineItems.some((it) => it.amount < 0) && (
               <div className="flex justify-between text-sm text-gray-900">
                 <span>Subtotal</span>
-                <span>${quoteSummary.subtotal.toFixed(2)}</span>
+                <span">${(typeof quoteSummary.subtotal === 'number' ? quoteSummary.subtotal : 0).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm text-gray-900">
               <span>Shipping</span>
-              <span>${quoteSummary.shipping.toFixed(2)}</span>
+              <span>${(typeof quoteSummary.shipping === 'number' ? quoteSummary.shipping : 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-base font-semibold text-gray-900">
               <span>Grand Total</span>
-              <span>${quoteSummary.grandTotal.toFixed(2)}</span>
+              <span>${(typeof quoteSummary.grandTotal === 'number' ? quoteSummary.grandTotal : 0).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -1362,7 +1365,7 @@ const renderSizesStep = () => {
             </Button>
           </div>
           {estimateError && <div className="mt-2 text-xs text-red-700">{estimateError}</div>}
-          {estimatedShipping != null && estimatedShipping > 0 && !estimateError && (
+          {estimatedShipping != null && Number.isFinite(estimatedShipping) && estimatedShipping > 0 && !estimateError && (
             <div className="mt-2 text-sm text-gray-900">
               Estimated Shipping Price: <span className="font-semibold">${Number(estimatedShipping).toFixed(2)}</span>
             </div>
