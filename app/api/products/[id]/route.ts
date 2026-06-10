@@ -52,14 +52,30 @@ async function ensureAllowCustomDimensionsColumn() {
   }
 }
 
+async function ensureShippingColumns() {
+  const shippingEnabled: any = await queryOne("SHOW COLUMNS FROM products LIKE 'shipping_enabled'");
+  if (!shippingEnabled) {
+    await query('ALTER TABLE products ADD COLUMN shipping_enabled BOOLEAN NOT NULL DEFAULT TRUE AFTER allow_custom_dimensions');
+  }
+  const localDeliveryEligible: any = await queryOne("SHOW COLUMNS FROM products LIKE 'local_delivery_eligible'");
+  if (!localDeliveryEligible) {
+    await query('ALTER TABLE products ADD COLUMN local_delivery_eligible BOOLEAN NOT NULL DEFAULT FALSE AFTER shipping_enabled');
+  }
+  const shippingCategory: any = await queryOne("SHOW COLUMNS FROM products LIKE 'shipping_category'");
+  if (!shippingCategory) {
+    await query("ALTER TABLE products ADD COLUMN shipping_category VARCHAR(50) DEFAULT 'standard' AFTER local_delivery_eligible");
+  }
+}
+
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } | Promise<{ id: string }> }
-) {
-  try {
-    await ensureLCategoryColumn();
-    await ensureOutOfStockColumn();
-    await ensureAllowCustomDimensionsColumn();
+   request: NextRequest,
+   { params }: { params: { id: string } | Promise<{ id: string }> }
+ ) {
+   try {
+     await ensureLCategoryColumn();
+     await ensureOutOfStockColumn();
+     await ensureAllowCustomDimensionsColumn();
+     await ensureShippingColumns();
     const resolvedParams = await params;
     const id = resolvedParams.id;
 
@@ -115,54 +131,57 @@ export async function GET(
         )) as any[])
       : ([] as any[]);
 
-     const transformed: any = {
-       id: product.id,
-       name: product.name,
-       slug: product.slug,
-       description: product.description,
-       price: parseFloat(product.price),
-       minQuantity: product.min_quantity != null ? Number(product.min_quantity) : null,
-       maxQuantity: product.max_quantity != null ? Number(product.max_quantity) : null,
-       minWidthIn: product.min_width_in != null ? Number(product.min_width_in) : null,
-       maxWidthIn: product.max_width_in != null ? Number(product.max_width_in) : null,
-       minHeightIn: product.min_height_in != null ? Number(product.min_height_in) : null,
-       maxHeightIn: product.max_height_in != null ? Number(product.max_height_in) : null,
-       pricePerSqInch: product.price_per_sq_inch != null ? Number(product.price_per_sq_inch) : null,
-       mailboxPricePerMonth:
-         product.mailbox_price_per_month != null ? Number(product.mailbox_price_per_month) : null,
-       oldPrice: product.old_price != null ? parseFloat(product.old_price) : null,
-       weightLb: product.weight_lb != null ? Number(product.weight_lb) : null,
-       packageLengthIn: product.package_length_in != null ? Number(product.package_length_in) : null,
-       packageWidthIn: product.package_width_in != null ? Number(product.package_width_in) : null,
-       packageHeightIn: product.package_height_in != null ? Number(product.package_height_in) : null,
-       packageType: product.package_type || 'YOUR_PACKAGING',
-       category: product.category_name || product.category_id,
-       categoryId: product.category_id,
-       linkedCategorySlug: product.l_category || null,
-       categorySlug: product.category_slug,
-       image: product.image || '/placeholder.jpg',
-       sameDayEligible: Boolean(product.same_day_eligible),
-       outOfStock: Boolean(product.out_of_stock),
-       enabled: Boolean(product.enabled),
-       featured: Boolean(product.featured),
-       allowCustomDimensions: Boolean(product.allow_custom_dimensions),
-       createdAt: product.created_at || null,
-       features: product.features ? product.features.split(',') : [],
-       sizes: sizes.map((s: any) => s.label),
-       galleryImages: Array.isArray(gallery)
-         ? gallery.map((g: any) => g.image_url).filter((url: string) => url && url.trim().length > 0)
-         : [],
-       ...(includeVideos
-         ? {
-             videos: Array.isArray(videosRaw)
-               ? (videosRaw
-                   .map(normalizeVideoRow)
-                   .filter(Boolean) as Array<{ url: string; title: string; description: string }>)
-               : [],
-           }
-         : {}),
-       couponCodes: [],
-     };
+const transformed: any = {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        description: product.description,
+        price: parseFloat(product.price),
+        minQuantity: product.min_quantity != null ? Number(product.min_quantity) : null,
+        maxQuantity: product.max_quantity != null ? Number(product.max_quantity) : null,
+        minWidthIn: product.min_width_in != null ? Number(product.min_width_in) : null,
+        maxWidthIn: product.max_width_in != null ? Number(product.max_width_in) : null,
+        minHeightIn: product.min_height_in != null ? Number(product.min_height_in) : null,
+        maxHeightIn: product.max_height_in != null ? Number(product.max_height_in) : null,
+        pricePerSqInch: product.price_per_sq_inch != null ? Number(product.price_per_sq_inch) : null,
+        mailboxPricePerMonth:
+          product.mailbox_price_per_month != null ? Number(product.mailbox_price_per_month) : null,
+        oldPrice: product.old_price != null ? parseFloat(product.old_price) : null,
+        weightLb: product.weight_lb != null ? Number(product.weight_lb) : null,
+        packageLengthIn: product.package_length_in != null ? Number(product.package_length_in) : null,
+        packageWidthIn: product.package_width_in != null ? Number(product.package_width_in) : null,
+        packageHeightIn: product.package_height_in != null ? Number(product.package_height_in) : null,
+        packageType: product.package_type || 'YOUR_PACKAGING',
+        category: product.category_name || product.category_id,
+        categoryId: product.category_id,
+        linkedCategorySlug: product.l_category || null,
+        categorySlug: product.category_slug,
+        image: product.image || '/placeholder.jpg',
+        sameDayEligible: Boolean(product.same_day_eligible),
+        outOfStock: Boolean(product.out_of_stock),
+        enabled: Boolean(product.enabled),
+        featured: Boolean(product.featured),
+        allowCustomDimensions: Boolean(product.allow_custom_dimensions),
+        shippingEnabled: product.shipping_enabled !== false,
+        localDeliveryEligible: Boolean(product.local_delivery_eligible),
+        shippingCategory: product.shipping_category || 'standard',
+        createdAt: product.created_at || null,
+        features: product.features ? product.features.split(',') : [],
+        sizes: sizes.map((s: any) => s.label),
+        galleryImages: Array.isArray(gallery)
+          ? gallery.map((g: any) => g.image_url).filter((url: string) => url && url.trim().length > 0)
+          : [],
+        ...(includeVideos
+          ? {
+              videos: Array.isArray(videosRaw)
+                ? (videosRaw
+                    .map(normalizeVideoRow)
+                    .filter(Boolean) as Array<{ url: string; title: string; description: string }>)
+                : [],
+            }
+          : {}),
+        couponCodes: [],
+      };
 
     const coupons = (await query(
       'SELECT coupon_code, discount_percent, is_active FROM product_coupon_codes WHERE product_id = ? ORDER BY id',
@@ -187,13 +206,14 @@ export async function GET(
 }
 
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } | Promise<{ id: string }> }
-) {
-  try {
-    await ensureLCategoryColumn();
-    await ensureOutOfStockColumn();
-    await ensureAllowCustomDimensionsColumn();
+   request: NextRequest,
+   { params }: { params: { id: string } | Promise<{ id: string }> }
+ ) {
+   try {
+     await ensureLCategoryColumn();
+     await ensureOutOfStockColumn();
+     await ensureAllowCustomDimensionsColumn();
+     await ensureShippingColumns();
     const body = await request.json();
     const resolvedParams = await params;
     
@@ -215,32 +235,64 @@ export async function PUT(
       categoryId = cat?.id || null;
     }
 
-    if (!existing) {
+if (!existing) {
       // Product doesn't exist - create it (upsert behavior)
       const productSlug = body.slug || body.name?.toLowerCase().replace(/\s+/g, '-') || id;
       
       await query(
-        `INSERT INTO products (id, name, slug, description, price, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, enabled)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
-        [
-          id,
-          body.name || 'Untitled Product',
-          productSlug,
-          body.description || '',
-          nullableNumber(body.price) ?? 0,
-          nullableNumber(body.oldPrice),
-          nullableNumber(body.weightLb),
-          nullableNumber(body.packageLengthIn),
-          nullableNumber(body.packageWidthIn),
-          nullableNumber(body.packageHeightIn),
-          categoryId,
-          body.linkedCategorySlug || body.lCategory || null,
-          body.image || '/placeholder.jpg',
-          body.sameDayEligible ? 1 : 0,
-          body.outOfStock ? 1 : 0,
-          body.featured ? 1 : 0,
-          body.allow_custom_dimensions ? 1 : 0,
-        ]
+        `INSERT INTO products (id, name, slug, description, price, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, enabled)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+         ON DUPLICATE KEY UPDATE
+           name = VALUES(name),
+           slug = VALUES(slug),
+           description = VALUES(description),
+           price = VALUES(price),
+           min_quantity = VALUES(min_quantity),
+           max_quantity = VALUES(max_quantity),
+           min_width_in = VALUES(min_width_in),
+           max_width_in = VALUES(max_width_in),
+           min_height_in = VALUES(min_height_in),
+           max_height_in = VALUES(max_height_in),
+           price_per_sq_inch = VALUES(price_per_sq_inch),
+           mailbox_price_per_month = VALUES(mailbox_price_per_month),
+           old_price = VALUES(old_price),
+           weight_lb = VALUES(weight_lb),
+           package_length_in = VALUES(package_length_in),
+           package_width_in = VALUES(package_width_in),
+           package_height_in = VALUES(package_height_in),
+           category_id = VALUES(category_id),
+           l_category = VALUES(l_category),
+           image = VALUES(image),
+           same_day_eligible = VALUES(same_day_eligible),
+           out_of_stock = VALUES(out_of_stock),
+           featured = VALUES(featured),
+           allow_custom_dimensions = VALUES(allow_custom_dimensions),
+           shipping_enabled = VALUES(shipping_enabled),
+           local_delivery_eligible = VALUES(local_delivery_eligible),
+           shipping_category = VALUES(shipping_category),
+           updated_at = CURRENT_TIMESTAMP`,
+[
+           id,
+           body.name,
+           productSlug,
+           body.description || '',
+           nullableNumber(body.price) ?? 0,
+           nullableNumber(body.oldPrice),
+           nullableNumber(body.weightLb),
+           nullableNumber(body.packageLengthIn),
+           nullableNumber(body.packageWidthIn),
+           nullableNumber(body.packageHeightIn),
+           categoryId,
+           body.linkedCategorySlug || null,
+           body.image || '/placeholder.jpg',
+           body.sameDayEligible ? 1 : 0,
+           body.outOfStock ? 1 : 0,
+           body.featured ? 1 : 0,
+           body.allow_custom_dimensions ? 1 : 0,
+           body.shippingEnabled !== false,
+           body.localDeliveryEligible ? 1 : 0,
+           body.shippingCategory || 'standard',
+         ]
       );
     } else {
       // Product exists - update it
@@ -343,14 +395,26 @@ export async function PUT(
          updates.push('featured = ?');
          values.push(body.featured ? 1 : 0);
        }
-       if (body.allow_custom_dimensions !== undefined) {
-         updates.push('allow_custom_dimensions = ?');
-         values.push(body.allow_custom_dimensions ? 1 : 0);
-       }
-       if (body.enabled !== undefined) {
-         updates.push('enabled = ?');
-         values.push(body.enabled ? 1 : 0);
-       }
+if (body.allow_custom_dimensions !== undefined) {
+          updates.push('allow_custom_dimensions = ?');
+          values.push(body.allow_custom_dimensions ? 1 : 0);
+        }
+        if (body.shippingEnabled !== undefined) {
+          updates.push('shipping_enabled = ?');
+          values.push(body.shippingEnabled ? 1 : 0);
+        }
+        if (body.localDeliveryEligible !== undefined) {
+          updates.push('local_delivery_eligible = ?');
+          values.push(body.localDeliveryEligible ? 1 : 0);
+        }
+        if (body.shippingCategory !== undefined) {
+          updates.push('shipping_category = ?');
+          values.push(body.shippingCategory || 'standard');
+        }
+        if (body.enabled !== undefined) {
+          updates.push('enabled = ?');
+          values.push(body.enabled ? 1 : 0);
+        }
 
       if (updates.length > 0) {
         updates.push('updated_at = CURRENT_TIMESTAMP');

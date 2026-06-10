@@ -10,6 +10,8 @@ import type {
 } from '@/app/lib/quoteConfigTypes';
 import { fetchFedexRatesForCheckout } from '@/app/lib/fedexCheckout';
 
+const useRuleBasedShipping = process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true';
+
 async function getProductQuantityBounds(productId: string): Promise<{ min: number | null; max: number | null }> {
   const row: any = await queryOne(
     'SELECT min_quantity, max_quantity FROM products WHERE id = ? LIMIT 1',
@@ -225,6 +227,9 @@ async function getConfigWithCustomPrices(productId: string): Promise<QuoteConfig
     shipping: {
       enabled: Boolean(shippingConfig.enabled),
       defaultFlatRate: parseFloat(shippingConfig.default_flat_rate || 0),
+      under100Rate: parseFloat(shippingConfig.under_100_rate || 0),
+      between100And199Rate: parseFloat(shippingConfig.between_100_199_rate || 0),
+      over200Rate: parseFloat(shippingConfig.over_200_rate || 0),
       rules: shippingRules.map((r: any) => ({
         id: r.id.toString(),
         mode: r.rule_type === 'flat' ? 'flat' : r.rule_type === 'state' ? 'state' : 'zip',
@@ -339,7 +344,7 @@ export async function POST(req: NextRequest) {
       const baseUnitPrice = productWithCat?.price != null ? Number(productWithCat.price) : null;
       let summary = calculateDynamicQuote(pools, shipping, dynamicPayload, baseUnitPrice, dimensionPricing);
 
-      if (dynamicPayload.deliveryMethod === 'shipping') {
+      if (dynamicPayload.deliveryMethod === 'shipping' && !useRuleBasedShipping) {
         const fedexShipping = await calculateFedexShippingAmount(
           dynamicPayload.productId,
           dynamicPayload.deliveryMethod,
@@ -493,7 +498,7 @@ export async function POST(req: NextRequest) {
 
     let summary = calculateQuote(config, apparelPayload);
 
-    if (apparelPayload.deliveryMethod === 'shipping') {
+    if (apparelPayload.deliveryMethod === 'shipping' && !useRuleBasedShipping) {
       const fedexShipping = await calculateFedexShippingAmount(
         apparelPayload.productId,
         apparelPayload.deliveryMethod,

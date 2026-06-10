@@ -74,6 +74,9 @@ export type ShippingRule = {
 export type ShippingConfig = {
   enabled: boolean;
   defaultFlatRate: number;
+  under100Rate: number;
+  between100And199Rate: number;
+  over200Rate: number;
   rules: ShippingRule[];
 };
 

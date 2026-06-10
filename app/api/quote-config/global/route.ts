@@ -75,6 +75,9 @@ async function getFullConfig() {
     shipping: {
       enabled: Boolean(shippingConfig?.enabled),
       defaultFlatRate: parseFloat(shippingConfig?.default_flat_rate || 0),
+      under100Rate: parseFloat(shippingConfig?.under_100_rate || 0),
+      between100And199Rate: parseFloat(shippingConfig?.between_100_199_rate || 0),
+      over200Rate: parseFloat(shippingConfig?.over_200_rate || 0),
       rules: shippingRules.map((r: any) => ({
         id: r.id.toString(),
         ruleType: r.rule_type,
@@ -200,10 +203,13 @@ export async function PUT(req: NextRequest) {
     // Update shipping config if provided
     if (body.shipping) {
       await query(
-        `UPDATE shipping_config SET enabled = ?, default_flat_rate = ?`,
+        `UPDATE shipping_config SET enabled = ?, default_flat_rate = ?, under_100_rate = ?, between_100_199_rate = ?, over_200_rate = ?`,
         [
           body.shipping.enabled !== false ? 1 : 0,
           body.shipping.defaultFlatRate || 0,
+          body.shipping.under100Rate || 0,
+          body.shipping.between100And199Rate || 0,
+          body.shipping.over200Rate || 0,
         ]
       );
     }

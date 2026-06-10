@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { DynamicQuoteBuilder } from './DynamicQuoteBuilder';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
+import { getShippingMethodLabel } from '../../lib/shippingEngine';
 
 function debounce(fn, delay) {
   let timeoutId;
@@ -52,14 +53,15 @@ const [phoneNumber, setPhoneNumber] = useState('');
 const [shareFeedback, setShareFeedback] = useState('');
 const printableQuoteRef = useRef(null);
 
-  const [decorationId, setDecorationId] = useState(null);
-  const [colorId, setColorId] = useState(null);
-  const [quantities, setQuantities] = useState({});
-  const [printLocationIds, setPrintLocationIds] = useState([]);
-  const [turnaroundId, setTurnaroundId] = useState(null);
-  const [designerHelpId, setDesignerHelpId] = useState(null);
-  const [deliveryMethod, setDeliveryMethod] = useState('pickup');
-  // Shipping address is collected at checkout (not in quote builder)
+const [decorationId, setDecorationId] = useState(null);
+const [colorId, setColorId] = useState(null);
+const [quantities, setQuantities] = useState({});
+const [printLocationIds, setPrintLocationIds] = useState([]);
+const [turnaroundId, setTurnaroundId] = useState(null);
+const [designerHelpId, setDesignerHelpId] = useState(null);
+const [deliveryMethod, setDeliveryMethod] = useState('pickup');
+const useRuleBasedShipping = process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true';
+// Shipping address is collected at checkout (not in quote builder)
   const [useMyCloth, setUseMyCloth] = useState(false);
   const [fabricChoice, setFabricChoice] = useState('');
   const isCustomApparels = /custom\s*apparel/i.test(String(productCategory || ''));
@@ -329,7 +331,7 @@ const printableQuoteRef = useRef(null);
                 .filter((s) => (newQuantities[s.id] || 0) > 0)
                 .map((s) => `${s.label}×${newQuantities[s.id]}`)
                 .join(', '),
-              Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping',
+              Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping'),
               ...(isCustomApparels
                 ? {
                     Fabric:
@@ -544,7 +546,7 @@ const printableQuoteRef = useRef(null);
                 .filter((s) => (quantities[s.id] || 0) > 0)
                 .map((s) => `${s.label}×${quantities[s.id]}`)
                 .join(', '),
-              Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping',
+              Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping'),
               ...(isCustomApparels
                 ? {
                     Fabric:
@@ -580,30 +582,61 @@ const printableQuoteRef = useRef(null);
     try {
       setEstimatingShipping(true);
       setEstimateError('');
-      const res = await fetch('/api/fedex/rates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deliveryMethod: 'shipping',
+      const qty = quoteSummary?.totalQuantity || totalQuantity || 1;
+
+      if (useRuleBasedShipping) {
+        const payload = {
           items: [
             {
               id: productId,
-              quantity: totalQuantity || 1,
-              quotePayload: { mode: 'apparel', selections: {} },
+              quantity: qty,
+              quotePayload: quoteSummary?.quotePayload || { mode: 'apparel', selections: {} },
             },
           ],
           shippingAddress: { zip },
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!json.success || !Array.isArray(json.rates) || json.rates.length === 0) {
-        throw new Error(json.message || json.error || 'Failed to estimate shipping');
+        };
+        const res = await fetch('/api/shipping/methods', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success || !Array.isArray(json.methods) || json.methods.length === 0) {
+          throw new Error(json.message || json.error || 'Failed to estimate shipping');
+        }
+        const standardMethod = json.methods.find((m) => m.type === 'standard_shipping');
+        const localMethod = json.methods.find((m) => m.type === 'local_delivery');
+        const method = standardMethod || localMethod;
+        if (!method || !Number.isFinite(method.cost)) {
+          throw new Error('No shipping rate available for this ZIP.');
+        }
+        setEstimatedShipping(method.cost);
+      } else {
+        const res = await fetch('/api/fedex/rates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deliveryMethod: 'shipping',
+            items: [
+              {
+                id: productId,
+                quantity: qty,
+                quotePayload: { mode: 'apparel', selections: {} },
+              },
+            ],
+            shippingAddress: { zip },
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!json.success || !Array.isArray(json.rates) || json.rates.length === 0) {
+          throw new Error(json.message || json.error || 'Failed to estimate shipping');
+        }
+        const amount = Number(json.amount ?? json.rates[0]?.cost);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          throw new Error('No shipping rates found for this ZIP.');
+        }
+        setEstimatedShipping(amount);
       }
-      const amount = Number(json.amount ?? json.rates[0]?.cost);
-      if (!Number.isFinite(amount) || amount <= 0) {
-        throw new Error('No FedEx rates found for this ZIP.');
-      }
-      setEstimatedShipping(amount);
     } catch (err) {
       setEstimateError(err.message || 'Failed to estimate shipping');
     } finally {
@@ -947,7 +980,9 @@ const renderSizesStep = () => {
               }`}
             >
               <div className="font-semibold text-gray-900">Shipping</div>
-              <div className="text-sm text-gray-600">Delivered via FedEx.</div>
+              <div className="text-sm text-gray-600">
+                {useRuleBasedShipping ? 'Shipping calculated at checkout' : 'Shipping'}
+              </div>
             </button>
           )}
         </div>
@@ -993,7 +1028,7 @@ const renderSizesStep = () => {
         .filter((size) => (quantities[size.id] || 0) > 0)
         .map((size) => `${size.label}: ${quantities[size.id] || 0}`)
         .join(', '),
-      Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping',
+      Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping'),
       ...(isCustomApparels
         ? {
             Fabric: fabricChoice === 'own'
@@ -1046,7 +1081,7 @@ const renderSizesStep = () => {
           ? printLocationIds.map((id) => config?.printLocations?.find((p) => p.id === id)?.name).filter(Boolean).join(', ')
           : '—',
         'Size Breakdown': availableSizes.filter((s) => (quantities[s.id] || 0) > 0).map((s) => `${s.label}: ${quantities[s.id] || 0}`).join(', '),
-        Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping',
+        Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping'),
         ...(isCustomApparels ? { Fabric: fabricChoice === 'own' ? 'I have my own fabric' : "I don't have my own fabric" } : {}),
         Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
         productName,
@@ -1067,7 +1102,7 @@ const renderSizesStep = () => {
           ? printLocationIds.map((id) => config?.printLocations?.find((p) => p.id === id)?.name).filter(Boolean).join(', ')
           : '—',
         'Size Breakdown': availableSizes.filter((s) => (quantities[s.id] || 0) > 0).map((s) => `${s.label}×${quantities[s.id]}`).join(', '),
-        Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping',
+        Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping'),
         ...(isCustomApparels ? { Fabric: fabricChoice === 'own' ? 'I have my own fabric' : "I don't have my own fabric" } : {}),
         Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
         productName,
@@ -1346,8 +1381,8 @@ const renderSizesStep = () => {
           </div>
         )}
 
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <h4 className="text-sm font-semibold text-gray-900 mb-2">Estimated Shipping Price</h4>
+<div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-2">Estimated Shipping Price</h4>
           <p className="text-xs text-gray-600 mb-3">Enter ZIP code to get estimated shipping price.</p>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
@@ -1366,12 +1401,12 @@ const renderSizesStep = () => {
               {estimatingShipping ? 'Estimating...' : 'Estimate'}
             </Button>
           </div>
-          {estimateError && <div className="mt-2 text-xs text-red-700">{estimateError}</div>}
-          {estimatedShipping != null && Number.isFinite(estimatedShipping) && estimatedShipping > 0 && !estimateError && (
-            <div className="mt-2 text-sm text-gray-900">
-              Estimated Shipping Price: <span className="font-semibold">${Number(estimatedShipping).toFixed(2)}</span>
-            </div>
-          )}
+{estimateError && <div className="mt-2 text-xs text-red-700">{estimateError}</div>}
+           {estimatedShipping != null && Number.isFinite(estimatedShipping) && !estimateError && (
+             <div className="mt-2 text-sm text-gray-900">
+               Estimated Shipping Price: <span className="font-semibold">${Number(estimatedShipping).toFixed(2)}</span>
+             </div>
+           )}
         </div>
       </div>
     );

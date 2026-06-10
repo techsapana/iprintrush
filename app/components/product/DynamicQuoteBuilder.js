@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceHTML, buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
+import { getShippingMethodLabel } from '../../lib/shippingEngine';
 
 function debounce(fn, delay) {
   let timeoutId;
@@ -47,6 +48,7 @@ export function DynamicQuoteBuilder({
   const [heightIn, setHeightIn] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('pickup');
   // Shipping address is collected at checkout (not in quote builder)
+  const useRuleBasedShipping = process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true';
   const [hasCalculated, setHasCalculated] = useState(false);
   const [estimateZip, setEstimateZip] = useState('');
   const [estimatingShipping, setEstimatingShipping] = useState(false);
@@ -247,6 +249,11 @@ const artworkFileRef = useRef(null);
     if (!hasCalculated) return;
     setQuoteSummary(null);
     setHasCalculated(false);
+  };
+
+  const isShippingReviewRequired = () => {
+    const w = parseFloat(widthIn);
+    return Number.isFinite(w) && w > 44;
   };
 
   const scheduleRecalculation = debounce(() => {
@@ -529,8 +536,8 @@ try {
           }
         }
 
-        customizationsDisplay.Delivery =
-          deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping';
+customizationsDisplay.Delivery =
+           deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping');
         customizationsDisplay.Artwork =
           artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later';
         onQuoteReady({
@@ -570,30 +577,60 @@ try {
         selections.width_in = w;
         selections.height_in = h;
       }
-      const res = await fetch('/api/fedex/rates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deliveryMethod: 'shipping',
-          items: [
-            {
-              id: productId,
-              quantity: qty,
-              quotePayload: { mode: 'print_product', selections },
-            },
-          ],
-          shippingAddress: { zip },
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!json.success || !Array.isArray(json.rates) || json.rates.length === 0) {
-        throw new Error(json.message || json.error || 'Failed to estimate shipping');
+
+      if (useRuleBasedShipping) {
+        const res = await fetch('/api/shipping/methods', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deliveryMethod: 'shipping',
+            items: [
+              {
+                id: productId,
+                quantity: qty,
+                quotePayload: { mode: 'print_product', selections },
+              },
+            ],
+            shippingAddress: { zip },
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success || !Array.isArray(json.methods) || json.methods.length === 0) {
+          throw new Error(json.message || json.error || 'Failed to estimate shipping');
+        }
+        const standardMethod = json.methods.find((m) => m.type === 'standard_shipping');
+        const localMethod = json.methods.find((m) => m.type === 'local_delivery');
+        const method = standardMethod || localMethod;
+        if (!method || !Number.isFinite(method.cost)) {
+          throw new Error('No shipping rate available for this ZIP.');
+        }
+        setEstimatedShipping(method.cost);
+      } else {
+        const res = await fetch('/api/fedex/rates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deliveryMethod: 'shipping',
+            items: [
+              {
+                id: productId,
+                quantity: qty,
+                quotePayload: { mode: 'print_product', selections },
+              },
+            ],
+            shippingAddress: { zip },
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!json.success || !Array.isArray(json.rates) || json.rates.length === 0) {
+          throw new Error(json.message || json.error || 'Failed to estimate shipping');
+        }
+        const amount = Number(json.amount ?? json.rates[0]?.cost);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          throw new Error('No shipping rates found for this ZIP.');
+        }
+        setEstimatedShipping(amount);
       }
-      const amount = Number(json.amount ?? json.rates[0]?.cost);
-      if (!Number.isFinite(amount) || amount <= 0) {
-        throw new Error('No FedEx rates found for this ZIP.');
-      }
-      setEstimatedShipping(amount);
     } catch (err) {
       setEstimateError(err.message || 'Failed to estimate shipping');
     } finally {
@@ -904,6 +941,7 @@ const renderDimensionStep = (group, pool, value) => {
 
   const renderSummaryStep = () => {
     if (!quoteSummary) return null;
+    const showShippingReview = isShippingReviewRequired();
     const selectionLines = [];
     for (const g of activeGroups) {
       const pool = poolMap.get(g.poolKey);
@@ -928,7 +966,7 @@ const renderDimensionStep = (group, pool, value) => {
         selectionLines.push(`- Dimensions: ${w}" × ${h}"`);
       }
     }
-    selectionLines.push(`- Delivery: ${deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping'}`);
+    selectionLines.push(`- Delivery: ${deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping')}`);
     selectionLines.push(
       `- Artwork: ${artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—'}`,
     );
@@ -1005,7 +1043,7 @@ const renderDimensionStep = (group, pool, value) => {
           quoteForInvoice.selections['Dimensions'] = `${w}" × ${h}"`;
         }
       }
-      quoteForInvoice.selections['Delivery'] = deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping';
+      quoteForInvoice.selections['Delivery'] = deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping');
       quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
       const encoded = btoa(encodeURIComponent(JSON.stringify(quoteForInvoice)));
       window.location.href = `/quote/print?data=${encoded}`;
@@ -1040,7 +1078,7 @@ const renderDimensionStep = (group, pool, value) => {
           quoteForInvoice.selections['Dimensions'] = `${w}" × ${h}"`;
         }
       }
-      quoteForInvoice.selections['Delivery'] = deliveryMethod === 'pickup' ? 'Store Pickup FREE' : 'Shipping';
+      quoteForInvoice.selections['Delivery'] = deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping');
       quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
       const payload = buildInvoiceSharePayload(quoteForInvoice, { productName });
       try {
@@ -1186,28 +1224,30 @@ const renderDimensionStep = (group, pool, value) => {
             </div>
           </div>
         )}
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <h4 className="text-sm font-semibold text-gray-900 mb-2">Estimated FedEx Price</h4>
-          <p className="text-xs text-gray-600 mb-3">Enter ZIP code to get estimated shipping price.</p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="text"
-              value={estimateZip}
-              onChange={(e) => setEstimateZip(e.target.value)}
-              placeholder="ZIP code"
-              className="w-full sm:w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-            <Button type="button" variant="outline" onClick={handleEstimateShipping} disabled={estimatingShipping}>
-              {estimatingShipping ? 'Estimating...' : 'Estimate'}
-            </Button>
-          </div>
-          {estimateError && <div className="mt-2 text-xs text-red-700">{estimateError}</div>}
-          {estimatedShipping != null && estimatedShipping > 0 && !estimateError && (
-            <div className="mt-2 text-sm text-gray-900">
-              Estimated shipping: <span className="font-semibold">${Number(estimatedShipping).toFixed(2)}</span>
-            </div>
-          )}
-        </div>
+{!showShippingReview && !useRuleBasedShipping && (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-2">Estimated Shipping Price</h4>
+           <p className="text-xs text-gray-600 mb-3">Enter ZIP code to get estimated shipping price.</p>
+           <div className="flex flex-col sm:flex-row gap-2">
+             <input
+               type="text"
+               value={estimateZip}
+               onChange={(e) => setEstimateZip(e.target.value)}
+               placeholder="ZIP code"
+               className="w-full sm:w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+             />
+             <Button type="button" variant="outline" onClick={handleEstimateShipping} disabled={estimatingShipping}>
+               {estimatingShipping ? 'Estimating...' : 'Estimate'}
+             </Button>
+           </div>
+{estimateError && <div className="mt-2 text-xs text-red-700">{estimateError}</div>}
+            {estimatedShipping != null && !estimateError && (
+              <div className="mt-2 text-sm text-gray-900">
+                Estimated shipping: <span className="font-semibold">${Number(estimatedShipping).toFixed(2)}</span>
+              </div>
+            )}
+         </div>
+         )}
       </div>
     );
   };
@@ -1303,23 +1343,29 @@ onChange={async (e) => {
     </div>
   );
 
-  const renderDeliveryStep = () => {
+const renderDeliveryStep = () => {
+    const showShippingReview = isShippingReviewRequired();
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Delivery Option</h3>
+        {showShippingReview && (
+          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+            Shipping Review Required for oversized items (width exceeds 44"). Our team will contact you with shipping options.
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-<button
-             type="button"
-             onClick={() => handleDeliveryMethodChange('pickup')}
-             className={`rounded-xl border px-4 py-3 text-left transition ${
-               deliveryMethod === 'pickup'
-                 ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                 : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-             }`}
-           >
-             <div className="font-semibold text-gray-900">Store Pickup FREE</div>
-             <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
-           </button>
+          <button
+            type="button"
+            onClick={() => handleDeliveryMethodChange('pickup')}
+            className={`rounded-xl border px-4 py-3 text-left transition ${
+              deliveryMethod === 'pickup'
+                ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
+                : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
+            }`}
+          >
+            <div className="font-semibold text-gray-900">Store Pickup FREE</div>
+            <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
+          </button>
           {shipping?.enabled !== false && (
             <button
               type="button"
@@ -1331,7 +1377,9 @@ onChange={async (e) => {
               }`}
             >
               <div className="font-semibold text-gray-900">Shipping</div>
-              <div className="text-sm text-gray-600">Delivered via FedEx.</div>
+              <div className="text-sm text-gray-600">
+                {useRuleBasedShipping ? 'Shipping calculated at checkout' : 'Shipping'}
+              </div>
             </button>
           )}
         </div>

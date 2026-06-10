@@ -253,6 +253,7 @@ function computeShipping(
   deliveryMethod: QuoteRequestPayload['deliveryMethod'],
   state?: string,
   zip?: string,
+  totalQuantity?: number,
 ): number {
   if (deliveryMethod === 'pickup') return 0;
   if (!shipping.enabled) return 0;
@@ -277,6 +278,11 @@ function computeShipping(
 
   const flat = enabledRules.find((r) => r.mode === 'flat');
   if (flat) return flat.flatRate;
+
+  const qty = Number(totalQuantity);
+  if (qty >= 200 && shipping.over200Rate > 0) return shipping.over200Rate;
+  if (qty >= 100 && shipping.between100And199Rate > 0) return shipping.between100And199Rate;
+  if (qty >= 1 && qty <= 99 && shipping.under100Rate > 0) return shipping.under100Rate;
 
   return shipping.defaultFlatRate;
 }
@@ -431,7 +437,7 @@ export function calculateQuote(
   }
 
   const subtotal = priced.productSubtotal;
-  const shipping = computeShipping(config.shipping, deliveryMethod, shippingState, shippingZip);
+  const shipping = computeShipping(config.shipping, deliveryMethod, shippingState, shippingZip, totalQuantity);
   const grandTotal = subtotal + shipping;
   const unitPrice = totalQuantity > 0 ? subtotal / totalQuantity : 0;
 
@@ -476,7 +482,8 @@ function computeShippingDynamic(
   shipping: ShippingConfig,
   deliveryMethod: 'pickup' | 'shipping',
   state?: string,
-  zip?: string
+  zip?: string,
+  totalQuantity?: number,
 ): number {
   if (deliveryMethod === 'pickup') return 0;
   if (!shipping.enabled) return 0;
@@ -496,6 +503,12 @@ function computeShippingDynamic(
   }
   const flat = enabledRules.find((r: any) => r.mode === 'flat');
   if (flat) return flat.flatRate;
+
+  const qty = Number(totalQuantity);
+  if (qty >= 200 && shipping.over200Rate > 0) return shipping.over200Rate;
+  if (qty >= 100 && shipping.between100And199Rate > 0) return shipping.between100And199Rate;
+  if (qty >= 1 && qty <= 99 && shipping.under100Rate > 0) return shipping.under100Rate;
+
   return shipping.defaultFlatRate;
 }
 
@@ -658,7 +671,7 @@ export function calculateDynamicQuote(
 
   const lineItems = priced.lineItems;
   const subtotal = priced.productSubtotal;
-  const shippingCost = computeShippingDynamic(shipping, deliveryMethod, shippingState, shippingZip);
+  const shippingCost = computeShippingDynamic(shipping, deliveryMethod, shippingState, shippingZip, totalQuantity);
   const grandTotal = subtotal + shippingCost;
   const unitPrice = totalQuantity > 0 ? subtotal / totalQuantity : 0;
 

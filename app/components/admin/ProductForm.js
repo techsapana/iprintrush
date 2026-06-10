@@ -95,37 +95,40 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
     _pendingVideos || initialProduct?.videos || []
   );
 
-  const [formData, setFormData] = useState({
-    name: initialProduct?.name || '',
-    slug: initialProduct?.slug || '',
-    description: initialProduct?.description || '',
-    price: initialProduct?.price || '',
-    mailboxPricePerMonth: initialProduct?.mailboxPricePerMonth ?? '',
-    minQuantity: initialProduct?.minQuantity ?? '',
-    maxQuantity: initialProduct?.maxQuantity ?? '',
-    minWidthIn: initialProduct?.minWidthIn ?? '',
-    maxWidthIn: initialProduct?.maxWidthIn ?? '',
-    minHeightIn: initialProduct?.minHeightIn ?? '',
-    maxHeightIn: initialProduct?.maxHeightIn ?? '',
-    pricePerSqInch: initialProduct?.pricePerSqInch ?? '',
-    oldPrice: initialProduct?.oldPrice ?? '',
-    weightLb: initialProduct?.weightLb ?? '',
-    packageLengthIn: initialProduct?.packageLengthIn ?? '',
-    packageWidthIn: initialProduct?.packageWidthIn ?? '',
-    packageHeightIn: initialProduct?.packageHeightIn ?? '',
-    packageType: initialProduct?.packageType || 'YOUR_PACKAGING',
-    category: initialProduct?.category || categories[0]?.name || '',
-    linkedCategorySlug: initialProduct?.linkedCategorySlug || '',
-    sameDayEligible: initialProduct?.sameDayEligible ?? false,
-    outOfStock: initialProduct?.outOfStock ?? false,
-    allow_custom_dimensions: initialProduct?.allowCustomDimensions ?? false,
-    image: _pendingImage || initialProduct?.image || '/placeholder.jpg',
-    galleryImages: _pendingGallery || initialProduct?.galleryImages || [],
-    videos: _pendingVideos || initialProduct?.videos || [],
-    features: initialProduct?.features?.join(', ') || '',
-    featured: initialProduct?.featured ?? false,
-    couponCodes: initialProduct?.couponCodes || [],
-  });
+const [formData, setFormData] = useState({
+     name: initialProduct?.name || '',
+     slug: initialProduct?.slug || '',
+     description: initialProduct?.description || '',
+     price: initialProduct?.price || '',
+     mailboxPricePerMonth: initialProduct?.mailboxPricePerMonth ?? '',
+     minQuantity: initialProduct?.minQuantity ?? '',
+     maxQuantity: initialProduct?.maxQuantity ?? '',
+     minWidthIn: initialProduct?.minWidthIn ?? '',
+     maxWidthIn: initialProduct?.maxWidthIn ?? '',
+     minHeightIn: initialProduct?.minHeightIn ?? '',
+     maxHeightIn: initialProduct?.maxHeightIn ?? '',
+     pricePerSqInch: initialProduct?.pricePerSqInch ?? '',
+     oldPrice: initialProduct?.oldPrice ?? '',
+     weightLb: initialProduct?.weightLb ?? '',
+     packageLengthIn: initialProduct?.packageLengthIn ?? '',
+     packageWidthIn: initialProduct?.packageWidthIn ?? '',
+     packageHeightIn: initialProduct?.packageHeightIn ?? '',
+     packageType: initialProduct?.packageType || 'YOUR_PACKAGING',
+     category: initialProduct?.category || categories[0]?.name || '',
+     linkedCategorySlug: initialProduct?.linkedCategorySlug || '',
+     sameDayEligible: initialProduct?.sameDayEligible ?? false,
+     outOfStock: initialProduct?.outOfStock ?? false,
+     allow_custom_dimensions: initialProduct?.allowCustomDimensions ?? false,
+     shippingEnabled: initialProduct?.shippingEnabled !== false,
+     localDeliveryEligible: initialProduct?.localDeliveryEligible ?? false,
+     shippingCategory: initialProduct?.shippingCategory || 'standard',
+     image: _pendingImage || initialProduct?.image || '/placeholder.jpg',
+     galleryImages: _pendingGallery || initialProduct?.galleryImages || [],
+     videos: _pendingVideos || initialProduct?.videos || [],
+     features: initialProduct?.features?.join(', ') || '',
+     featured: initialProduct?.featured ?? false,
+     couponCodes: initialProduct?.couponCodes || [],
+   });
 
   // Quote settings state
   const [quoteEnabled, setQuoteEnabled] = useState(true);
@@ -166,44 +169,51 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
       removeSessionKey(pendingVideosStorageKey(prevId));
     }
 
-    if (switchedProduct) {
-      // Clear dirty flags when switching to a different product so the
-      // new product's saved media can be loaded.
-      dirtyMediaFields.current.clear();
+if (switchedProduct) {
+       // Clear dirty flags when switching to a different product so the
+       // new product's saved media can be loaded.
+       dirtyMediaFields.current.clear();
 
-      setImagePreview(snap.image || null);
-      setGalleryPreviews(snap.galleryImages || []);
-      setVideoPreviews(snap.videos || []);
-      setFormData((prev) => ({
-        ...prev,
-        name: snap.name || '',
-        slug: snap.slug || '',
-        description: snap.description || '',
-        price: snap.price || '',
-        mailboxPricePerMonth: snap.mailboxPricePerMonth ?? '',
-        minQuantity: snap.minQuantity ?? '',
-        maxQuantity: snap.maxQuantity ?? '',
-        minWidthIn: snap.minWidthIn ?? '',
-        maxWidthIn: snap.maxWidthIn ?? '',
-        minHeightIn: snap.minHeightIn ?? '',
-        maxHeightIn: snap.maxHeightIn ?? '',
-        pricePerSqInch: snap.pricePerSqInch ?? '',
-        oldPrice: snap.oldPrice ?? '',
-        category: snap.category || prev.category,
-        linkedCategorySlug: snap.linkedCategorySlug || '',
-        sameDayEligible: snap.sameDayEligible ?? false,
-        outOfStock: snap.outOfStock ?? false,
-        allow_custom_dimensions: snap.allowCustomDimensions ?? false,
-        image: snap.image || '/placeholder.jpg',
-        galleryImages: snap.galleryImages || [],
-        videos: snap.videos || [],
-        features: Array.isArray(snap.features)
-          ? snap.features.join(', ')
-          : (snap.features || prev.features || ''),
-        featured: snap.featured ?? false,
-        couponCodes: snap.couponCodes || [],
-      }));
-    }
+       setImagePreview(snap.image || null);
+       setGalleryPreviews(snap.galleryImages || []);
+       setVideoPreviews(snap.videos || []);
+       setFormData((prev) => ({
+         ...prev,
+         name: snap.name || '',
+         slug: snap.slug || '',
+         description: snap.description || '',
+         price: snap.price || '',
+         mailboxPricePerMonth: snap.mailboxPricePerMonth ?? '',
+         minQuantity: snap.minQuantity ?? '',
+         maxQuantity: snap.maxQuantity ?? '',
+         minWidthIn: snap.minWidthIn ?? '',
+         maxWidthIn: snap.maxWidthIn ?? '',
+         minHeightIn: snap.minHeightIn ?? '',
+         maxHeightIn: snap.maxHeightIn ?? '',
+         pricePerSqInch: snap.pricePerSqInch ?? '',
+         oldPrice: snap.oldPrice ?? '',
+         weightLb: snap.weightLb ?? '',
+         packageLengthIn: snap.packageLengthIn ?? '',
+         packageWidthIn: snap.packageWidthIn ?? '',
+         packageHeightIn: snap.packageHeightIn ?? '',
+         category: snap.category || prev.category,
+         linkedCategorySlug: snap.linkedCategorySlug || '',
+         sameDayEligible: snap.sameDayEligible ?? false,
+         outOfStock: snap.outOfStock ?? false,
+         allow_custom_dimensions: snap.allowCustomDimensions ?? false,
+         shippingEnabled: snap.shippingEnabled !== false,
+         localDeliveryEligible: snap.localDeliveryEligible ?? false,
+         shippingCategory: snap.shippingCategory || 'standard',
+         image: snap.image || '/placeholder.jpg',
+         galleryImages: snap.galleryImages || [],
+         videos: snap.videos || [],
+         features: Array.isArray(snap.features)
+           ? snap.features.join(', ')
+           : (snap.features || prev.features || ''),
+         featured: snap.featured ?? false,
+         couponCodes: snap.couponCodes || [],
+       }));
+     }
     // First mount for this id: useState already seeded from initialProduct — do not set image/gallery/videos from snap here (would race uploads).
 
     previousStableProductIdRef.current = stableProductId;
@@ -227,40 +237,39 @@ export function ProductForm({ initialProduct = null, onSubmit = null }) {
     if (prevId !== stableProductId) return; // product switch handled by the other effect
 
     // Sync non-media fields unconditionally (they can't be in mid-upload).
-    setFormData((current) => ({
-      ...current,
-      name: initialProduct.name || current.name,
-      slug: initialProduct.slug || current.slug,
-      description: initialProduct.description ?? current.description,
-      price: initialProduct.price ?? current.price,
-      mailboxPricePerMonth: initialProduct.mailboxPricePerMonth ?? current.mailboxPricePerMonth,
-      minQuantity: initialProduct.minQuantity ?? current.minQuantity,
-      maxQuantity: initialProduct.maxQuantity ?? current.maxQuantity,
-      minWidthIn: initialProduct.minWidthIn ?? current.minWidthIn,
-      maxWidthIn: initialProduct.maxWidthIn ?? current.maxWidthIn,
-      minHeightIn: initialProduct.minHeightIn ?? current.minHeightIn,
-      maxHeightIn: initialProduct.maxHeightIn ?? current.maxHeightIn,
-      pricePerSqInch: initialProduct.pricePerSqInch ?? current.pricePerSqInch,
-      oldPrice: initialProduct.oldPrice ?? current.oldPrice,
-      weightLb: initialProduct.weightLb ?? current.weightLb,
-      packageLengthIn: initialProduct.packageLengthIn ?? current.packageLengthIn,
-      packageWidthIn: initialProduct.packageWidthIn ?? current.packageWidthIn,
-      packageHeightIn: initialProduct.packageHeightIn ?? current.packageHeightIn,
-      category: initialProduct.category || current.category,
-      linkedCategorySlug: initialProduct.linkedCategorySlug ?? current.linkedCategorySlug,
-      sameDayEligible: initialProduct.sameDayEligible ?? current.sameDayEligible,
-      outOfStock: initialProduct.outOfStock ?? current.outOfStock,
-      allow_custom_dimensions: initialProduct.allowCustomDimensions ?? current.allow_custom_dimensions,
-      features: Array.isArray(initialProduct.features)
-        ? initialProduct.features.join(', ')
-        : (initialProduct.features ?? current.features),
-      featured: initialProduct.featured ?? current.featured,
-      couponCodes: initialProduct.couponCodes ?? current.couponCodes,
-      // Media fields: only update if the user hasn't touched them.
-      image: dirtyMediaFields.current.has('image') ? current.image : (initialProduct.image || current.image),
-      galleryImages: dirtyMediaFields.current.has('galleryImages') ? current.galleryImages : (initialProduct.galleryImages || current.galleryImages),
-      videos: dirtyMediaFields.current.has('videos') ? current.videos : (initialProduct.videos || current.videos),
-    }));
+setFormData((current) => ({
+       ...current,
+       name: initialProduct.name || current.name,
+       slug: initialProduct.slug || current.slug,
+       description: initialProduct.description ?? current.description,
+       price: initialProduct.price ?? current.price,
+       mailboxPricePerMonth: initialProduct.mailboxPricePerMonth ?? current.mailboxPricePerMonth,
+       minQuantity: initialProduct.minQuantity ?? current.minQuantity,
+       maxQuantity: initialProduct.maxQuantity ?? current.maxQuantity,
+       minWidthIn: initialProduct.minWidthIn ?? current.minWidthIn,
+       maxWidthIn: initialProduct.maxWidthIn ?? current.maxWidthIn,
+       minHeightIn: initialProduct.minHeightIn ?? current.minHeightIn,
+       maxHeightIn: initialProduct.maxHeightIn ?? current.maxHeightIn,
+       pricePerSqInch: initialProduct.pricePerSqInch ?? current.pricePerSqInch,
+       oldPrice: initialProduct.oldPrice ?? current.oldPrice,
+       weightLb: initialProduct.weightLb ?? current.weightLb,
+       packageLengthIn: initialProduct.packageLengthIn ?? current.packageLengthIn,
+       packageWidthIn: initialProduct.packageWidthIn ?? current.packageWidthIn,
+       packageHeightIn: initialProduct.packageHeightIn ?? current.packageHeightIn,
+       category: initialProduct.category || current.category,
+       linkedCategorySlug: initialProduct.linkedCategorySlug ?? current.linkedCategorySlug,
+       sameDayEligible: initialProduct.sameDayEligible ?? current.sameDayEligible,
+       outOfStock: initialProduct.outOfStock ?? current.outOfStock,
+       allow_custom_dimensions: initialProduct.allowCustomDimensions ?? current.allow_custom_dimensions,
+       shippingEnabled: initialProduct.shippingEnabled !== false,
+       localDeliveryEligible: initialProduct.localDeliveryEligible ?? current.localDeliveryEligible,
+       shippingCategory: initialProduct.shippingCategory || current.shippingCategory,
+       features: Array.isArray(initialProduct.features)
+         ? initialProduct.features.join(', ')
+         : (initialProduct.features ?? current.features),
+       featured: initialProduct.featured ?? current.featured,
+       couponCodes: initialProduct.couponCodes ?? current.couponCodes,
+     }));
 
     if (!dirtyMediaFields.current.has('image')) {
       setImagePreview(initialProduct.image || null);
@@ -931,53 +940,56 @@ setCustomizationMode('print_product');
         return;
       }
 
-      const productData = {
-        ...formData,
-        price: parseFloat(
-          isMailboxCategory
-            ? formData.mailboxPricePerMonth || formData.price || 0
-            : formData.price || 0
-        ),
-        mailboxPricePerMonth:
-          formData.mailboxPricePerMonth === '' || formData.mailboxPricePerMonth == null
-            ? null
-            : parseFloat(formData.mailboxPricePerMonth),
-        oldPrice: formData.oldPrice === '' || formData.oldPrice == null ? null : parseFloat(formData.oldPrice),
-        weightLb: parseNullableNumber(formData.weightLb),
-        packageLengthIn: parseNullableNumber(formData.packageLengthIn),
-        packageWidthIn: parseNullableNumber(formData.packageWidthIn),
-        packageHeightIn: parseNullableNumber(formData.packageHeightIn),
-        packageType: formData.packageType || 'YOUR_PACKAGING',
-        pricePerSqInch:
-          formData.pricePerSqInch === '' || formData.pricePerSqInch == null
-            ? null
-            : parseFloat(formData.pricePerSqInch),
-        features: formData.features.split(',').map((f) => f.trim()).filter(Boolean),
-        slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, '-'),
-        galleryImages: (formData.galleryImages || []).filter((url) => url && url.trim().length > 0),
-        videos: Array.isArray(formData.videos)
-          ? formData.videos
-              .filter((v) => v && v.url && String(v.url).trim().length > 0)
-              .map((v) => ({
-                url: String(v.url).trim(),
-                title: v.title ? String(v.title) : '',
-                description: v.description ? String(v.description) : '',
-              }))
-          : [],
-        couponCodes: (formData.couponCodes || [])
-          .map((c) => ({
-            code: String(c.code || '').trim().toUpperCase(),
-            discountPercent:
-              c.discountPercent === '' || c.discountPercent == null
-                ? null
-                : parseFloat(c.discountPercent),
-            isActive: c.isActive !== false,
-          }))
-          .filter((c) => c.code && Number.isFinite(c.discountPercent) && c.discountPercent > 0),
-        sameDayEligible: formData.sameDayEligible === true,
-        outOfStock: formData.outOfStock === true,
-        linkedCategorySlug: formData.linkedCategorySlug || null,
-      };
+const productData = {
+         ...formData,
+         price: parseFloat(
+           isMailboxCategory
+             ? formData.mailboxPricePerMonth || formData.price || 0
+             : formData.price || 0
+         ),
+         mailboxPricePerMonth:
+           formData.mailboxPricePerMonth === '' || formData.mailboxPricePerMonth == null
+             ? null
+             : parseFloat(formData.mailboxPricePerMonth),
+         oldPrice: formData.oldPrice === '' || formData.oldPrice == null ? null : parseFloat(formData.oldPrice),
+         weightLb: parseNullableNumber(formData.weightLb),
+         packageLengthIn: parseNullableNumber(formData.packageLengthIn),
+         packageWidthIn: parseNullableNumber(formData.packageWidthIn),
+         packageHeightIn: parseNullableNumber(formData.packageHeightIn),
+         packageType: formData.packageType || 'YOUR_PACKAGING',
+         pricePerSqInch:
+           formData.pricePerSqInch === '' || formData.pricePerSqInch == null
+             ? null
+             : parseFloat(formData.pricePerSqInch),
+         features: formData.features.split(',').map((f) => f.trim()).filter(Boolean),
+         slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, '-'),
+         galleryImages: (formData.galleryImages || []).filter((url) => url && url.trim().length > 0),
+         videos: Array.isArray(formData.videos)
+           ? formData.videos
+               .filter((v) => v && v.url && String(v.url).trim().length > 0)
+               .map((v) => ({
+                 url: String(v.url).trim(),
+                 title: v.title ? String(v.title) : '',
+                 description: v.description ? String(v.description) : '',
+               }))
+           : [],
+         couponCodes: (formData.couponCodes || [])
+           .map((c) => ({
+             code: String(c.code || '').trim().toUpperCase(),
+             discountPercent:
+               c.discountPercent === '' || c.discountPercent == null
+                 ? null
+                 : parseFloat(c.discountPercent),
+             isActive: c.isActive !== false,
+           }))
+           .filter((c) => c.code && Number.isFinite(c.discountPercent) && c.discountPercent > 0),
+         sameDayEligible: formData.sameDayEligible === true,
+         outOfStock: formData.outOfStock === true,
+         linkedCategorySlug: formData.linkedCategorySlug || null,
+         shippingEnabled: formData.shippingEnabled !== false,
+         localDeliveryEligible: formData.localDeliveryEligible === true,
+         shippingCategory: formData.shippingCategory || 'standard',
+       };
 
       let productId;
       if (initialProduct && initialProduct.id) {
@@ -1387,19 +1399,72 @@ setCustomizationMode('print_product');
 
                 <div className="md:col-span-2">
                   <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      name="allow_custom_dimensions"
-                      checked={formData.allow_custom_dimensions === true}
+<input
+                        type="checkbox"
+                        name="allow_custom_dimensions"
+                        checked={formData.allow_custom_dimensions === true}
+                        onChange={handleChange}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-700">Enable Custom Width &amp; Height</span>
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Allow buyers to enter custom width and height values for this product.
+                    </p>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Shipping Category
+                    </label>
+                    <select
+                      name="shippingCategory"
+                      value={formData.shippingCategory || 'standard'}
                       onChange={handleChange}
-                      className="rounded"
-                    />
-                    <span className="text-sm text-gray-700">Enable Custom Width &amp; Height</span>
-                  </label>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Allow buyers to enter custom width and height values for this product.
-                  </p>
-                </div>
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                    >
+                      <option value="standard">Standard</option>
+                      <option value="oversized">Oversized</option>
+                      <option value="fragile">Fragile</option>
+                      <option value="rollable">Rollable</option>
+                      <option value="apparel">Apparel</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Shipping requirements for this product.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        name="shippingEnabled"
+                        checked={formData.shippingEnabled !== false}
+                        onChange={handleChange}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-700">Enable Standard Shipping</span>
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500">
+                      When unchecked, this product will not be available for standard shipping orders.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        name="localDeliveryEligible"
+                        checked={formData.localDeliveryEligible === true}
+                        onChange={handleChange}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-700">Eligible For Local Delivery</span>
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Check if this product can be delivered by local driver.
+                    </p>
+                  </div>
 
                 {(() => {
                 const selectedCategoryObj = categories.find(

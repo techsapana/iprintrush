@@ -31,6 +31,9 @@ function createDefaultConfig(): QuoteConfigStore {
   const shipping: ShippingConfig = {
     enabled: true,
     defaultFlatRate: 15,
+    under100Rate: 0,
+    between100And199Rate: 0,
+    over200Rate: 0,
     rules: [],
   };
 

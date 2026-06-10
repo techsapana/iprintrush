@@ -57,6 +57,7 @@ export async function GET(
         assigned_staff,
         internal_notes,
         rush_flag,
+        shipping_review_required,
         stripe_checkout_session_id,
         created_at,
         paid_at
@@ -131,6 +132,7 @@ export async function GET(
         assignedStaff: (order as any).assigned_staff || null,
         internalNotes: (order as any).internal_notes || null,
         rush: Boolean((order as any).rush_flag),
+        shippingReviewRequired: Boolean((order as any).shipping_review_required),
         createdAt: (order as any).created_at,
         paidAt: (order as any).paid_at,
       },

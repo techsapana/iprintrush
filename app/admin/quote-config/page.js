@@ -571,6 +571,9 @@ function ShippingSection({ shipping, onSave, setError, loadConfig }) {
   const [formData, setFormData] = useState({
     enabled: shipping?.enabled ?? true,
     defaultFlatRate: shipping?.defaultFlatRate ?? 0,
+    under100Rate: shipping?.under100Rate ?? 0,
+    between100And199Rate: shipping?.between100And199Rate ?? 0,
+    over200Rate: shipping?.over200Rate ?? 0,
   });
 
   const handleSubmit = async (e) => {
@@ -621,6 +624,48 @@ function ShippingSection({ shipping, onSave, setError, loadConfig }) {
             value={formData.defaultFlatRate}
             onChange={(e) =>
               setFormData({ ...formData, defaultFlatRate: parseFloat(e.target.value) || 0 })
+            }
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Under 100 Qty Rate ($)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.under100Rate}
+            onChange={(e) =>
+              setFormData({ ...formData, under100Rate: parseFloat(e.target.value) || 0 })
+            }
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            100-199 Qty Rate ($)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.between100And199Rate}
+            onChange={(e) =>
+              setFormData({ ...formData, between100And199Rate: parseFloat(e.target.value) || 0 })
+            }
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            200+ Qty Rate ($)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.over200Rate}
+            onChange={(e) =>
+              setFormData({ ...formData, over200Rate: parseFloat(e.target.value) || 0 })
             }
             className="w-full px-4 py-2 border border-gray-300 rounded-lg"
           />

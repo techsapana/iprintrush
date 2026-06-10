@@ -58,6 +58,9 @@ const CreateCheckoutSessionSchema = z.object({
         })
         .optional(),
       shippingRatesUnavailable: z.boolean().optional(),
+      useRuleBasedShipping: z.boolean().optional(),
+      selectedMethod: z.string().optional(),
+      shippingMethodsData: z.any().optional(),
     })
     .optional(),
   couponCode: z.string().trim().optional(),
@@ -114,7 +117,7 @@ async function ensureOrderShippingColumns() {
 export async function POST(req: NextRequest) {
   try {
     const payload = CreateCheckoutSessionSchema.parse(await req.json());
-    
+
     // Get authenticated user if available
     const authCustomer = getCustomerFromRequest(req);
     let userId = null;
@@ -136,7 +139,18 @@ export async function POST(req: NextRequest) {
 
     const stripe = getStripe();
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
-    const checkoutCustomer = payload.customer || {};
+    const checkoutCustomer = (payload.customer || {}) as {
+      deliveryMethod?: 'pickup' | 'shipping';
+      selectedShipping?: { serviceType: string; cost: number };
+      shippingAddress?: string;
+      shippingCity?: string;
+      shippingState?: string;
+      shippingZip?: string;
+      shippingRatesUnavailable?: boolean;
+      useRuleBasedShipping?: boolean;
+      selectedMethod?: string;
+      shippingMethodsData?: { type?: string; id?: string; label?: string; cost: number } | null;
+    } & Record<string, unknown>;
 
     const productIds = [...new Set(payload.items.map((i) => i.id))];
     const rows = await query(
@@ -158,6 +172,19 @@ export async function POST(req: NextRequest) {
 
     const conn = await beginTransaction();
     try {
+      // Detect if any item requires shipping review (width > 44 inches)
+      // OR if customer selected review_required shipping method
+      const useRuleBased = checkoutCustomer.useRuleBasedShipping === true;
+      const selectedMethodIsReviewRequired = useRuleBased && checkoutCustomer.selectedMethod === 'review_required';
+      let shippingReviewRequired = selectedMethodIsReviewRequired;
+      for (const item of payload.items) {
+        const width = Number(item.quotePayload?.selections?.width_in ?? 0);
+        if (Number.isFinite(width) && width > 44) {
+          shippingReviewRequired = true;
+          break;
+        }
+      }
+
       const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
       const orderItemRows: {
         productId: string;
@@ -339,55 +366,104 @@ export async function POST(req: NextRequest) {
           zip: checkoutCustomer.shippingZip,
         };
 
-        const selected = checkoutCustomer.selectedShipping;
-        if (selected?.serviceType && !checkoutCustomer.shippingRatesUnavailable) {
-          const resolved = await resolveSelectedShippingRate(
-            cartItemsForRates,
-            shippingAddress,
-            selected,
-          );
-          if (!resolved.ok) {
+        const useRuleBased = checkoutCustomer.useRuleBasedShipping === true;
+        if (useRuleBased) {
+          const methodData = checkoutCustomer.shippingMethodsData;
+          if (methodData && typeof methodData.cost === 'number') {
+            shippingCents = toCents(methodData.cost);
+            selectedRateMeta = {
+              serviceType: methodData.type || methodData.id || 'rule_based',
+              serviceName: methodData.label || 'Rule-Based Shipping',
+              cost: methodData.cost,
+              estimatedDeliveryDate: null,
+              estimatedDeliveryLabel: null,
+            };
+            shippingMeta = {
+              carrier: 'Rule-Based',
+              serviceType: methodData.type || methodData.id || 'rule_based',
+              serviceName: methodData.label || 'Rule-Based Shipping',
+              estimatedDeliveryDate: null,
+              estimatedDeliveryLabel: null,
+              selectedByCustomer: true,
+              shippingReviewRequired: selectedMethodIsReviewRequired,
+              ...(selectedMethodIsReviewRequired && {
+                message: 'Oversized items require manual shipping review. Our team will contact you with options.',
+              }),
+              destination: {
+                addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
+                city: checkoutCustomer.shippingCity || 'City',
+                stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
+                postalCode: checkoutCustomer.shippingZip || '',
+                countryCode: 'US',
+              },
+            };
+          } else {
             await rollback(conn);
-            return NextResponse.json({ error: resolved.error }, { status: 400 });
+            return NextResponse.json(
+              { error: 'Please select a shipping method.' },
+              { status: 400 },
+            );
           }
-          selectedRateMeta = {
-            serviceType: resolved.rate.serviceType,
-            serviceName: resolved.rate.serviceName,
-            cost: resolved.rate.cost,
-            estimatedDeliveryDate: resolved.rate.estimatedDeliveryDate,
-            estimatedDeliveryLabel: resolved.rate.estimatedDeliveryLabel,
-          };
-          shippingCents = toCents(resolved.rate.cost);
-          shippingMeta = {
-            carrier: 'FedEx',
-            serviceType: resolved.rate.serviceType,
-            serviceName: resolved.rate.serviceName,
-            estimatedDeliveryDate: resolved.rate.estimatedDeliveryDate,
-            estimatedDeliveryLabel: resolved.rate.estimatedDeliveryLabel,
-            packages: resolved.packages,
-            destination: {
-              addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
-              city: checkoutCustomer.shippingCity || 'City',
-              stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
-              postalCode: checkoutCustomer.shippingZip || '',
-              countryCode: 'US',
-            },
-            selectedByCustomer: true,
-          };
-        } else if (checkoutCustomer.shippingRatesUnavailable) {
-          shippingCents = 0;
-          shippingMeta = {
-            carrier: 'FedEx',
-            pendingReview: true,
-            message:
-              'Shipping estimate unavailable. We will confirm shipping after order review.',
-          };
         } else {
-          await rollback(conn);
-          return NextResponse.json(
-            { error: 'Please select a FedEx shipping option before checkout.' },
-            { status: 400 },
-          );
+          const selected = checkoutCustomer.selectedShipping;
+          if (selected?.serviceType && !checkoutCustomer.shippingRatesUnavailable) {
+            const resolved = await resolveSelectedShippingRate(
+              cartItemsForRates,
+              shippingAddress,
+              selected,
+            );
+            if (!resolved.ok) {
+              await rollback(conn);
+              return NextResponse.json({ error: resolved.error }, { status: 400 });
+            }
+            selectedRateMeta = {
+              serviceType: resolved.rate.serviceType,
+              serviceName: resolved.rate.serviceName,
+              cost: resolved.rate.cost,
+              estimatedDeliveryDate: resolved.rate.estimatedDeliveryDate,
+              estimatedDeliveryLabel: resolved.rate.estimatedDeliveryLabel,
+            };
+            shippingCents = toCents(resolved.rate.cost);
+            shippingMeta = {
+              carrier: 'FedEx',
+              serviceType: resolved.rate.serviceType,
+              serviceName: resolved.rate.serviceName,
+              estimatedDeliveryDate: resolved.rate.estimatedDeliveryDate,
+              estimatedDeliveryLabel: resolved.rate.estimatedDeliveryLabel,
+              packages: resolved.packages,
+              destination: {
+                addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
+                city: checkoutCustomer.shippingCity || 'City',
+                stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
+                postalCode: checkoutCustomer.shippingZip || '',
+                countryCode: 'US',
+              },
+              selectedByCustomer: true,
+            };
+          } else if (checkoutCustomer.shippingRatesUnavailable) {
+            shippingCents = 0;
+            shippingMeta = {
+              carrier: 'FedEx',
+              pendingReview: true,
+              message:
+                'Shipping estimate unavailable. We will confirm shipping after order review.',
+            };
+          } else if (shippingReviewRequired) {
+            shippingCents = 0;
+            shippingMeta = {
+              carrier: 'FedEx',
+              pendingReview: true,
+              shippingReviewRequired: true,
+              message:
+                'Oversized item requires shipping review. Our team will contact you with options.',
+            };
+          } else {
+            await rollback(conn);
+            return NextResponse.json(
+              { error: 'Please select a shipping option before checkout.' },
+              { status: 400 },
+            );
+          }
         }
       }
 
@@ -426,7 +502,7 @@ export async function POST(req: NextRequest) {
       if (checkoutCustomer.deliveryMethod === 'shipping' && shippingCents > 0) {
         const shipLabel = selectedRateMeta?.serviceName
           ? `Shipping (${selectedRateMeta.serviceName})`
-          : 'Shipping (FedEx)';
+          : 'Shipping';
         lineItems.push({
           quantity: 1,
           price_data: {
@@ -458,6 +534,7 @@ export async function POST(req: NextRequest) {
         'shipping_carrier',
         'shipping_service',
         'shipping_payload_json',
+        'shipping_review_required',
       ];
       const orderValues: any[] = [
         orderNumber,
@@ -479,6 +556,7 @@ export async function POST(req: NextRequest) {
         shippingMeta?.carrier || null,
         shippingMeta?.serviceType || selectedRateMeta?.serviceType || null,
         shippingMeta ? JSON.stringify(shippingMeta) : null,
+        shippingReviewRequired,
       ];
 
       const hasServiceNameCol = await queryOne(`SHOW COLUMNS FROM orders LIKE 'shipping_service_name'`);

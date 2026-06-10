@@ -48,11 +48,27 @@ async function ensureAllowCustomDimensionsColumn() {
   }
 }
 
+async function ensureShippingColumns() {
+  const shippingEnabled: any = await queryOne("SHOW COLUMNS FROM products LIKE 'shipping_enabled'");
+  if (!shippingEnabled) {
+    await query('ALTER TABLE products ADD COLUMN shipping_enabled BOOLEAN NOT NULL DEFAULT TRUE AFTER allow_custom_dimensions');
+  }
+  const localDeliveryEligible: any = await queryOne("SHOW COLUMNS FROM products LIKE 'local_delivery_eligible'");
+  if (!localDeliveryEligible) {
+    await query('ALTER TABLE products ADD COLUMN local_delivery_eligible BOOLEAN NOT NULL DEFAULT FALSE AFTER shipping_enabled');
+  }
+  const shippingCategory: any = await queryOne("SHOW COLUMNS FROM products LIKE 'shipping_category'");
+  if (!shippingCategory) {
+    await query("ALTER TABLE products ADD COLUMN shipping_category VARCHAR(50) DEFAULT 'standard' AFTER local_delivery_eligible");
+  }
+}
+
 export async function GET(request: NextRequest) {
-  try {
-    await ensureLCategoryColumn();
-    await ensureOutOfStockColumn();
-    await ensureAllowCustomDimensionsColumn();
+   try {
+     await ensureLCategoryColumn();
+     await ensureOutOfStockColumn();
+     await ensureAllowCustomDimensionsColumn();
+     await ensureShippingColumns();
     const searchParams = request.nextUrl.searchParams;
     const category = searchParams.get('category');
     const enabled = searchParams.get('enabled') !== 'false';
@@ -106,75 +122,78 @@ export async function GET(request: NextRequest) {
       }
     }
 
-     // Transform results
-     const transformed = products.map((p: any) => ({
-       id: p.id,
-       name: p.name,
-       slug: p.slug,
-       description: p.description,
-       price: parseFloat(p.price),
-       minQuantity: p.min_quantity != null ? Number(p.min_quantity) : null,
-       maxQuantity: p.max_quantity != null ? Number(p.max_quantity) : null,
-       minWidthIn: p.min_width_in != null ? Number(p.min_width_in) : null,
-       maxWidthIn: p.max_width_in != null ? Number(p.max_width_in) : null,
-       minHeightIn: p.min_height_in != null ? Number(p.min_height_in) : null,
-       maxHeightIn: p.max_height_in != null ? Number(p.max_height_in) : null,
-       pricePerSqInch: p.price_per_sq_inch != null ? Number(p.price_per_sq_inch) : null,
-       mailboxPricePerMonth:
-         p.mailbox_price_per_month != null ? Number(p.mailbox_price_per_month) : null,
-       oldPrice: p.old_price != null ? parseFloat(p.old_price) : null,
-       weightLb: p.weight_lb != null ? Number(p.weight_lb) : null,
-       packageLengthIn: p.package_length_in != null ? Number(p.package_length_in) : null,
-       packageWidthIn: p.package_width_in != null ? Number(p.package_width_in) : null,
-       packageHeightIn: p.package_height_in != null ? Number(p.package_height_in) : null,
-       packageType: p.package_type || 'YOUR_PACKAGING',
-       category: p.category_name || p.category_id,
-       categoryId: p.category_id,
-       linkedCategorySlug: p.l_category || null,
-       categorySlug: p.category_slug,
-       image: p.image || '/placeholder.jpg',
-       sameDayEligible: Boolean(p.same_day_eligible),
-       outOfStock: Boolean(p.out_of_stock),
-       enabled: Boolean(p.enabled),
-       featured: Boolean(p.featured),
-       allowCustomDimensions: Boolean(p.allow_custom_dimensions),
-       createdAt: p.created_at || null,
-       features: p.features ? p.features.split(',') : [],
-       galleryImages: p.gallery_images
-         ? p.gallery_images
-             .split('|')
-             .map((url: string) => url.trim())
-             .filter((url: string) => url.length > 0)
-         : [],
-       ...(includeVideos
-         ? {
-             videos: (() => {
-               if (p.videos_json) {
-                 const arr = safeParseJson<any[]>(p.videos_json, []);
-                 return arr
-                   .filter((v) => v && v.url)
-                   .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
-                   .map((v) => ({
-                     url: String(v.url),
-                     title: v.title ? String(v.title) : '',
-                     description: v.description ? String(v.description) : '',
-                   }));
-               }
- 
-               // Fallback if some DB returns only url concat (legacy)
-               if (p.videos) {
-                 return String(p.videos)
-                   .split('|')
-                   .map((url: string) => url.trim())
-                   .filter((url: string) => url.length > 0)
-                   .map((url: string) => ({ url, title: '', description: '' }));
-               }
-               return [];
-             })(),
-           }
-         : {}),
-       sizes: [], // Will be loaded separately if needed
-     }));
+// Transform results
+      const transformed = products.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        description: p.description,
+        price: parseFloat(p.price),
+        minQuantity: p.min_quantity != null ? Number(p.min_quantity) : null,
+        maxQuantity: p.max_quantity != null ? Number(p.max_quantity) : null,
+        minWidthIn: p.min_width_in != null ? Number(p.min_width_in) : null,
+        maxWidthIn: p.max_width_in != null ? Number(p.max_width_in) : null,
+        minHeightIn: p.min_height_in != null ? Number(p.min_height_in) : null,
+        maxHeightIn: p.max_height_in != null ? Number(p.max_height_in) : null,
+        pricePerSqInch: p.price_per_sq_inch != null ? Number(p.price_per_sq_inch) : null,
+        mailboxPricePerMonth:
+          p.mailbox_price_per_month != null ? Number(p.mailbox_price_per_month) : null,
+        oldPrice: p.old_price != null ? parseFloat(p.old_price) : null,
+        weightLb: p.weight_lb != null ? Number(p.weight_lb) : null,
+        packageLengthIn: p.package_length_in != null ? Number(p.package_length_in) : null,
+        packageWidthIn: p.package_width_in != null ? Number(p.package_width_in) : null,
+        packageHeightIn: p.package_height_in != null ? Number(p.package_height_in) : null,
+        packageType: p.package_type || 'YOUR_PACKAGING',
+        category: p.category_name || p.category_id,
+        categoryId: p.category_id,
+        linkedCategorySlug: p.l_category || null,
+        categorySlug: p.category_slug,
+        image: p.image || '/placeholder.jpg',
+        sameDayEligible: Boolean(p.same_day_eligible),
+        outOfStock: Boolean(p.out_of_stock),
+        enabled: Boolean(p.enabled),
+        featured: Boolean(p.featured),
+        allowCustomDimensions: Boolean(p.allow_custom_dimensions),
+        shippingEnabled: p.shipping_enabled !== false,
+        localDeliveryEligible: Boolean(p.local_delivery_eligible),
+        shippingCategory: p.shipping_category || 'standard',
+        createdAt: p.created_at || null,
+        features: p.features ? p.features.split(',') : [],
+        galleryImages: p.gallery_images
+          ? p.gallery_images
+              .split('|')
+              .map((url: string) => url.trim())
+              .filter((url: string) => url.length > 0)
+          : [],
+        ...(includeVideos
+          ? {
+              videos: (() => {
+                if (p.videos_json) {
+                  const arr = safeParseJson<any[]>(p.videos_json, []);
+                  return arr
+                    .filter((v) => v && v.url)
+                    .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+                    .map((v) => ({
+                      url: String(v.url),
+                      title: v.title ? String(v.title) : '',
+                      description: v.description ? String(v.description) : '',
+                    }));
+                }
+      
+                // Fallback if some DB returns only url concat (legacy)
+                if (p.videos) {
+                  return String(p.videos)
+                    .split('|')
+                    .map((url: string) => url.trim())
+                    .filter((url: string) => url.length > 0)
+                    .map((url: string) => ({ url, title: '', description: '' }));
+                }
+                return [];
+              })(),
+            }
+          : {}),
+        sizes: [], // Will be loaded separately if needed
+      }));
 
     return NextResponse.json({ products: transformed });
   } catch (error: any) {
@@ -187,43 +206,47 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    await ensureLCategoryColumn();
-    await ensureOutOfStockColumn();
-    await ensureAllowCustomDimensionsColumn();
+   try {
+     await ensureLCategoryColumn();
+     await ensureOutOfStockColumn();
+     await ensureAllowCustomDimensionsColumn();
+     await ensureShippingColumns();
      const body = await request.json();
-     const {
-       id,
-       name,
-       slug,
-       description,
-       price,
-       minQuantity,
-       maxQuantity,
-       minWidthIn,
-       maxWidthIn,
-       minHeightIn,
-       maxHeightIn,
-       pricePerSqInch,
-       mailboxPricePerMonth,
-       oldPrice,
-       weightLb,
-       packageLengthIn,
-       packageWidthIn,
-       packageHeightIn,
-       category,
-       linkedCategorySlug,
-       outOfStock,
-       sameDayEligible,
-       image,
-       featured,
-       allow_custom_dimensions,
-       features = [],
-       sizes = [],
-       galleryImages = [],
-       videos,
-       couponCodes = [],
-     } = body;
+const {
+        id,
+        name,
+        slug,
+        description,
+        price,
+        minQuantity,
+        maxQuantity,
+        minWidthIn,
+        maxWidthIn,
+        minHeightIn,
+        maxHeightIn,
+        pricePerSqInch,
+        mailboxPricePerMonth,
+        oldPrice,
+        weightLb,
+        packageLengthIn,
+        packageWidthIn,
+        packageHeightIn,
+        category,
+        linkedCategorySlug,
+        outOfStock,
+        sameDayEligible,
+        image,
+        featured,
+        allow_custom_dimensions,
+        shippingEnabled,
+        localDeliveryEligible,
+        shippingCategory,
+        features = [],
+        sizes = [],
+        galleryImages = [],
+        videos,
+        couponCodes = [],
+      } = body;
 
     // Get category ID from slug or name
     let categoryId = null;
@@ -235,7 +258,7 @@ export async function POST(request: NextRequest) {
       categoryId = cat?.id || null;
     }
 
-    const productId = id || `product-${Date.now()}`;
+const productId = id || `product-${Date.now()}`;
     const productSlug = slug || name.toLowerCase().replace(/\s+/g, '-');
 
     // Insert or update product
@@ -244,62 +267,68 @@ export async function POST(request: NextRequest) {
     console.log('Product name:', name);
     
      await query(
-       `INSERT INTO products (id, name, slug, description, price, min_quantity, max_quantity, min_width_in, max_width_in, min_height_in, max_height_in, price_per_sq_inch, mailbox_price_per_month, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, enabled)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
-        ON DUPLICATE KEY UPDATE
-          name = VALUES(name),
-          slug = VALUES(slug),
-          description = VALUES(description),
-          price = VALUES(price),
-          min_quantity = VALUES(min_quantity),
-          max_quantity = VALUES(max_quantity),
-          min_width_in = VALUES(min_width_in),
-          max_width_in = VALUES(max_width_in),
-          min_height_in = VALUES(min_height_in),
-          max_height_in = VALUES(max_height_in),
-          price_per_sq_inch = VALUES(price_per_sq_inch),
-          mailbox_price_per_month = VALUES(mailbox_price_per_month),
-          old_price = VALUES(old_price),
-          weight_lb = VALUES(weight_lb),
-          package_length_in = VALUES(package_length_in),
-          package_width_in = VALUES(package_width_in),
-          package_height_in = VALUES(package_height_in),
-          category_id = VALUES(category_id),
-          l_category = VALUES(l_category),
-          image = VALUES(image),
-          same_day_eligible = VALUES(same_day_eligible),
-          out_of_stock = VALUES(out_of_stock),
-          featured = VALUES(featured),
-          allow_custom_dimensions = VALUES(allow_custom_dimensions),
-          updated_at = CURRENT_TIMESTAMP`,
-       [
-         productId,
-         name,
-         productSlug,
-         description || '',
-         price || 0,
-         nullableNumber(minQuantity),
-         nullableNumber(maxQuantity),
-         nullableNumber(minWidthIn),
-         nullableNumber(maxWidthIn),
-         nullableNumber(minHeightIn),
-         nullableNumber(maxHeightIn),
-         nullableNumber(pricePerSqInch),
-         nullableNumber(mailboxPricePerMonth),
-         nullableNumber(oldPrice),
-         nullableNumber(weightLb),
-         nullableNumber(packageLengthIn),
-         nullableNumber(packageWidthIn),
-         nullableNumber(packageHeightIn),
-         categoryId,
-         linkedCategorySlug || null,
-         image || '/placeholder.jpg',
-         sameDayEligible ? 1 : 0,
-         outOfStock ? 1 : 0,
-         featured ? 1 : 0,
-         allow_custom_dimensions ? 1 : 0,
-       ]
-     );
+       `INSERT INTO products (id, name, slug, description, price, min_quantity, max_quantity, min_width_in, max_width_in, min_height_in, max_height_in, price_per_sq_inch, mailbox_price_per_month, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         name = VALUES(name),
+         slug = VALUES(slug),
+         description = VALUES(description),
+         price = VALUES(price),
+         min_quantity = VALUES(min_quantity),
+         max_quantity = VALUES(max_quantity),
+         min_width_in = VALUES(min_width_in),
+         max_width_in = VALUES(max_width_in),
+         min_height_in = VALUES(min_height_in),
+         max_height_in = VALUES(max_height_in),
+         price_per_sq_inch = VALUES(price_per_sq_inch),
+         mailbox_price_per_month = VALUES(mailbox_price_per_month),
+         old_price = VALUES(old_price),
+         weight_lb = VALUES(weight_lb),
+         package_length_in = VALUES(package_length_in),
+         package_width_in = VALUES(package_width_in),
+         package_height_in = VALUES(package_height_in),
+         category_id = VALUES(category_id),
+         l_category = VALUES(l_category),
+         image = VALUES(image),
+         same_day_eligible = VALUES(same_day_eligible),
+         out_of_stock = VALUES(out_of_stock),
+         featured = VALUES(featured),
+         allow_custom_dimensions = VALUES(allow_custom_dimensions),
+         shipping_enabled = VALUES(shipping_enabled),
+         local_delivery_eligible = VALUES(local_delivery_eligible),
+         shipping_category = VALUES(shipping_category),
+         updated_at = CURRENT_TIMESTAMP`,
+      [
+        productId,
+        name,
+        productSlug,
+        description || '',
+        price || 0,
+        nullableNumber(minQuantity),
+        nullableNumber(maxQuantity),
+        nullableNumber(minWidthIn),
+        nullableNumber(maxWidthIn),
+        nullableNumber(minHeightIn),
+        nullableNumber(maxHeightIn),
+        nullableNumber(pricePerSqInch),
+        nullableNumber(mailboxPricePerMonth),
+        nullableNumber(oldPrice),
+        nullableNumber(weightLb),
+        nullableNumber(packageLengthIn),
+        nullableNumber(packageWidthIn),
+        nullableNumber(packageHeightIn),
+        categoryId,
+        linkedCategorySlug || null,
+        image || '/placeholder.jpg',
+        sameDayEligible ? 1 : 0,
+        outOfStock ? 1 : 0,
+        featured ? 1 : 0,
+        allow_custom_dimensions ? 1 : 0,
+        shippingEnabled !== false,
+        localDeliveryEligible ? 1 : 0,
+        shippingCategory || 'standard',
+      ]
+    );
     
     console.log('Product insertion completed');
 

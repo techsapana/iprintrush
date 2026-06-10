@@ -58,7 +58,43 @@ export default function CheckoutClient() {
     message: '',
   });
   const [selectedShipping, setSelectedShipping] = useState(null);
+  const [shippingMethods, setShippingMethods] = useState([]);
+  const [selectedMethod, setSelectedMethod] = useState(null);
+  const [useRuleBased, setUseRuleBased] = useState(
+    process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true'
+  );
   const [shippingAddressKey, setShippingAddressKey] = useState('');
+
+  async function fetchShippingMethods() {
+    if (!useRuleBased) return;
+    try {
+      const res = await fetch('/api/shipping/methods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: checkoutItems.map((i) => ({
+            id: i.id,
+            quantity: i.quantity,
+            quotePayload: i.options?.quotePayload || null,
+          })),
+          shippingAddress: {
+            address: formData.shippingAddress.trim(),
+            city: formData.shippingCity.trim(),
+            state: formData.shippingState.trim(),
+            zip: formData.shippingZip.trim(),
+          },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data?.success && Array.isArray(data.methods)) {
+        setShippingMethods(data.methods);
+      } else {
+        setShippingMethods([]);
+      }
+    } catch {
+      setShippingMethods([]);
+    }
+  }
 
   useEffect(() => {
     if (isBuyNow) {
@@ -68,6 +104,12 @@ export default function CheckoutClient() {
     }
     setSessionReady(true);
   }, [isBuyNow]);
+
+  useEffect(() => {
+    if (!useRuleBased) return;
+    if (!canCalculateShipping()) return;
+    fetchShippingMethods();
+  }, [useRuleBased, checkoutItems, formData.shippingAddress, formData.shippingCity, formData.shippingState, formData.shippingZip]);
 
   const checkoutItems = isBuyNow ? buyNowItems : cartItems;
 
@@ -101,6 +143,10 @@ export default function CheckoutClient() {
       setPayError('Enter street, city, state, and a 5-digit ZIP in Shipping Address first.');
       return;
     }
+    // Skip rate calculation when rule-based shipping is active
+    if (useRuleBased) {
+      return;
+    }
     setPayError('');
     setFedexRates({ options: [], loading: true, unavailable: false, message: '' });
     setSelectedShipping(null);
@@ -126,7 +172,7 @@ export default function CheckoutClient() {
           loading: false,
           unavailable: true,
           message:
-            data.message || data.error || 'Unable to retrieve FedEx rates. Check your address and try again.',
+            data.message || data.error || 'Unable to retrieve shipping rates. Check your address and try again.',
         });
         return;
       }
@@ -149,7 +195,7 @@ export default function CheckoutClient() {
         options: [],
         loading: false,
         unavailable: true,
-        message: 'Unable to retrieve FedEx rates. Please try again.',
+        message: 'Unable to retrieve shipping rates. Please try again.',
       });
     }
   };
@@ -223,6 +269,8 @@ export default function CheckoutClient() {
     if (formData.deliveryMethod !== 'shipping') {
       setFedexRates({ options: [], loading: false, unavailable: false, message: '' });
       setSelectedShipping(null);
+      setShippingMethods([]);
+      setSelectedMethod(null);
       setShippingAddressKey('');
       return;
     }
@@ -230,6 +278,8 @@ export default function CheckoutClient() {
     if (shippingAddressKey && currentKey !== shippingAddressKey) {
       setFedexRates({ options: [], loading: false, unavailable: false, message: '' });
       setSelectedShipping(null);
+      setShippingMethods([]);
+      setSelectedMethod(null);
       setShippingAddressKey('');
     }
   }, [
@@ -239,6 +289,7 @@ export default function CheckoutClient() {
     formData.shippingState,
     formData.shippingZip,
     shippingAddressKey,
+    useRuleBased,
   ]);
 
   const handleApplyCoupon = (e) => {
@@ -284,8 +335,29 @@ export default function CheckoutClient() {
       setPayError('Shipping ZIP code must be exactly 5 digits.');
       return;
     }
-    if (formData.deliveryMethod === 'shipping' && !selectedShipping) {
-      setPayError('Calculate shipping and select a FedEx option before checkout.');
+    if (
+      formData.deliveryMethod === 'shipping' &&
+      !useRuleBased &&
+      !selectedShipping
+    ) {
+      setPayError('Calculate shipping and select a shipping option before checkout.');
+      return;
+    }
+    if (
+      formData.deliveryMethod === 'shipping' &&
+      useRuleBased &&
+      !selectedMethod
+    ) {
+      setPayError('Please select a shipping method.');
+      return;
+    }
+    if (
+      formData.deliveryMethod === 'shipping' &&
+      useRuleBased &&
+      selectedMethod === 'review_required' &&
+      !formData.shippingAddress.trim()
+    ) {
+      setPayError('Please enter a shipping address for oversized items.');
       return;
     }
     setIsPaying(true);
@@ -311,9 +383,18 @@ export default function CheckoutClient() {
           customer: {
             ...formData,
             selectedShipping:
-              formData.deliveryMethod === 'shipping' && selectedShipping
+              formData.deliveryMethod === 'shipping' && !useRuleBased && selectedShipping
                 ? selectedShipping
                 : undefined,
+            selectedMethod:
+              formData.deliveryMethod === 'shipping' && useRuleBased
+                ? selectedMethod
+                : undefined,
+            shippingMethodsData:
+              formData.deliveryMethod === 'shipping' && useRuleBased
+                ? shippingMethods.find((m) => m.type === selectedMethod) || null
+                : undefined,
+            useRuleBasedShipping: useRuleBased,
             shippingRatesUnavailable: false,
           },
           couponCode: appliedCoupon || undefined,
@@ -336,7 +417,11 @@ export default function CheckoutClient() {
     : 0;
   const taxableBase = Math.max(0, (subtotal || 0) - discount);
   const shippingAmount =
-    formData.deliveryMethod === 'shipping' ? Number(selectedShipping?.cost || 0) : 0;
+    formData.deliveryMethod === 'shipping'
+      ? useRuleBased
+        ? Number(shippingMethods.find((m) => m.type === selectedMethod)?.cost || 0)
+        : Number(selectedShipping?.cost || 0)
+      : 0;
   const taxAmount = (taxableBase + shippingAmount) * ((Number(taxRatePercent) || 0) / 100);
   const finalTotal = taxableBase + shippingAmount + taxAmount;
 
@@ -436,89 +521,127 @@ export default function CheckoutClient() {
               </div>
             </div>
 
-            {formData.deliveryMethod === 'shipping' && (
-              <>
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Address</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Street</label>
-                      <input name="shippingAddress" value={formData.shippingAddress} onChange={handleInputChange} required className={inputClass} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Apt (optional)</label>
-                      <input name="shippingApt" value={formData.shippingApt} onChange={handleInputChange} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                      <input name="shippingCity" value={formData.shippingCity} onChange={handleInputChange} required className={inputClass} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                      <input name="shippingState" value={formData.shippingState} onChange={handleInputChange} required className={inputClass} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
-                      <input name="shippingZip" value={formData.shippingZip} onChange={handleInputChange} required className={inputClass} maxLength={5} />
-                    </div>
+{formData.deliveryMethod === 'shipping' && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Address</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Street</label>
+                    <input name="shippingAddress" value={formData.shippingAddress} onChange={handleInputChange} required className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Apt (optional)</label>
+                    <input name="shippingApt" value={formData.shippingApt} onChange={handleInputChange} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <input name="shippingCity" value={formData.shippingCity} onChange={handleInputChange} required className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                    <input name="shippingState" value={formData.shippingState} onChange={handleInputChange} required className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                    <input name="shippingZip" value={formData.shippingZip} onChange={handleInputChange} required className={inputClass} maxLength={5} />
                   </div>
                 </div>
+              </div>
+            )}
 
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">FedEx Shipping Options</h2>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Fill in the shipping address above, then calculate live FedEx rates for your order.
+            {formData.deliveryMethod === 'shipping' && !useRuleBased && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Shipping Options</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Fill in the shipping address above, then calculate shipping rates for your order.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCalculateShipping}
+                  disabled={!canCalculateShipping() || fedexRates.loading}
+                  className="mb-4"
+                >
+                  {fedexRates.loading ? 'Calculating shipping…' : 'Calculate shipping'}
+                </Button>
+                {!canCalculateShipping() && (
+                  <p className="text-sm text-gray-500 mb-4">
+                    Enter street, city, state, and ZIP in Shipping Address to calculate rates.
                   </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCalculateShipping}
-                    disabled={!canCalculateShipping() || fedexRates.loading}
-                    className="mb-4"
-                  >
-                    {fedexRates.loading ? 'Calculating shipping…' : 'Calculate shipping'}
-                  </Button>
-                  {!canCalculateShipping() && (
-                    <p className="text-sm text-gray-500 mb-4">
-                      Enter street, city, state, and ZIP in Shipping Address to calculate rates.
-                    </p>
-                  )}
-                  {!fedexRates.loading && fedexRates.unavailable && (
-                    <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
-                      {fedexRates.message || 'Unable to retrieve FedEx rates. Check your address and try again.'}
-                    </p>
-                  )}
-                  {!fedexRates.loading && !fedexRates.unavailable && fedexRates.options.length > 0 && (
-                    <div className="space-y-3">
-                      {fedexRates.options.map((rate) => {
-                        const deliveryLabel =
-                          rate.estimatedDeliveryLabel || rate.transitTime || 'Delivery date pending';
-                        const label = `${rate.serviceName} — Delivery ${deliveryLabel} — $${Number(rate.cost).toFixed(2)}`;
-                        const checked = selectedShipping?.serviceType === rate.serviceType;
-                        return (
-                          <label
-                            key={rate.serviceType}
-                            className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
-                              checked
-                                ? 'border-[#29b6f6] bg-sky-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="fedexShippingOption"
-                              checked={checked}
-                              onChange={() => setSelectedShipping(rate)}
-                              className="mt-1"
-                            />
-                            <span className="text-sm text-gray-900">{label}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </>
+                )}
+{!fedexRates.loading && fedexRates.unavailable && (
+                  <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+                    {fedexRates.message || 'Unable to retrieve shipping rates. Check your address and try again.'}
+                  </p>
+                )}
+                {!fedexRates.loading && !fedexRates.unavailable && fedexRates.options.length > 0 && (
+                  <div className="space-y-3">
+                    {fedexRates.options.map((rate) => {
+                      const deliveryLabel =
+                        rate.estimatedDeliveryLabel || rate.transitTime || 'Delivery date pending';
+                      const label = `${rate.serviceName} — Delivery ${deliveryLabel} — $${Number(rate.cost).toFixed(2)}`;
+                      const checked = selectedShipping?.serviceType === rate.serviceType;
+                      return (
+                        <label
+                          key={rate.serviceType}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
+                            checked
+                              ? 'border-[#29b6f6] bg-sky-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="fedexShippingOption"
+                            checked={checked}
+                            onChange={() => setSelectedShipping(rate)}
+                            className="mt-1"
+                          />
+                          <span className="text-sm text-gray-900">{label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {formData.deliveryMethod === 'shipping' && useRuleBased && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Methods</h2>
+                {shippingMethods.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    Enter street, city, state, and ZIP in Shipping Address to load shipping methods.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {shippingMethods.map((method) => {
+                      const checked = selectedMethod === method.type;
+                      return (
+                        <label
+                          key={method.type}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
+                            checked
+                              ? 'border-[#29b6f6] bg-sky-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="ruleBasedShippingOption"
+                            checked={checked}
+                            onChange={() => setSelectedMethod(method.type)}
+                            className="mt-1"
+                          />
+                          <span className="text-sm text-gray-900">
+                            {method.label} — ${Number(method.cost || 0).toFixed(2)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -592,29 +715,35 @@ export default function CheckoutClient() {
                     <span>- ${(discount || 0).toFixed(2)}</span>
                   </div>
                 )}
-                {formData.deliveryMethod === 'shipping' && (
-                  <div className="flex justify-between items-center text-sm text-gray-700 gap-2">
-                    <span className="min-w-0">
-                      {selectedShipping
-                        ? `Shipping (${selectedShipping.serviceName}):`
-                        : 'Shipping:'}
-                    </span>
-                    {selectedShipping ? (
-                      <span className="shrink-0 font-medium">${shippingAmount.toFixed(2)}</span>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0 text-xs h-8"
-                        onClick={handleCalculateShipping}
-                        disabled={!canCalculateShipping() || fedexRates.loading}
-                      >
-                        {fedexRates.loading ? 'Calculating…' : 'Calculate shipping'}
-                      </Button>
-                    )}
-                  </div>
-                )}
+{formData.deliveryMethod === 'shipping' && (
+                   <div className="flex justify-between items-center text-sm text-gray-700 gap-2">
+                     <span className="min-w-0">
+                       {useRuleBased && shippingMethods.find((m) => m.type === selectedMethod)
+                         ? `Shipping (${shippingMethods.find((m) => m.type === selectedMethod)?.label}):`
+                         : !useRuleBased && selectedShipping
+                         ? `Shipping (${selectedShipping.serviceName}):`
+                         : 'Shipping:'}
+                     </span>
+                     {useRuleBased && shippingMethods.find((m) => m.type === selectedMethod) ? (
+                       <span className="shrink-0 font-medium">${shippingAmount.toFixed(2)}</span>
+                     ) : selectedShipping ? (
+                       <span className="shrink-0 font-medium">${shippingAmount.toFixed(2)}</span>
+                     ) : useRuleBased ? (
+                       <span className="shrink-0 font-medium">$0.00</span>
+                     ) : (
+                       <Button
+                         type="button"
+                         variant="outline"
+                         size="sm"
+                         className="shrink-0 text-xs h-8"
+                         onClick={handleCalculateShipping}
+                         disabled={!canCalculateShipping() || fedexRates.loading}
+                       >
+                         {fedexRates.loading ? 'Calculating…' : 'Calculate shipping'}
+                       </Button>
+                     )}
+                   </div>
+                 )}
                 <div className="flex justify-between text-sm text-gray-700">
                   <span>Tax:</span>
                   <span>${(taxAmount || 0).toFixed(2)}</span>

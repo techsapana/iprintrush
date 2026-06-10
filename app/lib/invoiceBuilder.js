@@ -1,5 +1,17 @@
 'use client';
 
+const SHIPPING_METHOD_LABELS = {
+  pickup: 'Store Pickup',
+  local_delivery: 'Local Delivery',
+  standard_shipping: 'Standard Shipping',
+  review_required: 'Shipping Review Required',
+};
+
+function getShippingMethodLabel(method) {
+  if (!method) return 'Unknown';
+  return SHIPPING_METHOD_LABELS[method] || 'Unknown';
+}
+
 const formatAmount = (amount) => {
   const abs = Math.abs(amount).toFixed(2);
   return amount < 0 ? `- $${abs}` : `$${abs}`;
