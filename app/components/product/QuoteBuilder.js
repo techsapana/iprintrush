@@ -73,6 +73,12 @@ const useRuleBasedShipping = process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING ===
     if (hasCalculated) hasEverCalculatedRef.current = true;
   }, [hasCalculated]);
 
+  // Keep hasCalculated ref updated for debounced calls (avoids stale closure)
+  const hasCalculatedRef = useRef(hasCalculated);
+  useEffect(() => {
+    hasCalculatedRef.current = hasCalculated;
+  }, [hasCalculated]);
+
   const quantityMin = useMemo(() => {
     if (minQuantityProp == null || minQuantityProp === '') return null;
     const n = Number(minQuantityProp);
@@ -224,6 +230,28 @@ const useRuleBasedShipping = process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING ===
     scrollCustomizationSectionIntoView(customizationSectionRef);
   }, [step]);
 
+  // Track previous step to detect navigation to summary
+  const prevStepRef = useRef(step);
+  const summaryStepRef = useRef<number | null>(null);
+  const handleCalculateRef = useRef(handleCalculate);
+  // Keep the ref updated with the latest handleCalculate
+  handleCalculateRef.current = handleCalculate;
+  
+  // Calculate summary step index and detect when we navigate to it
+  useEffect(() => {
+    if (stepTitles.length > 0) {
+      const summaryIndex = stepTitles.length - 1;
+      summaryStepRef.current = summaryIndex;
+      
+      // If we just navigated to summary step (not initial load) and have no quoteSummary but have quantity
+      if (prevStepRef.current !== step && step === summaryIndex && !quoteSummary && totalQuantity > 0) {
+        // Trigger immediate recalculation when reaching summary with updated selections
+        handleCalculateRef.current();
+      }
+      prevStepRef.current = step;
+    }
+  }, [step, stepTitles.length, quoteSummary, totalQuantity]);
+
   const handleSizeQtyChange = (sizeId, delta) => {
     invalidateQuote();
     setQuantities((prev) => {
@@ -356,15 +384,16 @@ const useRuleBasedShipping = process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING ===
     }
 };
 
-   const invalidateQuote = () => {
+const invalidateQuote = () => {
     if (!hasCalculated) return;
     setQuoteSummary(null);
     setHasCalculated(false);
   };
 
-  const scheduleRecalculation = debounce(() => {
-    if (!hasCalculated && !hasEverCalculatedRef.current) return;
-    handleCalculate();
+   const scheduleRecalculation = debounce(() => {
+    // Read fresh value from ref to avoid stale closure
+    if (!hasCalculatedRef.current && !hasEverCalculatedRef.current) return;
+    handleCalculateRef.current();
   }, 300);
 
   // Handler for changing quantity in the summary step - triggers recalculation
@@ -1012,6 +1041,13 @@ const renderSizesStep = () => {
 
   const renderSummaryStep = () => {
     if (!quoteSummary) return null;
+
+    const discountAmount = quoteSummary.lineItems
+      .filter((it) => it.amount < 0)
+      .reduce((sum, it) => sum + Math.abs(it.amount), 0);
+
+    // Use live totalQuantity from state instead of cached quoteSummary.totalQuantity
+    const liveTotalQuantity = totalQuantity;
     
     const customizationsDisplay = {
       Color: config.colors.find((c) => c.id === colorId)?.name ?? '—',
@@ -1147,7 +1183,7 @@ const renderSizesStep = () => {
                 ${(typeof quoteSummary.grandTotal === 'number' ? quoteSummary.grandTotal : 0).toFixed(2)}
               </div>
               <div className="text-xs text-gray-500">
-                {quoteSummary.totalQuantity} pcs · $
+                {liveTotalQuantity} pcs · $
                 {(typeof quoteSummary.unitPrice === 'number' ? quoteSummary.unitPrice : 0).toFixed(2)} per piece
               </div>
             </div>
@@ -1277,12 +1313,16 @@ const renderSizesStep = () => {
           </div>
 
           <div className="px-4 sm:px-6 py-4 space-y-2">
-            {!quoteSummary.lineItems.some((it) => it.amount < 0) && (
-              <div className="flex justify-between text-sm text-gray-900">
-                <span>Subtotal</span>
-                <span>${(typeof quoteSummary.subtotal === 'number'
-  ? quoteSummary.subtotal
-  : 0).toFixed(2)}</span>
+            <div className="flex justify-between text-sm text-gray-900">
+              <span>Subtotal</span>
+              <span>${(typeof quoteSummary.subtotal === 'number'
+                ? quoteSummary.subtotal + discountAmount
+                : discountAmount).toFixed(2)}</span>
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-sm text-emerald-700">
+                <span>Discount</span>
+                <span>-${discountAmount.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm text-gray-900">
@@ -1593,7 +1633,14 @@ const renderStepContent = () => {
 
   const handleNextStep = () => {
     if (!isStepValid()) return;
-    setStep((s) => Math.min(stepTitles.length - 1, s + 1));
+    const nextStep = Math.min(stepTitles.length - 1, step + 1);
+    
+    // When navigating to summary step, trigger calculation with fresh state
+    if (nextStep === stepTitles.length - 1 && !quoteSummary && totalQuantity > 0) {
+      handleCalculate();
+    }
+    
+    setStep(nextStep);
   };
 
   return (

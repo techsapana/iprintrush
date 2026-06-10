@@ -239,6 +239,28 @@ const artworkFileRef = useRef(null);
     scrollCustomizationSectionIntoView(customizationSectionRef);
   }, [step]);
 
+  // Track previous step to detect navigation to summary
+  const prevStepRef = useRef(step);
+  const summaryStepRef = useRef<number | null>(null);
+  const handleCalculateRef = useRef(handleCalculate);
+  // Keep the ref updated with the latest handleCalculate
+  handleCalculateRef.current = handleCalculate;
+  
+  // Calculate summary step index and detect when we navigate to it
+  useEffect(() => {
+    if (stepTitles.length > 0) {
+      const summaryIndex = stepTitles.length - 1;
+      summaryStepRef.current = summaryIndex;
+      
+      // If we just navigated to summary step (not initial load) and have no quoteSummary but have quantity
+      if (prevStepRef.current !== step && step === summaryIndex && !quoteSummary && totalQuantity > 0) {
+        // Trigger immediate recalculation when reaching summary with updated selections
+        handleCalculateRef.current();
+      }
+      prevStepRef.current = step;
+    }
+  }, [step, stepTitles.length, quoteSummary, totalQuantity]);
+
   const handleSelectionChange = (poolKey, value) => {
     invalidateQuote();
     setSelections((prev) => ({ ...prev, [poolKey]: value }));
@@ -256,9 +278,22 @@ const artworkFileRef = useRef(null);
     return Number.isFinite(w) && w > 44;
   };
 
+  // Use a ref to track hasCalculated for fresh reads inside the debounced callback
+  const hasCalculatedRef = useRef(hasCalculated);
+  useEffect(() => {
+    hasCalculatedRef.current = hasCalculated;
+  }, [hasCalculated]);
+  
+  // Keep handleCalculate ref updated for debounced calls
+  const handleCalculateRef = useRef(handleCalculate);
+  useEffect(() => {
+    handleCalculateRef.current = handleCalculate;
+  }, [handleCalculate]);
+
   const scheduleRecalculation = debounce(() => {
-    if (!hasCalculated && !hasEverCalculatedRef.current) return;
-    handleCalculate();
+    // Read fresh value from ref to avoid stale closure
+    if (!hasCalculatedRef.current && !hasEverCalculatedRef.current) return;
+    handleCalculateRef.current();
   }, 300);
 
   const handleArtworkReadyChange = (value) => {
@@ -940,8 +975,29 @@ const renderDimensionStep = (group, pool, value) => {
   };
 
   const renderSummaryStep = () => {
-    if (!quoteSummary) return null;
     const showShippingReview = isShippingReviewRequired();
+
+    const discountAmount = quoteSummary
+      ? quoteSummary.lineItems
+          .filter((it) => it.amount < 0)
+          .reduce((sum, it) => sum + Math.abs(it.amount), 0)
+      : 0;
+    
+    // Use live values from selections instead of cached quoteSummary
+    const displayTotalQuantity = totalQuantity > 0 ? totalQuantity : quoteSummary?.totalQuantity || 0;
+    
+    // If no quoteSummary but we're on summary step, calculate immediately
+    if (!quoteSummary) {
+      return (
+        <div className="space-y-6">
+          <h3 className="text-lg font-semibold text-gray-900">Quote Summary</h3>
+          <div className="text-center py-8">
+            <div className="text-gray-600">Calculating your quote...</div>
+          </div>
+        </div>
+      );
+    }
+    
     const selectionLines = [];
     for (const g of activeGroups) {
       const pool = poolMap.get(g.poolKey);
@@ -973,7 +1029,7 @@ const renderDimensionStep = (group, pool, value) => {
 
     const quoteLines = [
       `Quote for: ${productName}`,
-      `Total Quantity: ${quoteSummary.totalQuantity} pcs`,
+      `Total Quantity: ${displayTotalQuantity} pcs`,
       `Unit Price: $${quoteSummary.unitPrice.toFixed(2)}`,
       `Subtotal: $${quoteSummary.subtotal.toFixed(2)}`,
       `Shipping: $${quoteSummary.shipping.toFixed(2)}`,
@@ -1114,7 +1170,7 @@ const renderDimensionStep = (group, pool, value) => {
             <div className="text-right">
               <div className="text-2xl font-bold text-gray-900">${quoteSummary.grandTotal.toFixed(2)}</div>
               <div className="text-xs text-gray-500">
-                {quoteSummary.totalQuantity} pcs · ${quoteSummary.unitPrice.toFixed(2)} per piece
+                {displayTotalQuantity} pcs · ${quoteSummary.unitPrice.toFixed(2)} per piece
               </div>
             </div>
           </div>
@@ -1139,10 +1195,14 @@ const renderDimensionStep = (group, pool, value) => {
             </ul>
           </div>
           <div className="px-4 sm:px-6 py-4 border-t space-y-2">
-            {!quoteSummary.lineItems.some((it) => it.amount < 0) && (
-              <div className="flex justify-between text-sm">
-                <span>Subtotal</span>
-                <span>${quoteSummary.subtotal.toFixed(2)}</span>
+            <div className="flex justify-between text-sm">
+              <span>Subtotal</span>
+              <span>${(quoteSummary.subtotal + discountAmount).toFixed(2)}</span>
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-sm text-emerald-700">
+                <span>Discount</span>
+                <span>-${discountAmount.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm">
@@ -1468,7 +1528,14 @@ const renderDeliveryStep = () => {
 
   const handleNextStep = () => {
     if (!canGoNext()) return;
-    setStep((s) => Math.min(stepTitles.length - 1, s + 1));
+    const nextStep = Math.min(stepTitles.length - 1, step + 1);
+    
+    // When navigating to summary step, trigger calculation with fresh state
+    if (nextStep === stepTitles.length - 1 && !quoteSummary && totalQuantity > 0) {
+      handleCalculate();
+    }
+    
+    setStep(nextStep);
   };
 
   return (
