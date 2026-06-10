@@ -1649,7 +1649,7 @@ const renderStepContent = () => {
                   onClick={handleNextStep}
                   disabled={!isStepValid()}
                 >
-                  Next Step
+                  Next Steps
                 </Button>
               )}
               {!hasCalculated && step === stepTitles.length - 1 && (
