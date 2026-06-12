@@ -637,7 +637,7 @@ export function calculateDynamicQuote(
             const baseForPct = tierMerchandise.merchandiseSubtotal + addonsTotal;
             productionTimeTotal = baseForPct * (opt.percentageValue / 100);
           } else if (opt.priceModifier !== 0) {
-            productionTimeTotal = opt.priceModifier * totalQuantity;
+            productionTimeTotal = opt.priceModifier;
           }
           if (productionTimeTotal !== 0) {
             productionTimeLabel = `${productionPool.name} (${opt.label})`;
@@ -993,7 +993,7 @@ function resolveProductionTimeForMode(
             };
           } else if (opt.priceModifier !== 0) {
             return {
-              productionTimeTotal: opt.priceModifier * totalQuantity,
+              productionTimeTotal: opt.priceModifier,
               productionTimeLabel: `${productionPool.name} (${opt.label})`,
             };
           }
