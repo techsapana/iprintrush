@@ -34,6 +34,9 @@ function createDefaultConfig(): QuoteConfigStore {
     under100Rate: 0,
     between100And199Rate: 0,
     over200Rate: 0,
+    localUnder100Rate: 0,
+    localBetween100And199Rate: 0,
+    localOver200Rate: 0,
     rules: [],
   };
 

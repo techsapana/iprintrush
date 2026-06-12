@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import {
   detectOversizedItems,
   getAvailableShippingMethods,
-  getTotalQuantity,
 } from "@/app/lib/shippingEngine";
 
 export async function POST(req: Request) {
@@ -18,8 +17,7 @@ export async function POST(req: Request) {
     }
 
     const oversized = detectOversizedItems(items);
-    const totalQuantity = getTotalQuantity(items);
-    const methodsOptions = getAvailableShippingMethods(items, shippingAddress?.zip);
+    const methodsOptions = getAvailableShippingMethods(items, { enabled: true, under100Rate: 0, between100And199Rate: 0, over200Rate: 0, localUnder100Rate: 0, localBetween100And199Rate: 0, localOver200Rate: 0, rules: [], defaultFlatRate: 0 });
     const availableMethods = methodsOptions
       .filter((m) => m.available)
       .map((m) => m.id);

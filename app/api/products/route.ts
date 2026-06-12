@@ -131,6 +131,8 @@ export async function GET(request: NextRequest) {
         price: parseFloat(p.price),
         minQuantity: p.min_quantity != null ? Number(p.min_quantity) : null,
         maxQuantity: p.max_quantity != null ? Number(p.max_quantity) : null,
+        minOrderValue: p.min_order_value != null ? Number(p.min_order_value) : null,
+        maxOrderValue: p.max_order_value != null ? Number(p.max_order_value) : null,
         minWidthIn: p.min_width_in != null ? Number(p.min_width_in) : null,
         maxWidthIn: p.max_width_in != null ? Number(p.max_width_in) : null,
         minHeightIn: p.min_height_in != null ? Number(p.min_height_in) : null,
@@ -220,6 +222,8 @@ const {
         price,
         minQuantity,
         maxQuantity,
+        minOrderValue,
+        maxOrderValue,
         minWidthIn,
         maxWidthIn,
         minHeightIn,
@@ -266,19 +270,21 @@ const productId = id || `product-${Date.now()}`;
     console.log('Product slug:', productSlug);
     console.log('Product name:', name);
     
-     await query(
-       `INSERT INTO products (id, name, slug, description, price, min_quantity, max_quantity, min_width_in, max_width_in, min_height_in, max_height_in, price_per_sq_inch, mailbox_price_per_month, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, enabled)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         name = VALUES(name),
-         slug = VALUES(slug),
-         description = VALUES(description),
-         price = VALUES(price),
-         min_quantity = VALUES(min_quantity),
-         max_quantity = VALUES(max_quantity),
-         min_width_in = VALUES(min_width_in),
-         max_width_in = VALUES(max_width_in),
-         min_height_in = VALUES(min_height_in),
+      await query(
+        `INSERT INTO products (id, name, slug, description, price, min_quantity, max_quantity, min_order_value, max_order_value, min_width_in, max_width_in, min_height_in, max_height_in, price_per_sq_inch, mailbox_price_per_month, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, enabled)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          name = VALUES(name),
+          slug = VALUES(slug),
+          description = VALUES(description),
+          price = VALUES(price),
+          min_quantity = VALUES(min_quantity),
+          max_quantity = VALUES(max_quantity),
+          min_order_value = VALUES(min_order_value),
+          max_order_value = VALUES(max_order_value),
+          min_width_in = VALUES(min_width_in),
+          max_width_in = VALUES(max_width_in),
+          min_height_in = VALUES(min_height_in),
          max_height_in = VALUES(max_height_in),
          price_per_sq_inch = VALUES(price_per_sq_inch),
          mailbox_price_per_month = VALUES(mailbox_price_per_month),
@@ -306,6 +312,8 @@ const productId = id || `product-${Date.now()}`;
         price || 0,
         nullableNumber(minQuantity),
         nullableNumber(maxQuantity),
+        nullableNumber(minOrderValue),
+        nullableNumber(maxOrderValue),
         nullableNumber(minWidthIn),
         nullableNumber(maxWidthIn),
         nullableNumber(minHeightIn),

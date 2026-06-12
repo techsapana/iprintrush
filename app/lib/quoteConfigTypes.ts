@@ -77,6 +77,9 @@ export type ShippingConfig = {
   under100Rate: number;
   between100And199Rate: number;
   over200Rate: number;
+  localUnder100Rate: number;
+  localBetween100And199Rate: number;
+  localOver200Rate: number;
   rules: ShippingRule[];
 };
 
@@ -102,6 +105,7 @@ export type QuoteConfigStore = {
   designerHelp: DesignerHelpOption[];
   shipping: ShippingConfig;
   productSettings: ProductQuoteSettings[];
+  baseUnitPrice?: number | null; // Product's base price for print products
 };
 
 export type QuoteLineItem = {
@@ -122,12 +126,12 @@ export type QuoteRequestPayload = {
   printLocationIds: UUID[];
   turnaroundOptionId: UUID | null;
   designerHelpOptionId: UUID | null;
-  deliveryMethod: 'pickup' | 'shipping';
+  deliveryMethod: 'pickup' | 'local_delivery' | 'standard_shipping';
   shippingState?: string;
   shippingZip?: string;
   shippingCity?: string;
   /**
-   * Full street address (first line) for FedEx destination.
+   * Full street address (first line) for shipping destination.
    */
   shippingStreet?: string;
   /**
@@ -152,6 +156,7 @@ export type QuoteSummary = {
   }[];
   lineItems: QuoteLineItem[];
   subtotal: number;
+  merchandiseSubtotal: number;
   shipping: number;
   grandTotal: number;
 };
@@ -197,12 +202,12 @@ export type DynamicQuoteRequestPayload = {
   productId: string;
   mode: 'print_product';
   selections: Record<string, string | string[] | number>; // poolKey -> optionId | optionIds[] | quantity
-  deliveryMethod: 'pickup' | 'shipping';
+  deliveryMethod: 'pickup' | 'local_delivery' | 'standard_shipping';
   shippingState?: string;
   shippingZip?: string;
   shippingCity?: string;
   /**
-   * Full street address (first line) for FedEx destination.
+   * Full street address (first line) for shipping destination.
    */
   shippingStreet?: string;
   /** Customer artwork (temp upload ids), same contract as apparel quotes. */

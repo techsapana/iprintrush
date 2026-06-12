@@ -86,11 +86,14 @@ quantityTiers: (tiers as any[]).map((t: any) => ({
       enabled: Boolean(d.enabled),
     })),
     shipping: {
-      enabled: Boolean(shippingConfig?.enabled),
+      enabled: Boolean(shippingConfig?.enabled ?? true),
       defaultFlatRate: Number.isFinite(parseFloat(shippingConfig?.default_flat_rate || 0)) ? parseFloat(shippingConfig?.default_flat_rate || 0) : 0,
       under100Rate: Number.isFinite(parseFloat(shippingConfig?.under_100_rate || 0)) ? parseFloat(shippingConfig?.under_100_rate || 0) : 0,
       between100And199Rate: Number.isFinite(parseFloat(shippingConfig?.between_100_199_rate || 0)) ? parseFloat(shippingConfig?.between_100_199_rate || 0) : 0,
       over200Rate: Number.isFinite(parseFloat(shippingConfig?.over_200_rate || 0)) ? parseFloat(shippingConfig?.over_200_rate || 0) : 0,
+      localUnder100Rate: Number.isFinite(parseFloat(shippingConfig?.local_under_100_rate || 0)) ? parseFloat(shippingConfig?.local_under_100_rate || 0) : 0,
+      localBetween100And199Rate: Number.isFinite(parseFloat(shippingConfig?.local_between_100_199_rate || 0)) ? parseFloat(shippingConfig?.local_between_100_199_rate || 0) : 0,
+      localOver200Rate: Number.isFinite(parseFloat(shippingConfig?.local_over_200_rate || 0)) ? parseFloat(shippingConfig?.local_over_200_rate || 0) : 0,
       rules: (shippingRules as any[]).map((r: any) => ({
         id: r.id.toString(),
         ruleType: r.rule_type,

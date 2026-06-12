@@ -6,6 +6,7 @@ import { DynamicQuoteBuilder } from './DynamicQuoteBuilder';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
 import { getShippingMethodLabel } from '../../lib/shippingEngine';
+import { ShippingSelector, getShippingDisplayLabel } from '../shared/ShippingSelector';
 
 function debounce(fn, delay) {
   let timeoutId;
@@ -21,6 +22,8 @@ export function QuoteBuilder({
   productCategory,
   minQuantity: minQuantityProp,
   maxQuantity: maxQuantityProp,
+  minOrderValue: minOrderValueProp,
+  maxOrderValue: maxOrderValueProp,
   prefillQuote = null,
   onQuoteReady,
 }) {
@@ -40,12 +43,8 @@ export function QuoteBuilder({
   const [artworkFiles, setArtworkFiles] = useState([]);
   const [customSizeNote, setCustomSizeNote] = useState('');
   const [artworkUploading, setArtworkUploading] = useState(false);
-  const [artworkError, setArtworkError] = useState('');
-  const [estimateZip, setEstimateZip] = useState('');
-  const [estimatingShipping, setEstimatingShipping] = useState(false);
-  const [estimatedShipping, setEstimatedShipping] = useState(null);
-  const [estimateError, setEstimateError] = useState('');
-  const [showEmailForm, setShowEmailForm] = useState(false);
+const [artworkError, setArtworkError] = useState('');
+   const [showEmailForm, setShowEmailForm] = useState(false);
   const [emailTo, setEmailTo] = useState('');
   const [showTextForm, setShowTextForm] = useState(false);
   const [countryCode, setCountryCode] = useState('');
@@ -60,8 +59,7 @@ const [printLocationIds, setPrintLocationIds] = useState([]);
 const [turnaroundId, setTurnaroundId] = useState(null);
 const [designerHelpId, setDesignerHelpId] = useState(null);
 const [deliveryMethod, setDeliveryMethod] = useState('pickup');
-const useRuleBasedShipping = process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true';
-// Shipping address is collected at checkout (not in quote builder)
+  // Shipping address is collected at checkout (not in quote builder)
   const [useMyCloth, setUseMyCloth] = useState(false);
   const [fabricChoice, setFabricChoice] = useState('');
   const isCustomApparels = /custom\s*apparel/i.test(String(productCategory || ''));
@@ -359,7 +357,7 @@ const useRuleBasedShipping = process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING ===
                 .filter((s) => (newQuantities[s.id] || 0) > 0)
                 .map((s) => `${s.label}×${newQuantities[s.id]}`)
                 .join(', '),
-              Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping'),
+              Delivery: getShippingDisplayLabel(deliveryMethod),
               ...(isCustomApparels
                 ? {
                     Fabric:
@@ -575,7 +573,7 @@ const invalidateQuote = () => {
                 .filter((s) => (quantities[s.id] || 0) > 0)
                 .map((s) => `${s.label}×${quantities[s.id]}`)
                 .join(', '),
-              Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping'),
+              Delivery: getShippingDisplayLabel(deliveryMethod),
               ...(isCustomApparels
                 ? {
                     Fabric:
@@ -596,84 +594,9 @@ const invalidateQuote = () => {
     } finally {
       setCalculating(false);
     }
-  };
+};
 
-  const handleEstimateShipping = async () => {
-    const zip = estimateZip.trim();
-    if (!zip) {
-      setEstimateError('Please enter ZIP code.');
-      return;
-    }
-    if (!/^\d{5}$/.test(zip)) {
-      setEstimateError('ZIP code must be exactly 5 digits.');
-      return;
-    }
-    try {
-      setEstimatingShipping(true);
-      setEstimateError('');
-      const qty = quoteSummary?.totalQuantity || totalQuantity || 1;
-
-      if (useRuleBasedShipping) {
-        const payload = {
-          items: [
-            {
-              id: productId,
-              quantity: qty,
-              quotePayload: quoteSummary?.quotePayload || { mode: 'apparel', selections: {} },
-            },
-          ],
-          shippingAddress: { zip },
-        };
-        const res = await fetch('/api/shipping/methods', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok || !json.success || !Array.isArray(json.methods) || json.methods.length === 0) {
-          throw new Error(json.message || json.error || 'Failed to estimate shipping');
-        }
-        const standardMethod = json.methods.find((m) => m.type === 'standard_shipping');
-        const localMethod = json.methods.find((m) => m.type === 'local_delivery');
-        const method = standardMethod || localMethod;
-        if (!method || !Number.isFinite(method.cost)) {
-          throw new Error('No shipping rate available for this ZIP.');
-        }
-        setEstimatedShipping(method.cost);
-      } else {
-        const res = await fetch('/api/fedex/rates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deliveryMethod: 'shipping',
-            items: [
-              {
-                id: productId,
-                quantity: qty,
-                quotePayload: { mode: 'apparel', selections: {} },
-              },
-            ],
-            shippingAddress: { zip },
-          }),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!json.success || !Array.isArray(json.rates) || json.rates.length === 0) {
-          throw new Error(json.message || json.error || 'Failed to estimate shipping');
-        }
-        const amount = Number(json.amount ?? json.rates[0]?.cost);
-        if (!Number.isFinite(amount) || amount <= 0) {
-          throw new Error('No shipping rates found for this ZIP.');
-        }
-        setEstimatedShipping(amount);
-      }
-    } catch (err) {
-      setEstimateError(err.message || 'Failed to estimate shipping');
-    } finally {
-      setEstimatingShipping(false);
-    }
-  };
-
-  if (loading) {
+   if (loading) {
     return (
       <div className="mt-10 p-6 bg-white rounded-xl shadow-sm border border-gray-200">
         <p className="text-gray-600">Loading quote options...</p>
@@ -854,6 +777,12 @@ const renderSizesStep = () => {
     return (
       <div className="space-y-6">
         <h3 className="text-lg font-semibold text-gray-900">Step 4 – Select Sizes & Quantities</h3>
+        {(minOrderValueProp != null || maxOrderValueProp != null) && (
+          <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            {minOrderValueProp != null && <span>Minimum order value: ${minOrderValueProp}. </span>}
+            {maxOrderValueProp != null && <span>Maximum order value: ${maxOrderValueProp}.</span>}
+          </p>
+        )}
         {adultSizes.length > 0 && (
           <div>
             <div className="text-sm font-medium text-gray-700 mb-2">Adult Sizes</div>
@@ -981,42 +910,15 @@ const renderSizesStep = () => {
     );
   };
 
-  const renderDeliveryStep = () => {
+const renderDeliveryStep = () => {
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Step 9 – Delivery Option</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-<button
-             type="button"
-             onClick={() => handleDeliveryMethodChange('pickup')}
-             className={`rounded-xl border px-4 py-3 text-left transition ${
-               deliveryMethod === 'pickup'
-                 ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                 : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-             }`}
-           >
-             <div className="font-semibold text-gray-900">Store Pickup FREE</div>
-             <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
-           </button>
-          {config?.shipping?.enabled !== false && (
-            <button
-              type="button"
-              onClick={() => handleDeliveryMethodChange('shipping')}
-              className={`rounded-xl border px-4 py-3 text-left transition ${
-                deliveryMethod === 'shipping'
-                  ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                  : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-              }`}
-            >
-              <div className="font-semibold text-gray-900">Shipping</div>
-              <div className="text-sm text-gray-600">
-                {useRuleBasedShipping ? 'Shipping calculated at checkout' : 'Shipping'}
-              </div>
-            </button>
-          )}
-        </div>
-
-
+        <ShippingSelector
+          selectedMethod={deliveryMethod}
+          onMethodChange={handleDeliveryMethodChange}
+          shippingEnabled={config?.shipping?.enabled !== false}
+        />
       </div>
     );
   };
@@ -1064,7 +966,7 @@ const renderSizesStep = () => {
         .filter((size) => (quantities[size.id] || 0) > 0)
         .map((size) => `${size.label}: ${quantities[size.id] || 0}`)
         .join(', '),
-      Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping'),
+      Delivery: getShippingDisplayLabel(deliveryMethod),
       ...(isCustomApparels
         ? {
             Fabric: fabricChoice === 'own'
@@ -1117,7 +1019,7 @@ const renderSizesStep = () => {
           ? printLocationIds.map((id) => config?.printLocations?.find((p) => p.id === id)?.name).filter(Boolean).join(', ')
           : '—',
         'Size Breakdown': availableSizes.filter((s) => (quantities[s.id] || 0) > 0).map((s) => `${s.label}: ${quantities[s.id] || 0}`).join(', '),
-        Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping'),
+        Delivery: getShippingDisplayLabel(deliveryMethod),
         ...(isCustomApparels ? { Fabric: fabricChoice === 'own' ? 'I have my own fabric' : "I don't have my own fabric" } : {}),
         Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
         productName,
@@ -1138,7 +1040,7 @@ const renderSizesStep = () => {
           ? printLocationIds.map((id) => config?.printLocations?.find((p) => p.id === id)?.name).filter(Boolean).join(', ')
           : '—',
         'Size Breakdown': availableSizes.filter((s) => (quantities[s.id] || 0) > 0).map((s) => `${s.label}×${quantities[s.id]}`).join(', '),
-        Delivery: deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping'),
+        Delivery: getShippingDisplayLabel(deliveryMethod),
         ...(isCustomApparels ? { Fabric: fabricChoice === 'own' ? 'I have my own fabric' : "I don't have my own fabric" } : {}),
         Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
         productName,
@@ -1396,7 +1298,7 @@ const renderSizesStep = () => {
             </div>
           </div>
         )}
-        {showTextForm && (
+{showTextForm && (
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="text-sm font-medium text-gray-900 mb-2">Send quote by WhatsApp</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1421,38 +1323,11 @@ const renderSizesStep = () => {
           </div>
         )}
 
-<div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <h4 className="text-sm font-semibold text-gray-900 mb-2">Estimated Shipping Price</h4>
-          <p className="text-xs text-gray-600 mb-3">Enter ZIP code to get estimated shipping price.</p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="text"
-              value={estimateZip}
-              onChange={(e) => setEstimateZip(e.target.value)}
-              placeholder="ZIP code"
-              className="w-full sm:w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleEstimateShipping}
-              disabled={estimatingShipping}
-            >
-              {estimatingShipping ? 'Estimating...' : 'Estimate'}
-            </Button>
-          </div>
-{estimateError && <div className="mt-2 text-xs text-red-700">{estimateError}</div>}
-           {estimatedShipping != null && Number.isFinite(estimatedShipping) && !estimateError && (
-             <div className="mt-2 text-sm text-gray-900">
-               Estimated Shipping Price: <span className="font-semibold">${Number(estimatedShipping).toFixed(2)}</span>
-             </div>
-           )}
-        </div>
       </div>
     );
   };
 
-const renderStepContent = () => {
+  const renderStepContent = () => {
     const artworkStep = (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Upload Artwork</h3>

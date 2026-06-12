@@ -103,6 +103,8 @@ const [formData, setFormData] = useState({
      mailboxPricePerMonth: initialProduct?.mailboxPricePerMonth ?? '',
      minQuantity: initialProduct?.minQuantity ?? '',
      maxQuantity: initialProduct?.maxQuantity ?? '',
+     minOrderValue: initialProduct?.minOrderValue ?? '',
+     maxOrderValue: initialProduct?.maxOrderValue ?? '',
      minWidthIn: initialProduct?.minWidthIn ?? '',
      maxWidthIn: initialProduct?.maxWidthIn ?? '',
      minHeightIn: initialProduct?.minHeightIn ?? '',
@@ -184,9 +186,11 @@ if (switchedProduct) {
          description: snap.description || '',
          price: snap.price || '',
          mailboxPricePerMonth: snap.mailboxPricePerMonth ?? '',
-         minQuantity: snap.minQuantity ?? '',
-         maxQuantity: snap.maxQuantity ?? '',
-         minWidthIn: snap.minWidthIn ?? '',
+          minQuantity: snap.minQuantity ?? '',
+          maxQuantity: snap.maxQuantity ?? '',
+          minOrderValue: snap.minOrderValue ?? '',
+          maxOrderValue: snap.maxOrderValue ?? '',
+          minWidthIn: snap.minWidthIn ?? '',
          maxWidthIn: snap.maxWidthIn ?? '',
          minHeightIn: snap.minHeightIn ?? '',
          maxHeightIn: snap.maxHeightIn ?? '',
@@ -244,9 +248,11 @@ setFormData((current) => ({
        description: initialProduct.description ?? current.description,
        price: initialProduct.price ?? current.price,
        mailboxPricePerMonth: initialProduct.mailboxPricePerMonth ?? current.mailboxPricePerMonth,
-       minQuantity: initialProduct.minQuantity ?? current.minQuantity,
-       maxQuantity: initialProduct.maxQuantity ?? current.maxQuantity,
-       minWidthIn: initialProduct.minWidthIn ?? current.minWidthIn,
+        minQuantity: initialProduct.minQuantity ?? current.minQuantity,
+        maxQuantity: initialProduct.maxQuantity ?? current.maxQuantity,
+        minOrderValue: initialProduct.minOrderValue ?? current.minOrderValue,
+        maxOrderValue: initialProduct.maxOrderValue ?? current.maxOrderValue,
+        minWidthIn: initialProduct.minWidthIn ?? current.minWidthIn,
        maxWidthIn: initialProduct.maxWidthIn ?? current.maxWidthIn,
        minHeightIn: initialProduct.minHeightIn ?? current.minHeightIn,
        maxHeightIn: initialProduct.maxHeightIn ?? current.maxHeightIn,
@@ -1284,6 +1290,38 @@ const productData = {
                   onChange={handleChange}
                   placeholder="e.g., 1000"
                   min="1"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Minimum Order Value ($, optional)
+                </label>
+                <input
+                  type="number"
+                  name="minOrderValue"
+                  value={formData.minOrderValue}
+                  onChange={handleChange}
+                  placeholder="e.g., 50.00"
+                  step="0.01"
+                  min="0"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Maximum Order Value ($, optional)
+                </label>
+                <input
+                  type="number"
+                  name="maxOrderValue"
+                  value={formData.maxOrderValue}
+                  onChange={handleChange}
+                  placeholder="e.g., 500.00"
+                  step="0.01"
+                  min="0"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
                 />
               </div>

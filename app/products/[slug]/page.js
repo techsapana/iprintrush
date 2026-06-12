@@ -165,6 +165,8 @@ export default function ProductDetailPage({ params }) {
     if (!currentQuote?.summary || !currentQuote?.payload) return [];
     const summary = currentQuote.summary;
     const totalQty = Number(summary.totalQuantity || 0);
+    const merchandiseSubtotal = Number(summary.merchandiseSubtotal ?? summary.subtotal ?? 0);
+    const shippingTierSubtotal = Number(summary.shippingTierSubtotal ?? summary.subtotal ?? 0);
     const breakdown = Array.isArray(summary.sizeBreakdown) ? summary.sizeBreakdown : [];
     if (breakdown.length <= 1 || totalQty <= 0) {
       return [
@@ -172,6 +174,8 @@ export default function ProductDetailPage({ params }) {
           quantity: summary.totalQuantity,
           quotePayload: currentQuote.payload,
           quoteSummary: summary,
+          merchandiseSubtotal,
+          shippingTierSubtotal,
           customizationsDisplay: currentQuote.customizationsDisplay,
           artworkReady: currentQuote.payload?.artworkReady === true,
           tempArtworkFiles: currentQuote.payload?.tempArtworkFiles || [],
@@ -183,6 +187,8 @@ export default function ProductDetailPage({ params }) {
     const unit = Number(summary.grandTotal || 0) / totalQty;
     const splitGroupId = `${product.id}-${Date.now()}`;
     let running = 0;
+    let runningMerchandise = 0;
+    let runningShippingTierSubtotal = 0;
     return breakdown
       .filter((s) => Number(s?.quantity || 0) > 0)
       .map((s, index, arr) => {
@@ -192,6 +198,18 @@ export default function ProductDetailPage({ params }) {
           lineTotal = Number((Number(summary.grandTotal || 0) - running).toFixed(2));
         } else {
           running = Number((running + lineTotal).toFixed(2));
+        }
+        let merchandiseLineTotal = Number(((merchandiseSubtotal / totalQty) * qty).toFixed(2));
+        if (index === arr.length - 1) {
+          merchandiseLineTotal = Number((merchandiseSubtotal - runningMerchandise).toFixed(2));
+        } else {
+          runningMerchandise = Number((runningMerchandise + merchandiseLineTotal).toFixed(2));
+        }
+        let shippingTierLineTotal = Number(((shippingTierSubtotal / totalQty) * qty).toFixed(2));
+        if (index === arr.length - 1) {
+          shippingTierLineTotal = Number((shippingTierSubtotal - runningShippingTierSubtotal).toFixed(2));
+        } else {
+          runningShippingTierSubtotal = Number((runningShippingTierSubtotal + shippingTierLineTotal).toFixed(2));
         }
         const splitDisplay = {
           ...(currentQuote.customizationsDisplay || {}),
@@ -205,8 +223,12 @@ export default function ProductDetailPage({ params }) {
             totalQuantity: qty,
             unitPrice: qty > 0 ? lineTotal / qty : 0,
             grandTotal: lineTotal,
+            merchandiseSubtotal: merchandiseLineTotal,
+            shippingTierSubtotal: shippingTierLineTotal,
             sizeBreakdown: [{ sizeLabel: s.sizeLabel || 'Selected size', quantity: qty }],
           },
+          merchandiseSubtotal: merchandiseLineTotal,
+          shippingTierSubtotal: shippingTierLineTotal,
           customizationsDisplay: splitDisplay,
           artworkReady: currentQuote.payload?.artworkReady === true,
           tempArtworkFiles: currentQuote.payload?.tempArtworkFiles || [],
@@ -465,6 +487,8 @@ export default function ProductDetailPage({ params }) {
                 productCategory={product.category || product.categorySlug || ''}
                 minQuantity={product.minQuantity}
                 maxQuantity={product.maxQuantity}
+                minOrderValue={product.minOrderValue}
+                maxOrderValue={product.maxOrderValue}
                 prefillQuote={quotePrefill}
                 onQuoteReady={setCurrentQuote}
               />

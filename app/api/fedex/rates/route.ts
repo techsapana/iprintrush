@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { handleFedexRatesRequest } from '@/app/lib/fedexRatesApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Primary FedEx rates endpoint — POST /api/fedex/rates */
+/** FedEx rates endpoint — DISABLED - shipping is now handled by /api/shipping/methods */
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => ({}));
-  const { status, data } = await handleFedexRatesRequest(body);
-  return NextResponse.json(data, { status });
+  return NextResponse.json(
+    { 
+      success: false, 
+      error: 'FedEx integration has been removed. Use /api/shipping/methods for shipping costs.', 
+      rates: [], 
+      amount: 0 
+    }, 
+    { status: 410 }
+  );
 }

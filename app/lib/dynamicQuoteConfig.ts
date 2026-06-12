@@ -129,11 +129,14 @@ async function getShippingConfig() {
     query('SELECT * FROM shipping_rules WHERE enabled = TRUE ORDER BY display_order'),
   ]);
   return {
-    enabled: Boolean((cfg as any)?.enabled),
+    enabled: Boolean((cfg as any)?.enabled ?? true),
     defaultFlatRate: parseFloat((cfg as any)?.default_flat_rate || 0),
     under100Rate: parseFloat((cfg as any)?.under_100_rate || 0),
     between100And199Rate: parseFloat((cfg as any)?.between_100_199_rate || 0),
     over200Rate: parseFloat((cfg as any)?.over_200_rate || 0),
+    localUnder100Rate: parseFloat((cfg as any)?.local_under_100_rate || 0),
+    localBetween100And199Rate: parseFloat((cfg as any)?.local_between_100_199_rate || 0),
+    localOver200Rate: parseFloat((cfg as any)?.local_over_200_rate || 0),
     rules: (shippingRules as any[]).map((r: any) => ({
       id: r.id.toString(),
       mode: r.rule_type || 'flat',

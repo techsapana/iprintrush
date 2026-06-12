@@ -45,6 +45,21 @@ function QuoteConfigAdminPageInner() {
     }
   };
 
+  useEffect(() => {
+    if (config?.shipping) {
+      setFormData({
+        enabled: config.shipping.enabled ?? true,
+        defaultFlatRate: config.shipping.defaultFlatRate ?? 0,
+        under100Rate: config.shipping.under100Rate ?? 0,
+        between100And199Rate: config.shipping.between100And199Rate ?? 0,
+        over200Rate: config.shipping.over200Rate ?? 0,
+        localUnder100Rate: config.shipping.localUnder100Rate ?? 0,
+        localBetween100And199Rate: config.shipping.localBetween100And199Rate ?? 0,
+        localOver200Rate: config.shipping.localOver200Rate ?? 0,
+      });
+    }
+  }, [config?.shipping]);
+
   const handleSave = async (type, data) => {
     try {
       setError('');
@@ -574,6 +589,9 @@ function ShippingSection({ shipping, onSave, setError, loadConfig }) {
     under100Rate: shipping?.under100Rate ?? 0,
     between100And199Rate: shipping?.between100And199Rate ?? 0,
     over200Rate: shipping?.over200Rate ?? 0,
+    localUnder100Rate: shipping?.localUnder100Rate ?? 0,
+    localBetween100And199Rate: shipping?.localBetween100And199Rate ?? 0,
+    localOver200Rate: shipping?.localOver200Rate ?? 0,
   });
 
   const handleSubmit = async (e) => {
@@ -630,7 +648,7 @@ function ShippingSection({ shipping, onSave, setError, loadConfig }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Under 100 Qty Rate ($)
+            Under $100 Standard Shipping Rate ($)
           </label>
           <input
             type="number"
@@ -644,7 +662,7 @@ function ShippingSection({ shipping, onSave, setError, loadConfig }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            100-199 Qty Rate ($)
+            $100-$199 Standard Shipping Rate ($)
           </label>
           <input
             type="number"
@@ -658,7 +676,7 @@ function ShippingSection({ shipping, onSave, setError, loadConfig }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            200+ Qty Rate ($)
+            $200+ Standard Shipping Rate ($)
           </label>
           <input
             type="number"
@@ -666,6 +684,48 @@ function ShippingSection({ shipping, onSave, setError, loadConfig }) {
             value={formData.over200Rate}
             onChange={(e) =>
               setFormData({ ...formData, over200Rate: parseFloat(e.target.value) || 0 })
+            }
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Local Delivery Under $100
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.localUnder100Rate}
+            onChange={(e) =>
+              setFormData({ ...formData, localUnder100Rate: parseFloat(e.target.value) || 0 })
+            }
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Local Delivery $100-$199
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.localBetween100And199Rate}
+            onChange={(e) =>
+              setFormData({ ...formData, localBetween100And199Rate: parseFloat(e.target.value) || 0 })
+            }
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Local Delivery $200+
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={formData.localOver200Rate}
+            onChange={(e) =>
+              setFormData({ ...formData, localOver200Rate: parseFloat(e.target.value) || 0 })
             }
             className="w-full px-4 py-2 border border-gray-300 rounded-lg"
           />

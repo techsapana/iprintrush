@@ -15,6 +15,48 @@ export function computeLineTotal(item) {
   return (base + extra) * qty;
 }
 
+export function computeItemShippingTierSubtotal(item) {
+  if (!item) return 0;
+  if (item.shippingTierSubtotal != null) {
+    return Number(item.shippingTierSubtotal) || 0;
+  }
+  if (item.options?.shippingTierSubtotal != null) {
+    return Number(item.options.shippingTierSubtotal) || 0;
+  }
+  if (item.options?.quoteSummary?.shippingTierSubtotal != null) {
+    return Number(item.options.quoteSummary.shippingTierSubtotal) || 0;
+  }
+  if (item.options?.quoteSummary?.subtotal != null) {
+    return Number(item.options.quoteSummary.subtotal) || 0;
+  }
+  if (item.merchandiseSubtotal != null) {
+    return Number(item.merchandiseSubtotal) || 0;
+  }
+  if (item.options?.merchandiseSubtotal != null) {
+    return Number(item.options.merchandiseSubtotal) || 0;
+  }
+  if (item.options?.quoteSummary?.merchandiseSubtotal != null) {
+    return Number(item.options.quoteSummary.merchandiseSubtotal) || 0;
+  }
+  const qty = Number(item.quantity || 1);
+  const base = Number(item.price || 0);
+  const extra = Number(item.options?.extraPrice || 0);
+  return Math.max(0, (base + extra) * qty);
+}
+
+export function computeItemsShippingTierSubtotal(items) {
+  if (!Array.isArray(items)) return 0;
+  return items.reduce((sum, item) => sum + computeItemShippingTierSubtotal(item), 0);
+}
+
+export function computeItemMerchandiseSubtotal(item) {
+  return computeItemShippingTierSubtotal(item);
+}
+
+export function computeItemsMerchandiseSubtotal(items) {
+  return computeItemsShippingTierSubtotal(items);
+}
+
 export function computeItemsSubtotal(items) {
   if (!Array.isArray(items)) return 0;
   return items.reduce((sum, item) => sum + computeLineTotal(item), 0);

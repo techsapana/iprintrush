@@ -1,11 +1,9 @@
 /**
- * Shipping Engine - Rule-based shipping calculation system
+ * Shipping Engine - Unified subtotal-based shipping calculation
  *
- * PHASE 1: Parallel system that does NOT modify existing FedEx flow.
- * This engine provides alternative shipping methods for future integration.
- *
- * NOTE: This file contains ONLY pure logic - NO database imports.
- * DB-dependent functions are in shippingEngine.server.ts
+ * Single source of truth for all shipping pricing.
+ * All rates come from shipping_config table (admin configurable).
+ * No hardcoded fallback values.
  */
 
 // ============================================================
@@ -15,6 +13,19 @@
 export type CartItem = {
   id: string;
   quantity: number;
+  price?: number;
+  merchandiseSubtotal?: number;
+  shippingTierSubtotal?: number;
+  options?: {
+    extraPrice?: number;
+    merchandiseSubtotal?: number;
+    shippingTierSubtotal?: number;
+    quoteSummary?: {
+      shippingTierSubtotal?: number;
+      merchandiseSubtotal?: number;
+      subtotal?: number;
+    } | null;
+  } | null;
   /** Selections from quote payload for dimension extraction */
   quotePayload?: {
     mode?: string;
@@ -40,6 +51,7 @@ export type ShippingMethod =
 
 export type ShippingMethodOption = {
   id: ShippingMethod;
+  type: ShippingMethod;
   label: string;
   cost: number;
   description?: string;
@@ -53,6 +65,27 @@ export type ShippingSummary = {
   defaultMethod?: ShippingMethod;
 };
 
+export type ShippingConfig = {
+  enabled: boolean;
+  defaultFlatRate: number;
+  under100Rate: number;
+  between100And199Rate: number;
+  over200Rate: number;
+  localUnder100Rate: number;
+  localBetween100And199Rate: number;
+  localOver200Rate: number;
+  rules: ShippingRule[];
+};
+
+export type ShippingRule = {
+  id: string;
+  mode: 'flat' | 'state' | 'zip';
+  state?: string;
+  zipPrefix?: string;
+  flatRate: number;
+  enabled: boolean;
+};
+
 export type ShippingCostResult = {
   cost: number;
   flagReviewRequired?: boolean;
@@ -60,20 +93,8 @@ export type ShippingCostResult = {
 };
 
 // ============================================================
-// CONSTANTS - Pricing rules (can be moved to DB later)
+// CONSTANTS - Oversized detection threshold
 // ============================================================
-
-const LOCAL_DELIVERY_RATES = {
-  under100: 14.99,
-  between100And199: 9.99,
-  over200: 0,
-} as const;
-
-const STANDARD_SHIPPING_RATES = {
-  under100: 12.99,
-  between100And199: 9.99,
-  over200: 0,
-} as const;
 
 const OVERSIZED_WIDTH_THRESHOLD = 44; // inches
 
@@ -105,55 +126,106 @@ function calculateTotalQuantity(cartItems: CartItem[]): number {
 }
 
 /**
- * Calculate local delivery shipping cost based on quantity tiers
+ * Calculate shipping tier subtotal from cart items
  */
-function calculateLocalDeliveryCost(totalQuantity: number): number {
-  if (totalQuantity >= 200) return LOCAL_DELIVERY_RATES.over200;
-  if (totalQuantity >= 100) return LOCAL_DELIVERY_RATES.between100And199;
-  return LOCAL_DELIVERY_RATES.under100;
+function calculateShippingTierSubtotalFromCartItems(cartItems: CartItem[]): number {
+  return cartItems.reduce((sum, item) => {
+    const explicitSubtotal =
+      item.shippingTierSubtotal
+      ?? item.options?.shippingTierSubtotal
+      ?? item.options?.quoteSummary?.shippingTierSubtotal
+      ?? item.options?.quoteSummary?.subtotal
+      ?? item.merchandiseSubtotal
+      ?? item.options?.merchandiseSubtotal
+      ?? item.options?.quoteSummary?.merchandiseSubtotal;
+
+    if (Number.isFinite(Number(explicitSubtotal))) {
+      return sum + Math.max(0, Number(explicitSubtotal));
+    }
+
+    const quantity = Math.max(1, Number(item.quantity || 1));
+    const unitPrice = Math.max(0, Number(item.price || 0) + Number(item.options?.extraPrice || 0));
+    return sum + unitPrice * quantity;
+  }, 0);
 }
 
-/**
- * Calculate standard shipping cost based on quantity tiers
- */
-function calculateStandardShippingCost(totalQuantity: number): number {
-  if (totalQuantity >= 200) return STANDARD_SHIPPING_RATES.over200;
-  if (totalQuantity >= 100) return STANDARD_SHIPPING_RATES.between100And199;
-  return STANDARD_SHIPPING_RATES.under100;
+export function getShippingTierSubtotalFromCartItems(cartItems: CartItem[]): number {
+  return calculateShippingTierSubtotalFromCartItems(cartItems);
 }
 
 // ============================================================
-// PHASE 2 API HELPERS
+// CORE SHIPPING CALCULATION - Single Source of Truth
+// ============================================================
+
+/**
+ * Unified shipping cost calculation
+ * All rates come from shipping_config table.
+ * If DB value missing, returns 0 safely.
+ */
+export type ShippingTierKey = 'under_100' | 'between_100_199' | 'over_200';
+
+export function getShippingTierKey(shippingTierSubtotal: number): ShippingTierKey {
+  const subtotal = Math.max(0, Number(shippingTierSubtotal) || 0);
+  if (subtotal >= 200) return 'over_200';
+  if (subtotal >= 100) return 'between_100_199';
+  return 'under_100';
+}
+
+export function getShippingCost(
+  shippingTierSubtotal: number,
+  type: 'standard_shipping' | 'local_delivery',
+  config: ShippingConfig,
+): number {
+  // If shipping disabled, return 0
+  if (!config.enabled) return 0;
+
+  const tierKey = getShippingTierKey(shippingTierSubtotal);
+
+  // Standard shipping rates
+  if (type === 'standard_shipping') {
+    if (tierKey === 'over_200') return Number(config.over200Rate) || 0;
+    if (tierKey === 'between_100_199') return Number(config.between100And199Rate) || 0;
+    return Number(config.under100Rate) || 0;
+  }
+
+  // Local delivery rates
+  if (type === 'local_delivery') {
+    if (tierKey === 'over_200') return Number(config.localOver200Rate) || 0;
+    if (tierKey === 'between_100_199') return Number(config.localBetween100And199Rate) || 0;
+    return Number(config.localUnder100Rate) || 0;
+  }
+
+  return 0;
+}
+
+// ============================================================
+// BACKWARD COMPATIBILITY - Legacy function (uses getShippingCost)
 // ============================================================
 
 export function calculateShippingCostByQuantity(method: ShippingMethod, totalQuantity: number): ShippingCostResult {
+  // This function now requires config - for backward compatibility, return 0
+  // Real usage should call getShippingCost() with config from DB
   switch (method) {
     case 'pickup':
       return { cost: 0, oversizedDetected: false };
-
     case 'local_delivery':
-      return { cost: calculateLocalDeliveryCost(totalQuantity), oversizedDetected: false };
-
+      return { cost: 0, oversizedDetected: false };
     case 'standard_shipping':
-      return { cost: calculateStandardShippingCost(totalQuantity), oversizedDetected: false };
-
+      return { cost: 0, oversizedDetected: false };
     case 'review_required':
       return { cost: 0, flagReviewRequired: true, oversizedDetected: false };
-
     default:
       return { cost: 0, oversizedDetected: false };
   }
 }
 
 // ============================================================
-// CORE FUNCTIONS (Phase 1 - Pure logic, no API calls)
+// OVERSIZED DETECTION
 // ============================================================
 
 /**
  * Detect if any cart items are oversized (width > 44 inches)
- *
  * Checks width_in from quotePayload selections for each item.
- * Used to determine shipping method availability.
  */
 export function detectOversizedItems(cartItems: CartItem[]): boolean {
   for (const item of cartItems) {
@@ -166,45 +238,45 @@ export function detectOversizedItems(cartItems: CartItem[]): boolean {
   return false;
 }
 
-/**
- * Get total quantity across all cart items
- */
-export function getTotalQuantity(cartItems: CartItem[]): number {
-  return calculateTotalQuantity(cartItems);
-}
+// ============================================================
+// SHIPPING METHODS
+// ============================================================
 
 /**
  * Get available shipping methods for a cart
- *
- * Normal mode: pickup, local_delivery, standard_shipping
- * Oversized mode: pickup, local_delivery, review_required (standard_shipping hidden)
+ * Returns: pickup, local_delivery, standard_shipping (or review_required for oversized)
  */
 export function getAvailableShippingMethods(
   cartItems: CartItem[],
-  _zip?: string, // Reserved for future ZIP-based rules
+  config: ShippingConfig,
+  shippingTierSubtotal?: number,
 ): ShippingMethodOption[] {
   const oversizedDetected = detectOversizedItems(cartItems);
-  const totalQuantity = calculateTotalQuantity(cartItems);
+  const subtotal = Number.isFinite(Number(shippingTierSubtotal))
+    ? Number(shippingTierSubtotal)
+    : calculateShippingTierSubtotalFromCartItems(cartItems);
 
   const methods: ShippingMethodOption[] = [];
 
   // Pickup - always available
   methods.push({
     id: 'pickup',
+    type: 'pickup',
     label: 'Store Pickup',
     cost: 0,
-    description: 'Pick up your order at our location',
+    description: 'Pick up your order at our Fair Oaks location',
     available: true,
   });
 
-  // Local delivery - always available (UI only phase)
-  const localDeliveryCost = calculateLocalDeliveryCost(totalQuantity);
+  // Local delivery - always available
+  const localDeliveryCost = getShippingCost(subtotal, 'local_delivery', config);
   methods.push({
     id: 'local_delivery',
+    type: 'local_delivery',
     label: 'Local Delivery',
     cost: localDeliveryCost,
     description: localDeliveryCost === 0
-      ? 'Free local delivery for 200+ items'
+      ? 'Free local delivery for $200+ merchandise'
       : `$${localDeliveryCost.toFixed(2)} delivery fee`,
     available: true,
   });
@@ -213,6 +285,7 @@ export function getAvailableShippingMethods(
     // Oversized mode - hide standard_shipping, show review_required
     methods.push({
       id: 'review_required',
+      type: 'review_required',
       label: 'Shipping Review Required',
       cost: 0,
       description: 'Oversized items require manual shipping review',
@@ -220,13 +293,14 @@ export function getAvailableShippingMethods(
     });
   } else {
     // Normal mode - standard shipping available
-    const standardCost = calculateStandardShippingCost(totalQuantity);
+    const standardCost = getShippingCost(subtotal, 'standard_shipping', config);
     methods.push({
       id: 'standard_shipping',
+      type: 'standard_shipping',
       label: 'Standard Shipping',
       cost: standardCost,
       description: standardCost === 0
-        ? 'Free shipping for 200+ items'
+        ? 'Free shipping for $200+ merchandise'
         : `$${standardCost.toFixed(2)} shipping fee`,
       available: true,
     });
@@ -235,77 +309,20 @@ export function getAvailableShippingMethods(
   return methods;
 }
 
-/**
- * Calculate shipping cost for a specific method
- *
- * @param method - Shipping method to calculate
- * @param cartItems - Cart items to check for oversized
- * @param orderTotal - Order subtotal (reserved for percentage-based rules)
- * @returns Shipping cost result with optional review flag
- */
-export function calculateShippingCost(
-  method: ShippingMethod,
-  cartItems: CartItem[],
-  _orderTotal?: number,
-): ShippingCostResult {
-  const oversizedDetected = detectOversizedItems(cartItems);
-  const totalQuantity = calculateTotalQuantity(cartItems);
-
-  switch (method) {
-    case 'pickup':
-      return { cost: 0, oversizedDetected: false };
-
-    case 'local_delivery':
-      return {
-        cost: calculateLocalDeliveryCost(totalQuantity),
-        oversizedDetected,
-      };
-
-    case 'standard_shipping':
-      if (oversizedDetected) {
-        // Standard shipping not available for oversized
-        return {
-          cost: 0,
-          flagReviewRequired: true,
-          oversizedDetected,
-        };
-      }
-      return {
-        cost: calculateStandardShippingCost(totalQuantity),
-        oversizedDetected: false,
-      };
-
-    case 'review_required':
-      // Used only for oversized orders
-      return {
-        cost: 0,
-        flagReviewRequired: true,
-        oversizedDetected,
-      };
-
-    default:
-      return { cost: 0, oversizedDetected };
-  }
-}
+// ============================================================
+// SHIPPING SUMMARY
+// ============================================================
 
 /**
  * Get complete shipping summary for a cart
- *
- * Includes all available methods, total quantity, oversized detection
  */
-export function getShippingSummary(cartItems: CartItem[]): ShippingSummary {
+export function getShippingSummary(cartItems: CartItem[], config: ShippingConfig, shippingTierSubtotal?: number): ShippingSummary {
   const oversizedDetected = detectOversizedItems(cartItems);
   const totalQuantity = calculateTotalQuantity(cartItems);
-  const methods = getAvailableShippingMethods(cartItems);
+  const methods = getAvailableShippingMethods(cartItems, config, shippingTierSubtotal);
 
-  // Determine default method
-  // Pickup is default, or local_delivery if available and preferred
-  let defaultMethod: ShippingMethod | undefined;
-  if (oversizedDetected) {
-    defaultMethod = 'pickup';
-  } else {
-    defaultMethod = 'pickup';
-  }
+  // Default to pickup
+  const defaultMethod: ShippingMethod = 'pickup';
 
   return {
     totalQuantity,
@@ -315,46 +332,10 @@ export function getShippingSummary(cartItems: CartItem[]): ShippingSummary {
   };
 }
 
-/**
- * Check if local delivery is available for a specific product
- *
- * @param item - Cart item to check
- * @returns true if the product has localDeliveryEligible flag
- */
-export function isLocalDeliveryEligible(item: CartItem): boolean {
-  // Phase 1: Always return true (UI only)
-  // Phase 2: Check item.product?.localDeliveryEligible
-  return item.product?.localDeliveryEligible === true || true;
-}
+// ============================================================
+// DISPLAY HELPERS
+// ============================================================
 
-/**
- * Get shipping method display info
- */
-export function getMethodDisplayInfo(method: ShippingMethod | null | undefined): {
-  label: string;
-  description: string;
-} {
-  if (!method) {
-    return { label: 'Unknown', description: '' };
-  }
-  switch (method) {
-    case 'pickup':
-      return { label: 'Store Pickup', description: 'Pick up your order at our location' };
-    case 'local_delivery':
-      return { label: 'Local Delivery', description: 'Delivered by our local driver' };
-    case 'standard_shipping':
-      return { label: 'Standard Shipping', description: 'Shipped via carrier' };
-    case 'review_required':
-      return { label: 'Shipping Review Required', description: 'Oversized items - manual review needed' };
-    default:
-      return { label: 'Unknown', description: '' };
-  }
-}
-
-/**
- * Get shipping method label (primary display field)
- * This is the source of truth for shipping method labels throughout the application.
- */
 export function getShippingMethodLabel(method: ShippingMethod | null | undefined): string {
   if (!method) return 'Unknown';
   switch (method) {
@@ -371,14 +352,39 @@ export function getShippingMethodLabel(method: ShippingMethod | null | undefined
   }
 }
 
+export function getMethodDisplayInfo(method: ShippingMethod | null | undefined): {
+  label: string;
+  description: string;
+} {
+  if (!method) {
+    return { label: 'Unknown', description: '' };
+  }
+  switch (method) {
+    case 'pickup':
+      return { label: 'Store Pickup', description: 'Pick up your order at our Fair Oaks location' };
+    case 'local_delivery':
+      return { label: 'Local Delivery', description: 'Delivered by our local driver' };
+    case 'standard_shipping':
+      return { label: 'Standard Shipping', description: 'Shipped via carrier' };
+    case 'review_required':
+      return { label: 'Shipping Review Required', description: 'Oversized items - manual review needed' };
+    default:
+      return { label: 'Unknown', description: '' };
+  }
+}
+
+// ============================================================
+// DEFAULT EXPORT - All public functions
+// ============================================================
+
 export default {
   detectOversizedItems,
-  getTotalQuantity,
+  getTotalQuantity: calculateTotalQuantity,
+  getShippingTierSubtotalFromCartItems,
+  getShippingCost,
+  getShippingTierKey,
   getAvailableShippingMethods,
-  calculateShippingCost,
-  calculateShippingCostByQuantity,
   getShippingSummary,
-  isLocalDeliveryEligible,
-  getMethodDisplayInfo,
   getShippingMethodLabel,
+  getMethodDisplayInfo,
 };

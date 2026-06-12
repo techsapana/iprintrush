@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS products (
     price DECIMAL(10, 2) DEFAULT 0.00,
     min_quantity INT DEFAULT NULL,
     max_quantity INT DEFAULT NULL,
+    min_order_value DECIMAL(10,2) DEFAULT NULL,
+    max_order_value DECIMAL(10,2) DEFAULT NULL,
     min_width_in DECIMAL(10, 2) DEFAULT NULL,
     max_width_in DECIMAL(10, 2) DEFAULT NULL,
     min_height_in DECIMAL(10, 2) DEFAULT NULL,

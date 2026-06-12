@@ -366,12 +366,15 @@ export default function AdminOrderDetailPage() {
                   <div className="font-medium">{fullAddress}</div>
                 </div>
               )}
-              {fullShipping && (
-                <div>
-                  <span className="text-gray-500">Shipping Address</span>
-                  <div className="font-medium">{fullShipping}</div>
-                </div>
-              )}
+{fullShipping && (
+                 <div>
+                   <span className="text-gray-500">Shipping Address</span>
+                   <div className="font-medium">{fullShipping}</div>
+                   {ship.zip && (
+                     <div className="text-xs text-gray-500 mt-1">Shipping ZIP: {ship.zip}</div>
+                   )}
+                 </div>
+               )}
             </div>
           </div>
         </div>

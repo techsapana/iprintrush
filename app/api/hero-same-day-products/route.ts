@@ -14,6 +14,8 @@ function mapHeroProductRow(p: any) {
     price: parseFloat(p.price),
     minQuantity: p.min_quantity != null ? Number(p.min_quantity) : null,
     maxQuantity: p.max_quantity != null ? Number(p.max_quantity) : null,
+    minOrderValue: p.min_order_value != null ? Number(p.min_order_value) : null,
+    maxOrderValue: p.max_order_value != null ? Number(p.max_order_value) : null,
     oldPrice: p.old_price != null ? parseFloat(p.old_price) : null,
     category: p.category_name || p.category_id,
     categoryId: p.category_id,

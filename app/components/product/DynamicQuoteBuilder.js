@@ -28,6 +28,8 @@ export function DynamicQuoteBuilder({
   productName,
   minQuantity: productMin = null,
   maxQuantity: productMax = null,
+  minOrderValue: productMinValue = null,
+  maxOrderValue: productMaxValue = null,
   prefillQuote = null,
   onQuoteReady,
 }) {
@@ -46,14 +48,8 @@ export function DynamicQuoteBuilder({
   const [selections, setSelections] = useState({});
   const [widthIn, setWidthIn] = useState('');
   const [heightIn, setHeightIn] = useState('');
-  const [deliveryMethod, setDeliveryMethod] = useState('pickup');
-  // Shipping address is collected at checkout (not in quote builder)
-  const useRuleBasedShipping = process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true';
+const [deliveryMethod, setDeliveryMethod] = useState('pickup');
   const [hasCalculated, setHasCalculated] = useState(false);
-  const [estimateZip, setEstimateZip] = useState('');
-  const [estimatingShipping, setEstimatingShipping] = useState(false);
-  const [estimatedShipping, setEstimatedShipping] = useState(null);
-  const [estimateError, setEstimateError] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [emailTo, setEmailTo] = useState('');
   const [showTextForm, setShowTextForm] = useState(false);
@@ -278,17 +274,10 @@ const artworkFileRef = useRef(null);
     return Number.isFinite(w) && w > 44;
   };
 
-  // Use a ref to track hasCalculated for fresh reads inside the debounced callback
   const hasCalculatedRef = useRef(hasCalculated);
   useEffect(() => {
     hasCalculatedRef.current = hasCalculated;
   }, [hasCalculated]);
-  
-  // Keep handleCalculate ref updated for debounced calls
-  const handleCalculateRef = useRef(handleCalculate);
-  useEffect(() => {
-    handleCalculateRef.current = handleCalculate;
-  }, [handleCalculate]);
 
   const scheduleRecalculation = debounce(() => {
     // Read fresh value from ref to avoid stale closure
@@ -592,85 +581,9 @@ customizationsDisplay.Delivery =
   };
 
   const handleEstimateShipping = async () => {
-    const zip = estimateZip.trim();
-    if (!zip) {
-      setEstimateError('Please enter ZIP code.');
-      return;
-    }
-    if (!/^\d{5}$/.test(zip)) {
-      setEstimateError('ZIP code must be exactly 5 digits.');
-      return;
-    }
-    try {
-      setEstimatingShipping(true);
-      setEstimateError('');
-      const qty = quoteSummary?.totalQuantity || totalQuantity || 1;
-      const selections = {};
-      const w = parseFloat(widthIn);
-      const h = parseFloat(heightIn);
-      if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) {
-        selections.width_in = w;
-        selections.height_in = h;
-      }
-
-      if (useRuleBasedShipping) {
-        const res = await fetch('/api/shipping/methods', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deliveryMethod: 'shipping',
-            items: [
-              {
-                id: productId,
-                quantity: qty,
-                quotePayload: { mode: 'print_product', selections },
-              },
-            ],
-            shippingAddress: { zip },
-          }),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok || !json.success || !Array.isArray(json.methods) || json.methods.length === 0) {
-          throw new Error(json.message || json.error || 'Failed to estimate shipping');
-        }
-        const standardMethod = json.methods.find((m) => m.type === 'standard_shipping');
-        const localMethod = json.methods.find((m) => m.type === 'local_delivery');
-        const method = standardMethod || localMethod;
-        if (!method || !Number.isFinite(method.cost)) {
-          throw new Error('No shipping rate available for this ZIP.');
-        }
-        setEstimatedShipping(method.cost);
-      } else {
-        const res = await fetch('/api/fedex/rates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deliveryMethod: 'shipping',
-            items: [
-              {
-                id: productId,
-                quantity: qty,
-                quotePayload: { mode: 'print_product', selections },
-              },
-            ],
-            shippingAddress: { zip },
-          }),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!json.success || !Array.isArray(json.rates) || json.rates.length === 0) {
-          throw new Error(json.message || json.error || 'Failed to estimate shipping');
-        }
-        const amount = Number(json.amount ?? json.rates[0]?.cost);
-        if (!Number.isFinite(amount) || amount <= 0) {
-          throw new Error('No shipping rates found for this ZIP.');
-        }
-        setEstimatedShipping(amount);
-      }
-    } catch (err) {
-      setEstimateError(err.message || 'Failed to estimate shipping');
-    } finally {
-      setEstimatingShipping(false);
-    }
+    // Shipping is now calculated from DB config at quote time - no separate estimate needed
+    setEstimateError('');
+    setEstimatedShipping(quoteSummary?.shipping ?? 0);
   };
 
   if (loading) {
@@ -775,10 +688,12 @@ customizationsDisplay.Delivery =
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">{pool.name || group.label}</h3>
         <p className="text-sm text-gray-600">{pool.description || 'Select the quantity you need.'}</p>
-        {(productMin != null || productMax != null) && (
+        {(productMin != null || productMax != null || productMinValue != null || productMaxValue != null) && (
           <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             {productMin != null && <span>Minimum order: {productMin} pieces. </span>}
-            {productMax != null && <span>Maximum order: {productMax} pieces.</span>}
+            {productMax != null && <span>Maximum order: {productMax} pieces. </span>}
+            {productMinValue != null && <span>Minimum order value: ${productMinValue}. </span>}
+            {productMaxValue != null && <span>Maximum order value: ${productMaxValue}. </span>}
           </p>
         )}
 
@@ -1022,7 +937,7 @@ const renderDimensionStep = (group, pool, value) => {
         selectionLines.push(`- Dimensions: ${w}" × ${h}"`);
       }
     }
-    selectionLines.push(`- Delivery: ${deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping')}`);
+    selectionLines.push(`- Delivery: ${getShippingMethodLabel(deliveryMethod)}`);
     selectionLines.push(
       `- Artwork: ${artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—'}`,
     );
@@ -1099,7 +1014,7 @@ const renderDimensionStep = (group, pool, value) => {
           quoteForInvoice.selections['Dimensions'] = `${w}" × ${h}"`;
         }
       }
-      quoteForInvoice.selections['Delivery'] = deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping');
+      quoteForInvoice.selections['Delivery'] = getShippingMethodLabel(deliveryMethod);
       quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
       const encoded = btoa(encodeURIComponent(JSON.stringify(quoteForInvoice)));
       window.location.href = `/quote/print?data=${encoded}`;
@@ -1134,7 +1049,7 @@ const renderDimensionStep = (group, pool, value) => {
           quoteForInvoice.selections['Dimensions'] = `${w}" × ${h}"`;
         }
       }
-      quoteForInvoice.selections['Delivery'] = deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping');
+      quoteForInvoice.selections['Delivery'] = getShippingMethodLabel(deliveryMethod);
       quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
       const payload = buildInvoiceSharePayload(quoteForInvoice, { productName });
       try {
@@ -1283,34 +1198,10 @@ const renderDimensionStep = (group, pool, value) => {
               </Button>
             </div>
           </div>
-        )}
-{!showShippingReview && !useRuleBasedShipping && (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <h4 className="text-sm font-semibold text-gray-900 mb-2">Estimated Shipping Price</h4>
-           <p className="text-xs text-gray-600 mb-3">Enter ZIP code to get estimated shipping price.</p>
-           <div className="flex flex-col sm:flex-row gap-2">
-             <input
-               type="text"
-               value={estimateZip}
-               onChange={(e) => setEstimateZip(e.target.value)}
-               placeholder="ZIP code"
-               className="w-full sm:w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-             />
-             <Button type="button" variant="outline" onClick={handleEstimateShipping} disabled={estimatingShipping}>
-               {estimatingShipping ? 'Estimating...' : 'Estimate'}
-             </Button>
-           </div>
-{estimateError && <div className="mt-2 text-xs text-red-700">{estimateError}</div>}
-            {estimatedShipping != null && !estimateError && (
-              <div className="mt-2 text-sm text-gray-900">
-                Estimated shipping: <span className="font-semibold">${Number(estimatedShipping).toFixed(2)}</span>
-              </div>
-            )}
-         </div>
-         )}
-      </div>
-    );
-  };
+)}
+       </div>
+     );
+   };
 
   const renderArtworkStep = () => (
     <div className="space-y-4">
@@ -1405,6 +1296,8 @@ onChange={async (e) => {
 
 const renderDeliveryStep = () => {
     const showShippingReview = isShippingReviewRequired();
+    const localMethod = shipping?.methods?.find((m) => m.type === 'local_delivery');
+    const standardMethod = shipping?.methods?.find((m) => m.type === 'standard_shipping');
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Delivery Option</h3>
@@ -1413,7 +1306,7 @@ const renderDeliveryStep = () => {
             Shipping Review Required for oversized items (width exceeds 44"). Our team will contact you with shipping options.
           </div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <button
             type="button"
             onClick={() => handleDeliveryMethodChange('pickup')}
@@ -1426,19 +1319,37 @@ const renderDeliveryStep = () => {
             <div className="font-semibold text-gray-900">Store Pickup FREE</div>
             <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
           </button>
-          {shipping?.enabled !== false && (
+          {shipping?.enabled !== false && localMethod && (
             <button
               type="button"
-              onClick={() => handleDeliveryMethodChange('shipping')}
+              onClick={() => handleDeliveryMethodChange('local_delivery')}
               className={`rounded-xl border px-4 py-3 text-left transition ${
-                deliveryMethod === 'shipping'
+                deliveryMethod === 'local_delivery'
                   ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
                   : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
               }`}
             >
-              <div className="font-semibold text-gray-900">Shipping</div>
+              <div className="font-semibold text-gray-900">Local Delivery</div>
               <div className="text-sm text-gray-600">
-                {useRuleBasedShipping ? 'Shipping calculated at checkout' : 'Shipping'}
+                ${localMethod.cost.toFixed(2)} delivery fee
+                {localMethod.cost === 0 && ' (Free for 200+ items)'}
+              </div>
+            </button>
+          )}
+          {shipping?.enabled !== false && standardMethod && (
+            <button
+              type="button"
+              onClick={() => handleDeliveryMethodChange('standard_shipping')}
+              className={`rounded-xl border px-4 py-3 text-left transition ${
+                deliveryMethod === 'standard_shipping'
+                  ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
+                  : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
+              }`}
+            >
+              <div className="font-semibold text-gray-900">Standard Shipping</div>
+              <div className="text-sm text-gray-600">
+                ${standardMethod.cost.toFixed(2)} shipping fee
+                {standardMethod.cost === 0 && ' (Free for 200+ items)'}
               </div>
             </button>
           )}

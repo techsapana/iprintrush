@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { query } from "@/app/lib/db";
 import {
   detectOversizedItems,
-  calculateShippingCostByQuantity,
-  CartItem,
-  ShippingMethod,
+  getShippingTierSubtotalFromCartItems,
+  getShippingCost,
+  ShippingConfig,
 } from "@/app/lib/shippingEngine";
 
 export async function POST(req: Request) {
@@ -12,45 +12,46 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { items = [], shippingAddress = {} } = body;
 
+    // Get shipping config from database
+    const configRows = (await query(`SELECT * FROM shipping_config LIMIT 1`)) as any[];
+    const row = configRows[0] || {};
+
+    const config: ShippingConfig = {
+      enabled: Boolean(row.enabled ?? true),
+      defaultFlatRate: parseFloat(row.default_flat_rate || 0),
+      under100Rate: parseFloat(row.under_100_rate || 0),
+      between100And199Rate: parseFloat(row.between_100_199_rate || 0),
+      over200Rate: parseFloat(row.over_200_rate || 0),
+      localUnder100Rate: parseFloat(row.local_under_100_rate || 0),
+      localBetween100And199Rate: parseFloat(row.local_between_100_199_rate || 0),
+      localOver200Rate: parseFloat(row.local_over_200_rate || 0),
+      rules: [],
+    };
+
     const oversized = detectOversizedItems(items);
-    const totalQuantity = items.reduce(
-      (sum: number, item: CartItem) => sum + Math.max(1, item.quantity || 1),
-      0
-    );
+    const shippingTierSubtotal = Number.isFinite(Number(body.shippingTierSubtotal))
+      ? Math.max(0, Number(body.shippingTierSubtotal))
+      : getShippingTierSubtotalFromCartItems(items);
 
-    const configRows = await query(`SELECT * FROM shipping_config LIMIT 1`) as any[];
-    const config = configRows.length > 0 ? configRows[0] : null;
+    // Calculate shipping costs using unified function
+    const standardCost = getShippingCost(shippingTierSubtotal, 'standard_shipping', config);
+    const localCost = getShippingCost(shippingTierSubtotal, 'local_delivery', config);
 
-    const methodTypes: ShippingMethod[] = oversized
-      ? ["pickup", "local_delivery", "review_required"]
-      : ["pickup", "local_delivery", "standard_shipping"];
-
-    const methods = methodTypes.map((type) => {
-      if (type === "pickup") {
-        return { type, id: type, label: "Store Pickup", cost: 0 };
-      }
-
-      if (type === "review_required") {
-        return { type, id: type, label: "Shipping Review Required", cost: 0 };
-      }
-
-      if (type === "local_delivery") {
-        const engineResult = calculateShippingCostByQuantity("local_delivery", totalQuantity);
-        const cost =
-          config?.between_100_199_rate !== undefined
-            ? config.between_100_199_rate
-            : engineResult.cost;
-        return { type, id: type, label: "Local Delivery", cost };
-      }
-
-      const engineResult = calculateShippingCostByQuantity("standard_shipping", totalQuantity);
-      const cost =
-        config?.under_100_rate !== undefined ? config.under_100_rate : engineResult.cost;
-      return { type, id: type, label: "Standard Shipping", cost };
-    });
+    const methods = oversized
+      ? [
+          { type: 'pickup', id: 'pickup', label: 'Store Pickup', cost: 0 },
+          { type: 'local_delivery', id: 'local_delivery', label: 'Local Delivery', cost: localCost },
+          { type: 'review_required', id: 'review_required', label: 'Shipping Review Required', cost: 0 },
+        ]
+      : [
+          { type: 'pickup', id: 'pickup', label: 'Store Pickup', cost: 0 },
+          { type: 'local_delivery', id: 'local_delivery', label: 'Local Delivery', cost: localCost },
+          { type: 'standard_shipping', id: 'standard_shipping', label: 'Standard Shipping', cost: standardCost },
+        ];
 
     return NextResponse.json({
       success: true,
+      shippingTierSubtotal,
       oversized,
       oversizedDetected: oversized,
       methods,

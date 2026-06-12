@@ -7,7 +7,6 @@ import { mkdir, rename } from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
 import crypto from 'crypto';
-import { resolveSelectedShippingRate } from '@/app/lib/fedexCheckout';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,7 +41,7 @@ const CreateCheckoutSessionSchema = z.object({
       state: z.string().optional().default(''),
       zip: z.string().optional().default(''),
       notes: z.string().optional().default(''),
-      deliveryMethod: z.enum(['pickup', 'shipping']).optional().default('pickup'),
+      deliveryMethod: z.enum(['pickup', 'local_delivery', 'standard_shipping']).optional().default('pickup'),
       shippingAddress: z.string().optional().default(''),
       shippingApt: z.string().optional().default(''),
       shippingCity: z.string().optional().default(''),
@@ -353,126 +352,55 @@ export async function POST(req: NextRequest) {
         estimatedDeliveryLabel: string | null;
       } | null = null;
 
-      if (checkoutCustomer.deliveryMethod === 'shipping') {
-        const cartItemsForRates = payload.items.map((item) => ({
-          id: item.id,
-          quantity: item.quantity,
-          quotePayload: item.quotePayload || null,
-        }));
-        const shippingAddress = {
-          address: checkoutCustomer.shippingAddress,
-          city: checkoutCustomer.shippingCity,
-          state: checkoutCustomer.shippingState,
-          zip: checkoutCustomer.shippingZip,
-        };
-
-        const useRuleBased = checkoutCustomer.useRuleBasedShipping === true;
-        if (useRuleBased) {
-          const methodData = checkoutCustomer.shippingMethodsData;
-          if (methodData && typeof methodData.cost === 'number') {
-            shippingCents = toCents(methodData.cost);
-            selectedRateMeta = {
-              serviceType: methodData.type || methodData.id || 'rule_based',
-              serviceName: methodData.label || 'Rule-Based Shipping',
-              cost: methodData.cost,
-              estimatedDeliveryDate: null,
-              estimatedDeliveryLabel: null,
-            };
-            shippingMeta = {
-              carrier: 'Rule-Based',
-              serviceType: methodData.type || methodData.id || 'rule_based',
-              serviceName: methodData.label || 'Rule-Based Shipping',
-              estimatedDeliveryDate: null,
-              estimatedDeliveryLabel: null,
-              selectedByCustomer: true,
-              shippingReviewRequired: selectedMethodIsReviewRequired,
-              ...(selectedMethodIsReviewRequired && {
-                message: 'Oversized items require manual shipping review. Our team will contact you with options.',
-              }),
-              destination: {
-                addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
-                city: checkoutCustomer.shippingCity || 'City',
-                stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
-                postalCode: checkoutCustomer.shippingZip || '',
-                countryCode: 'US',
-              },
-            };
-          } else {
-            await rollback(conn);
-            return NextResponse.json(
-              { error: 'Please select a shipping method.' },
-              { status: 400 },
-            );
-          }
-        } else {
-          const selected = checkoutCustomer.selectedShipping;
-          if (selected?.serviceType && !checkoutCustomer.shippingRatesUnavailable) {
-            const resolved = await resolveSelectedShippingRate(
-              cartItemsForRates,
-              shippingAddress,
-              selected,
-            );
-            if (!resolved.ok) {
-              await rollback(conn);
-              return NextResponse.json({ error: resolved.error }, { status: 400 });
-            }
-            selectedRateMeta = {
-              serviceType: resolved.rate.serviceType,
-              serviceName: resolved.rate.serviceName,
-              cost: resolved.rate.cost,
-              estimatedDeliveryDate: resolved.rate.estimatedDeliveryDate,
-              estimatedDeliveryLabel: resolved.rate.estimatedDeliveryLabel,
-            };
-            shippingCents = toCents(resolved.rate.cost);
-            shippingMeta = {
-              carrier: 'FedEx',
-              serviceType: resolved.rate.serviceType,
-              serviceName: resolved.rate.serviceName,
-              estimatedDeliveryDate: resolved.rate.estimatedDeliveryDate,
-              estimatedDeliveryLabel: resolved.rate.estimatedDeliveryLabel,
-              packages: resolved.packages,
-              destination: {
-                addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
-                city: checkoutCustomer.shippingCity || 'City',
-                stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
-                postalCode: checkoutCustomer.shippingZip || '',
-                countryCode: 'US',
-              },
-              selectedByCustomer: true,
-            };
-          } else if (checkoutCustomer.shippingRatesUnavailable) {
-            shippingCents = 0;
-            shippingMeta = {
-              carrier: 'FedEx',
-              pendingReview: true,
-              message:
-                'Shipping estimate unavailable. We will confirm shipping after order review.',
-            };
-          } else if (shippingReviewRequired) {
-            shippingCents = 0;
-            shippingMeta = {
-              carrier: 'FedEx',
-              pendingReview: true,
-              shippingReviewRequired: true,
-              message:
-                'Oversized item requires shipping review. Our team will contact you with options.',
-            };
-          } else {
-            await rollback(conn);
-            return NextResponse.json(
-              { error: 'Please select a shipping option before checkout.' },
-              { status: 400 },
-            );
-          }
-        }
-      }
+      if (checkoutCustomer.deliveryMethod === 'pickup') {
+  // Pickup - no shipping cost
+} else {
+  // Shipping (local_delivery or standard_shipping)
+  const methodData = checkoutCustomer.shippingMethodsData;
+  if (methodData && typeof methodData.cost === 'number') {
+    shippingCents = toCents(methodData.cost);
+    selectedRateMeta = {
+      serviceType: methodData.type || methodData.id || 'rule_based',
+      serviceName: methodData.label || 'Rule-Based Shipping',
+      cost: methodData.cost,
+      estimatedDeliveryDate: null,
+      estimatedDeliveryLabel: null,
+    };
+    shippingMeta = {
+      carrier: methodData.type === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
+      serviceType: methodData.type || methodData.id || 'rule_based',
+      serviceName: methodData.label || 'Rule-Based Shipping',
+      estimatedDeliveryDate: null,
+      estimatedDeliveryLabel: null,
+      selectedByCustomer: true,
+      shippingReviewRequired: selectedMethodIsReviewRequired,
+      ...(selectedMethodIsReviewRequired && {
+        message: 'Oversized items require manual shipping review. Our team will contact you with options.',
+      }),
+      destination: {
+        addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
+        city: checkoutCustomer.shippingCity || 'City',
+        stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
+        postalCode: checkoutCustomer.shippingZip || '',
+        countryCode: 'US',
+      },
+    };
+  } else {
+    await rollback(conn);
+    return NextResponse.json(
+      { error: 'Please select a shipping method.' },
+      { status: 400 },
+    );
+  }
+}
 
       const taxCents = Math.round((taxableBaseCents + shippingCents) * taxRate);
       const totalCents = taxableBaseCents + shippingCents + taxCents;
 
       const orderNumber = makeOrderNumber();
+      const isShippingMethod = checkoutCustomer.deliveryMethod === 'local_delivery' || checkoutCustomer.deliveryMethod === 'standard_shipping';
       if (
-        checkoutCustomer.deliveryMethod === 'shipping' &&
+        isShippingMethod &&
         (!checkoutCustomer.shippingAddress || !checkoutCustomer.shippingCity || !checkoutCustomer.shippingZip)
       ) {
         await rollback(conn);
@@ -488,18 +416,17 @@ export async function POST(req: NextRequest) {
         state: checkoutCustomer.state || '',
         zip: checkoutCustomer.zip || '',
       };
-      const shippingAddress =
-        checkoutCustomer.deliveryMethod === 'shipping'
-          ? {
-              address: checkoutCustomer.shippingAddress || '',
-              apt: checkoutCustomer.shippingApt || '',
-              city: checkoutCustomer.shippingCity || '',
-              state: checkoutCustomer.shippingState || '',
-              zip: checkoutCustomer.shippingZip || '',
-            }
-          : null;
+      const shippingAddr = isShippingMethod
+        ? {
+            address: checkoutCustomer.shippingAddress || '',
+            apt: checkoutCustomer.shippingApt || '',
+            city: checkoutCustomer.shippingCity || '',
+            state: checkoutCustomer.shippingState || '',
+            zip: checkoutCustomer.shippingZip || '',
+          }
+        : null;
 
-      if (checkoutCustomer.deliveryMethod === 'shipping' && shippingCents > 0) {
+      if (isShippingMethod && shippingCents > 0) {
         const shipLabel = selectedRateMeta?.serviceName
           ? `Shipping (${selectedRateMeta.serviceName})`
           : 'Shipping';
@@ -550,7 +477,7 @@ export async function POST(req: NextRequest) {
         checkoutCustomer.email || null,
         checkoutCustomer.phone || null,
         JSON.stringify(billingAddress),
-        shippingAddress ? JSON.stringify(shippingAddress) : null,
+        shippingAddr ? JSON.stringify(shippingAddr) : null,
         checkoutCustomer.notes || null,
         checkoutCustomer.deliveryMethod || 'pickup',
         shippingMeta?.carrier || null,

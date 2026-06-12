@@ -139,6 +139,8 @@ const transformed: any = {
         price: parseFloat(product.price),
         minQuantity: product.min_quantity != null ? Number(product.min_quantity) : null,
         maxQuantity: product.max_quantity != null ? Number(product.max_quantity) : null,
+        minOrderValue: product.min_order_value != null ? Number(product.min_order_value) : null,
+        maxOrderValue: product.max_order_value != null ? Number(product.max_order_value) : null,
         minWidthIn: product.min_width_in != null ? Number(product.min_width_in) : null,
         maxWidthIn: product.max_width_in != null ? Number(product.max_width_in) : null,
         minHeightIn: product.min_height_in != null ? Number(product.min_height_in) : null,
@@ -240,8 +242,8 @@ if (!existing) {
       const productSlug = body.slug || body.name?.toLowerCase().replace(/\s+/g, '-') || id;
       
       await query(
-        `INSERT INTO products (id, name, slug, description, price, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, enabled)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+`INSERT INTO products (id, name, slug, description, price, min_quantity, max_quantity, min_order_value, max_order_value, min_width_in, max_width_in, min_height_in, max_height_in, price_per_sq_inch, mailbox_price_per_month, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, enabled)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            name = VALUES(name),
            slug = VALUES(slug),
@@ -249,6 +251,8 @@ if (!existing) {
            price = VALUES(price),
            min_quantity = VALUES(min_quantity),
            max_quantity = VALUES(max_quantity),
+           min_order_value = VALUES(min_order_value),
+           max_order_value = VALUES(max_order_value),
            min_width_in = VALUES(min_width_in),
            max_width_in = VALUES(max_width_in),
            min_height_in = VALUES(min_height_in),
@@ -277,6 +281,16 @@ if (!existing) {
            productSlug,
            body.description || '',
            nullableNumber(body.price) ?? 0,
+           nullableNumber(body.minQuantity),
+           nullableNumber(body.maxQuantity),
+           nullableNumber(body.minOrderValue),
+           nullableNumber(body.maxOrderValue),
+           nullableNumber(body.minWidthIn),
+           nullableNumber(body.maxWidthIn),
+           nullableNumber(body.minHeightIn),
+           nullableNumber(body.maxHeightIn),
+           nullableNumber(body.pricePerSqInch),
+           nullableNumber(body.mailboxPricePerMonth),
            nullableNumber(body.oldPrice),
            nullableNumber(body.weightLb),
            nullableNumber(body.packageLengthIn),
@@ -292,7 +306,7 @@ if (!existing) {
            body.shippingEnabled !== false,
            body.localDeliveryEligible ? 1 : 0,
            body.shippingCategory || 'standard',
-         ]
+          ]
       );
     } else {
       // Product exists - update it
@@ -322,6 +336,14 @@ if (!existing) {
       if (body.maxQuantity !== undefined) {
         updates.push('max_quantity = ?');
         values.push(nullableNumber(body.maxQuantity));
+      }
+      if (body.minOrderValue !== undefined) {
+        updates.push('min_order_value = ?');
+        values.push(nullableNumber(body.minOrderValue));
+      }
+      if (body.maxOrderValue !== undefined) {
+        updates.push('max_order_value = ?');
+        values.push(nullableNumber(body.maxOrderValue));
       }
       if (body.minWidthIn !== undefined) {
         updates.push('min_width_in = ?');

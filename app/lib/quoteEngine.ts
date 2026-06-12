@@ -8,6 +8,24 @@ import {
   DynamicQuoteRequestPayload,
   CustomizationPool,
 } from './quoteConfigTypes';
+import { getShippingCost, detectOversizedItems } from './shippingEngine';
+import { UnifiedQuoteRequest } from './quote/QuoteNormalizer';
+
+/**
+ * Unified pricing configuration that works for both apparel and print products.
+ */
+type UnifiedPricingConfig = {
+  // Shared between both flows
+  tiers: QuantityTier[];
+  addonsPerUnit: number;
+  addonBreakdown: { label: string; perUnit: number }[];
+  flatFees: { label: string; amount: number }[];
+  productionTimeTotal: number;
+  productionTimeLabel: string;
+  baseUnitPrice: number | null;
+  useMyCloth: boolean;
+  sizeAddonPerUnit: number;
+};
 
 function findApplicableTier(
   tiers: QuantityTier[],
@@ -248,43 +266,48 @@ function resolveDynamicQuantity(
   return { key: candidatePool?.key ? String(candidatePool.key) : null, totalQuantity: 0 };
 }
 
+/**
+ * Compute shipping cost for apparel quotes.
+ * Maps deliveryMethod to shipping type and calculates from config.
+ */
 function computeShipping(
   shipping: ShippingConfig,
   deliveryMethod: QuoteRequestPayload['deliveryMethod'],
+  shippingTierSubtotal: number,
   state?: string,
   zip?: string,
-  totalQuantity?: number,
 ): number {
   if (deliveryMethod === 'pickup') return 0;
   if (!shipping.enabled) return 0;
 
-  if (!state && !zip) return shipping.defaultFlatRate;
+  // Map delivery method to shipping type
+  const shippingType = (deliveryMethod === 'local_delivery' || deliveryMethod === 'standard_shipping')
+    ? deliveryMethod
+    : 'standard_shipping';
 
-  const enabledRules = shipping.rules.filter((r) => r.enabled);
+  return getShippingCost(Number(shippingTierSubtotal) || 0, shippingType, shipping);
+}
 
-  if (zip) {
-    const byZip = enabledRules.find(
-      (r) => r.mode === 'zip' && r.zipPrefix && zip.startsWith(r.zipPrefix),
-    );
-    if (byZip) return byZip.flatRate;
-  }
+/**
+ * Compute shipping for dynamic print products.
+ * Maps deliveryMethod to shipping type and calculates from config.
+ */
+function computeShippingDynamic(
+  shipping: ShippingConfig,
+  deliveryMethod: 'pickup' | 'local_delivery' | 'standard_shipping',
+  shippingTierSubtotal: number,
+  state?: string,
+  zip?: string,
+): number {
+  if (deliveryMethod === 'pickup') return 0;
+  if (!shipping.enabled) return 0;
 
-  if (state) {
-    const byState = enabledRules.find(
-      (r) => r.mode === 'state' && r.state && r.state.toLowerCase() === state.toLowerCase(),
-    );
-    if (byState) return byState.flatRate;
-  }
+  // Map delivery method to shipping type
+  const shippingType = (deliveryMethod === 'local_delivery' || deliveryMethod === 'standard_shipping')
+    ? deliveryMethod
+    : 'standard_shipping';
 
-  const flat = enabledRules.find((r) => r.mode === 'flat');
-  if (flat) return flat.flatRate;
-
-  const qty = Number(totalQuantity);
-  if (qty >= 200 && shipping.over200Rate > 0) return shipping.over200Rate;
-  if (qty >= 100 && shipping.between100And199Rate > 0) return shipping.between100And199Rate;
-  if (qty >= 1 && qty <= 99 && shipping.under100Rate > 0) return shipping.under100Rate;
-
-  return shipping.defaultFlatRate;
+  return getShippingCost(Number(shippingTierSubtotal) || 0, shippingType, shipping);
 }
 
 export function calculateQuote(
@@ -437,7 +460,8 @@ export function calculateQuote(
   }
 
   const subtotal = priced.productSubtotal;
-  const shipping = computeShipping(config.shipping, deliveryMethod, shippingState, shippingZip, totalQuantity);
+  const shippingTierSubtotal = subtotal;
+  const shipping = computeShipping(config.shipping, deliveryMethod, shippingTierSubtotal, shippingState, shippingZip);
   const grandTotal = subtotal + shipping;
   const unitPrice = totalQuantity > 0 ? subtotal / totalQuantity : 0;
 
@@ -448,6 +472,7 @@ export function calculateQuote(
     sizeBreakdown,
     lineItems,
     subtotal,
+    merchandiseSubtotal: tierMerchandise.merchandiseSubtotal,
     shipping,
     grandTotal,
   };
@@ -475,41 +500,6 @@ function findDynamicTier(
     if (withinMin && withinMax) return tier;
   }
   return sorted[sorted.length - 1] ?? null;
-}
-
-/** Compute shipping for dynamic payload */
-function computeShippingDynamic(
-  shipping: ShippingConfig,
-  deliveryMethod: 'pickup' | 'shipping',
-  state?: string,
-  zip?: string,
-  totalQuantity?: number,
-): number {
-  if (deliveryMethod === 'pickup') return 0;
-  if (!shipping.enabled) return 0;
-  if (!state && !zip) return shipping.defaultFlatRate;
-  const enabledRules = shipping.rules.filter((r: any) => r.enabled);
-  if (zip) {
-    const byZip = enabledRules.find(
-      (r: any) => r.mode === 'zip' && r.zipPrefix && zip.startsWith(r.zipPrefix)
-    );
-    if (byZip) return byZip.flatRate;
-  }
-  if (state) {
-    const byState = enabledRules.find(
-      (r: any) => r.mode === 'state' && r.state && r.state.toLowerCase() === state.toLowerCase()
-    );
-    if (byState) return byState.flatRate;
-  }
-  const flat = enabledRules.find((r: any) => r.mode === 'flat');
-  if (flat) return flat.flatRate;
-
-  const qty = Number(totalQuantity);
-  if (qty >= 200 && shipping.over200Rate > 0) return shipping.over200Rate;
-  if (qty >= 100 && shipping.between100And199Rate > 0) return shipping.between100And199Rate;
-  if (qty >= 1 && qty <= 99 && shipping.under100Rate > 0) return shipping.under100Rate;
-
-  return shipping.defaultFlatRate;
 }
 
 /** Calculate quote for dynamic print products (flyers, brochures, etc.) */
@@ -626,7 +616,7 @@ export function calculateDynamicQuote(
 
   const tierMerchandise = resolveQuantityTierMerchandise(
     qtyTiers,
-    tier,
+    tier || { minQty: 1, maxQty: null, unitPrice: 0 },
     totalQuantity,
     catalogBaseUnitPrice,
   );
@@ -671,7 +661,8 @@ export function calculateDynamicQuote(
 
   const lineItems = priced.lineItems;
   const subtotal = priced.productSubtotal;
-  const shippingCost = computeShippingDynamic(shipping, deliveryMethod, shippingState, shippingZip, totalQuantity);
+  const shippingTierSubtotal = subtotal;
+  const shippingCost = computeShipping(shipping, deliveryMethod as any, shippingTierSubtotal, shippingState, shippingZip);
   const grandTotal = subtotal + shippingCost;
   const unitPrice = totalQuantity > 0 ? subtotal / totalQuantity : 0;
 
@@ -682,7 +673,356 @@ export function calculateDynamicQuote(
     sizeBreakdown: [{ sizeLabel: 'Total', quantity: totalQuantity }],
     lineItems,
     subtotal,
+    merchandiseSubtotal: tierMerchandise.merchandiseSubtotal,
     shipping: shippingCost,
     grandTotal,
   };
+}
+
+// =============================================================================
+// UNIFIED QUOTE ENGINE (Phase 2)
+// =============================================================================
+
+/**
+ * Calculate unified quote from normalized request.
+ * This is the single entry point for all pricing calculations.
+ */
+export function calculateUnifiedQuote(
+  config: QuoteConfigStore,
+  pools: CustomizationPool[],
+  unifiedRequest: UnifiedQuoteRequest,
+  dimensionPricing?: {
+    minWidthIn?: number | null;
+    maxWidthIn?: number | null;
+    minHeightIn?: number | null;
+    maxHeightIn?: number | null;
+    pricePerSqInch?: number | null;
+  },
+  state?: string,
+  zip?: string
+): QuoteSummary {
+  const { mode, quantityBreakdown, selections, deliveryMethod } = unifiedRequest;
+
+  // Calculate total quantity from normalized breakdown
+  const totalQuantity = quantityBreakdown.reduce((sum, q) => sum + q.quantity, 0);
+
+  if (totalQuantity <= 0) {
+    throw new Error('Total quantity must be greater than zero');
+  }
+
+  // Determine which tiers to use based on mode
+  const tiers = config.quantityTiers;
+
+  // Find applicable tier
+  const tier = findApplicableTier(tiers, totalQuantity);
+  if (!tier && !dimensionPricing?.pricePerSqInch) {
+    throw new Error('No quantity pricing tier configured for this quantity');
+  }
+
+  // Build addon breakdown based on mode
+  const { addonBreakdown, addonsPerUnit } = resolveAddonsForMode(
+    config,
+    pools,
+    mode,
+    selections,
+    dimensionPricing
+  );
+
+  // Calculate flat fees
+  const { flatFees } = resolveFlatFeesForMode(
+    config,
+    pools,
+    mode,
+    selections
+  );
+
+  // Calculate size addon per unit (only for apparel)
+  const sizeAddonPerUnit = resolveSizeAddonPerUnit(
+    mode,
+    config.sizes,
+    quantityBreakdown
+  );
+
+  // Calculate merchandise (base price)
+  const tierMerchandise = resolveQuantityTierMerchandise(
+    tiers,
+    tier || { minQty: 1, maxQty: null, unitPrice: 0 },
+    totalQuantity,
+    config.baseUnitPrice || null
+  );
+
+  // Calculate production time / turnaround
+  const { productionTimeTotal, productionTimeLabel } = resolveProductionTimeForMode(
+    config,
+    pools,
+    selections,
+    totalQuantity,
+    addonsPerUnit + sizeAddonPerUnit,
+    tierMerchandise.merchandiseSubtotal
+  );
+
+  // Build final pricing
+  const priced = buildStandardProductPrice({
+    merchandiseLineItems: tierMerchandise.lineItems,
+    merchandiseSubtotal: tierMerchandise.merchandiseSubtotal,
+    merchandisePerUnit: tierMerchandise.merchandisePerUnit,
+    addonsPerUnit: addonsPerUnit + sizeAddonPerUnit,
+    addonBreakdown: [...addonBreakdown],
+    totalQuantity,
+    productionTimeTotal,
+    productionTimeLabel,
+    flatFees,
+  });
+
+  const lineItems = [...priced.lineItems];
+  const subtotal = priced.productSubtotal;
+  const shippingTierSubtotal = subtotal;
+  const shipping = computeShipping(config.shipping, deliveryMethod, shippingTierSubtotal, state, zip);
+  const grandTotal = subtotal + shipping;
+  const unitPrice = totalQuantity > 0 ? subtotal / totalQuantity : 0;
+
+  // Build size breakdown from normalized request
+  const sizeBreakdown = quantityBreakdown.map(q => ({
+    sizeLabel: q.label,
+    quantity: q.quantity,
+  }));
+
+  return {
+    productId: unifiedRequest.productId,
+    totalQuantity,
+    unitPrice,
+    sizeBreakdown,
+    lineItems,
+    subtotal,
+    merchandiseSubtotal: tierMerchandise.merchandiseSubtotal,
+    shipping,
+    grandTotal,
+  };
+}
+
+/**
+ * Resolve add-ons based on mode.
+ */
+function resolveAddonsForMode(
+  config: QuoteConfigStore,
+  pools: CustomizationPool[],
+  mode: 'apparel' | 'print_product',
+  selections: Record<string, any>,
+  dimensionPricing?: {
+    minWidthIn?: number | null;
+    maxWidthIn?: number | null;
+    minHeightIn?: number | null;
+    maxHeightIn?: number | null;
+    pricePerSqInch?: number | null;
+  }
+): { addonBreakdown: { label: string; perUnit: number }[]; addonsPerUnit: number } {
+  const addonBreakdown: { label: string; perUnit: number }[] = [];
+  const poolMap = new Map(pools.map(p => [p.key, p]));
+
+  if (mode === 'apparel') {
+    // Apparel: decoration and print locations come from config
+    const decorationOptionId = selections.decorationOptionId;
+    if (decorationOptionId && decorationOptionId !== '') {
+      const decoration = config.decorations.find(d => d.id === decorationOptionId && d.enabled);
+      if (decoration && decoration.priceModifier !== 0) {
+        addonBreakdown.push({
+          label: `Decoration (${decoration.name})`,
+          perUnit: decoration.priceModifier,
+        });
+      }
+    }
+
+    const printLocationIds = selections.printLocationIds;
+    if (Array.isArray(printLocationIds) && printLocationIds.length > 0) {
+      let locationsPerUnit = 0;
+      for (const locId of printLocationIds) {
+        const loc = config.printLocations.find(p => p.id === locId && p.enabled);
+        if (loc && loc.priceModifier !== 0) {
+          locationsPerUnit += loc.priceModifier;
+        }
+      }
+      if (locationsPerUnit !== 0) {
+        addonBreakdown.push({ label: 'Print locations', perUnit: locationsPerUnit });
+      }
+    }
+  } else {
+    // Print product: addons come from pools, excluding special keys
+    for (const [poolKey, sel] of Object.entries(selections)) {
+      if (poolKey === 'width_in' || poolKey === 'height_in') continue;
+      if (poolKey === 'production_time' || poolKey === 'designer_help' || poolKey.toLowerCase().includes('quantity')) continue;
+
+      const pool = poolMap.get(poolKey);
+      if (!pool?.options) continue;
+
+      const ids = Array.isArray(sel) ? sel : (sel ? [sel] : []);
+      for (const id of ids) {
+        if (typeof id !== 'string') continue;
+        const opt = pool.options.find(o => o.id === id);
+        if (opt && opt.priceModifier !== 0) {
+          addonBreakdown.push({
+            label: `${pool.name} (${opt.label})`,
+            perUnit: opt.priceModifier,
+          });
+        }
+      }
+    }
+
+    // Handle dimension-based pricing
+    if (dimensionPricing?.pricePerSqInch && dimensionPricing.pricePerSqInch > 0) {
+      const width = Number(selections.width_in);
+      const height = Number(selections.height_in);
+      if (Number.isFinite(width) && Number.isFinite(height)) {
+        const area = width * height;
+        const rate = dimensionPricing.pricePerSqInch;
+        const areaPerUnit = area * rate;
+        if (areaPerUnit > 0) {
+          addonBreakdown.unshift({
+            label: `Area (${width}" × ${height}" @ $${rate.toFixed(4)}/sq in)`,
+            perUnit: areaPerUnit,
+          });
+        }
+      }
+    }
+  }
+
+  const addonsPerUnit = addonBreakdown.reduce((sum, a) => sum + a.perUnit, 0);
+  return { addonBreakdown, addonsPerUnit };
+}
+
+/**
+ * Resolve flat fees (per-order charges) based on mode.
+ */
+function resolveFlatFeesForMode(
+  config: QuoteConfigStore,
+  pools: CustomizationPool[],
+  mode: 'apparel' | 'print_product',
+  selections: Record<string, any>
+): { flatFees: { label: string; amount: number }[] } {
+  const flatFees: { label: string; amount: number }[] = [];
+  const poolMap = new Map(pools.map(p => [p.key, p]));
+
+  if (mode === 'apparel') {
+    const designerHelpOptionId = selections.designerHelpOptionId;
+    if (designerHelpOptionId && designerHelpOptionId !== '') {
+      const help = config.designerHelp.find(d => d.id === designerHelpOptionId && d.enabled);
+      if (help && help.priceModifier !== 0) {
+        flatFees.push({
+          label: `Designer help (${help.name})`,
+          amount: help.priceModifier,
+        });
+      }
+    }
+  } else {
+    // Print product: designer help from pool
+    const designerSel = selections.designer_help;
+    if (designerSel) {
+      const pool = poolMap.get('designer_help');
+      if (pool?.options) {
+        const id = Array.isArray(designerSel) ? designerSel[0] : designerSel;
+        if (typeof id === 'string') {
+          const opt = pool.options.find(o => o.id === id);
+          if (opt && opt.priceModifier !== 0) {
+            flatFees.push({
+              label: `${pool.name} (${opt.label})`,
+              amount: opt.priceModifier,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return { flatFees };
+}
+
+/**
+ * Resolve size addon per unit (only applicable for apparel).
+ */
+function resolveSizeAddonPerUnit(
+  mode: 'apparel' | 'print_product',
+  sizes: SizeOption[],
+  quantityBreakdown: { key: string; label: string; quantity: number }[]
+): number {
+  if (mode !== 'apparel' || sizes.length === 0 || quantityBreakdown.length === 0) {
+    return 0;
+  }
+
+  const sizeMap = new Map(sizes.map(s => [s.id, s.priceAddon]));
+  const totalQuantity = quantityBreakdown.reduce((sum, q) => sum + q.quantity, 0);
+
+  let sizeAddonTotal = 0;
+  for (const q of quantityBreakdown) {
+    const priceAddon = sizeMap.get(q.key) || 0;
+    if (priceAddon !== 0) {
+      sizeAddonTotal += priceAddon * q.quantity;
+    }
+  }
+
+  return totalQuantity > 0 ? sizeAddonTotal / totalQuantity : 0;
+}
+
+/**
+ * Resolve production time / turnaround based on mode.
+ */
+function resolveProductionTimeForMode(
+  config: QuoteConfigStore,
+  pools: CustomizationPool[],
+  selections: Record<string, any>,
+  totalQuantity: number,
+  addonsPerUnit: number,
+  merchandiseSubtotal: number
+): { productionTimeTotal: number; productionTimeLabel: string } {
+  const poolMap = new Map(pools.map(p => [p.key, p]));
+
+  // Check for production_time in pools (print mode)
+  const productionSel = selections.production_time;
+  if (productionSel) {
+    const productionPool = poolMap.get('production_time');
+    if (productionPool?.options) {
+      const id = Array.isArray(productionSel) ? productionSel[0] : productionSel;
+      if (typeof id === 'string') {
+        const opt = productionPool.options.find(o => o.id === id);
+        if (opt) {
+          const pricingType = opt.pricingType || 'flat';
+          if (pricingType === 'percentage' && opt.percentageValue != null) {
+            const addonsTotal = addonsPerUnit * totalQuantity;
+            const baseForPct = merchandiseSubtotal + addonsTotal;
+            return {
+              productionTimeTotal: baseForPct * (opt.percentageValue / 100),
+              productionTimeLabel: `${productionPool.name} (${opt.label})`,
+            };
+          } else if (opt.priceModifier !== 0) {
+            return {
+              productionTimeTotal: opt.priceModifier * totalQuantity,
+              productionTimeLabel: `${productionPool.name} (${opt.label})`,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Apparel mode: turnaround from config
+  const turnaroundOptionId = selections.turnaroundOptionId;
+  if (turnaroundOptionId && turnaroundOptionId !== '') {
+    const selectedTurnaround = config.turnarounds.find(t => t.id === turnaroundOptionId && t.enabled);
+    if (selectedTurnaround) {
+      const pricingType = selectedTurnaround.pricingType || 'flat';
+      if (pricingType === 'percentage' && selectedTurnaround.percentageValue != null) {
+        const addonsTotal = addonsPerUnit * totalQuantity;
+        const baseForPct = merchandiseSubtotal + addonsTotal;
+        return {
+          productionTimeTotal: baseForPct * (selectedTurnaround.percentageValue / 100),
+          productionTimeLabel: `Turnaround (${selectedTurnaround.name})`,
+        };
+      } else if (selectedTurnaround.priceModifier !== 0) {
+        return {
+          productionTimeTotal: selectedTurnaround.priceModifier,
+          productionTimeLabel: `Turnaround (${selectedTurnaround.name})`,
+        };
+      }
+    }
+  }
+
+  return { productionTimeTotal: 0, productionTimeLabel: 'Turnaround' };
 }
