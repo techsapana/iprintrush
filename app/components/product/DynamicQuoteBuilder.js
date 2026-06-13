@@ -237,10 +237,8 @@ const artworkFileRef = useRef(null);
 
   // Track previous step to detect navigation to summary
   const prevStepRef = useRef(step);
-  const summaryStepRef = useRef<number | null>(null);
-  const handleCalculateRef = useRef(handleCalculate);
-  // Keep the ref updated with the latest handleCalculate
-  handleCalculateRef.current = handleCalculate;
+  const summaryStepRef = useRef(null);
+  const handleCalculateRef = useRef(null);
   
   // Calculate summary step index and detect when we navigate to it
   useEffect(() => {
@@ -579,6 +577,8 @@ customizationsDisplay.Delivery =
       setCalculating(false);
     }
   };
+
+  handleCalculateRef.current = handleCalculate;
 
   const handleEstimateShipping = async () => {
     // Shipping is now calculated from DB config at quote time - no separate estimate needed
