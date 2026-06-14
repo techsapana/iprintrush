@@ -19,6 +19,7 @@ export async function POST(req: Request) {
     const config: ShippingConfig = {
       enabled: Boolean(row.enabled ?? true),
       defaultFlatRate: parseFloat(row.default_flat_rate || 0),
+      oversizedWidthThresholdIn: parseFloat(row.oversized_width_threshold_in || 0),
       under100Rate: parseFloat(row.under_100_rate || 0),
       between100And199Rate: parseFloat(row.between_100_199_rate || 0),
       over200Rate: parseFloat(row.over_200_rate || 0),
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
       rules: [],
     };
 
-    const oversized = detectOversizedItems(items);
+    const oversized = detectOversizedItems(items, config.oversizedWidthThresholdIn);
     const shippingTierSubtotal = Number.isFinite(Number(body.shippingTierSubtotal))
       ? Math.max(0, Number(body.shippingTierSubtotal))
       : getShippingTierSubtotalFromCartItems(items);

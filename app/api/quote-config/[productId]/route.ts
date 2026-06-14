@@ -89,6 +89,7 @@ quantityTiers: (tiers as any[]).map((t: any) => ({
     shipping: {
       enabled: Boolean(shippingConfig?.enabled ?? true),
       defaultFlatRate: Number.isFinite(parseFloat(shippingConfig?.default_flat_rate || 0)) ? parseFloat(shippingConfig?.default_flat_rate || 0) : 0,
+      oversizedWidthThresholdIn: Number.isFinite(parseFloat(shippingConfig?.oversized_width_threshold_in || 0)) ? parseFloat(shippingConfig?.oversized_width_threshold_in || 0) : 0,
       under100Rate: Number.isFinite(parseFloat(shippingConfig?.under_100_rate || 0)) ? parseFloat(shippingConfig?.under_100_rate || 0) : 0,
       between100And199Rate: Number.isFinite(parseFloat(shippingConfig?.between_100_199_rate || 0)) ? parseFloat(shippingConfig?.between_100_199_rate || 0) : 0,
       over200Rate: Number.isFinite(parseFloat(shippingConfig?.over_200_rate || 0)) ? parseFloat(shippingConfig?.over_200_rate || 0) : 0,

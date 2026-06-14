@@ -41,6 +41,7 @@ export async function GET(req: Request) {
     const config: ShippingConfig = {
       enabled: Boolean(row.enabled ?? true),
       defaultFlatRate: parseFloat(row.default_flat_rate || 0),
+      oversizedWidthThresholdIn: parseFloat(row.oversized_width_threshold_in || 0),
       under100Rate: parseFloat(row.under_100_rate || 0),
       between100And199Rate: parseFloat(row.between_100_199_rate || 0),
       over200Rate: parseFloat(row.over_200_rate || 0),

@@ -113,6 +113,11 @@ async function ensureOrderShippingColumns() {
   }
 }
 
+async function getOversizedWidthThresholdIn() {
+  const row: any = await queryOne('SELECT oversized_width_threshold_in FROM shipping_config LIMIT 1');
+  return parseFloat(row?.oversized_width_threshold_in || 0);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const payload = CreateCheckoutSessionSchema.parse(await req.json());
@@ -139,7 +144,7 @@ export async function POST(req: NextRequest) {
     const stripe = getStripe();
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
     const checkoutCustomer = (payload.customer || {}) as {
-      deliveryMethod?: 'pickup' | 'shipping';
+      deliveryMethod?: 'pickup' | 'local_delivery' | 'standard_shipping';
       selectedShipping?: { serviceType: string; cost: number };
       shippingAddress?: string;
       shippingCity?: string;
@@ -150,6 +155,8 @@ export async function POST(req: NextRequest) {
       selectedMethod?: string;
       shippingMethodsData?: { type?: string; id?: string; label?: string; cost: number } | null;
     } & Record<string, unknown>;
+
+    const oversizedWidthThresholdIn = await getOversizedWidthThresholdIn();
 
     const productIds = [...new Set(payload.items.map((i) => i.id))];
     const rows = await query(
@@ -171,14 +178,14 @@ export async function POST(req: NextRequest) {
 
     const conn = await beginTransaction();
     try {
-      // Detect if any item requires shipping review (width > 44 inches)
+      // Detect if any item requires shipping review using configured oversized threshold
       // OR if customer selected review_required shipping method
       const useRuleBased = checkoutCustomer.useRuleBasedShipping === true;
       const selectedMethodIsReviewRequired = useRuleBased && checkoutCustomer.selectedMethod === 'review_required';
       let shippingReviewRequired = selectedMethodIsReviewRequired;
       for (const item of payload.items) {
         const width = Number(item.quotePayload?.selections?.width_in ?? 0);
-        if (Number.isFinite(width) && width > 44) {
+        if (Number.isFinite(width) && width > oversizedWidthThresholdIn) {
           shippingReviewRequired = true;
           break;
         }

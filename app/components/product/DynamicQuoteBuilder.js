@@ -280,7 +280,8 @@ const artworkFileRef = useRef(null);
 
   const isShippingReviewRequired = () => {
     const w = parseFloat(widthIn);
-    return Number.isFinite(w) && w > 44;
+    const threshold = Number(shipping?.oversizedWidthThresholdIn);
+    return Number.isFinite(w) && Number.isFinite(threshold) && w > threshold;
   };
 
   const hasCalculatedRef = useRef(hasCalculated);
@@ -901,7 +902,6 @@ const renderDimensionStep = (group, pool, value) => {
   };
 
   const renderSummaryStep = () => {
-    const showShippingReview = isShippingReviewRequired();
 
     const discountAmount = quoteSummary
       ? quoteSummary.lineItems

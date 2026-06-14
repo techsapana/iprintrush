@@ -68,6 +68,7 @@ export type ShippingSummary = {
 export type ShippingConfig = {
   enabled: boolean;
   defaultFlatRate: number;
+  oversizedWidthThresholdIn: number;
   under100Rate: number;
   between100And199Rate: number;
   over200Rate: number;
@@ -91,12 +92,6 @@ export type ShippingCostResult = {
   flagReviewRequired?: boolean;
   oversizedDetected?: boolean;
 };
-
-// ============================================================
-// CONSTANTS - Oversized detection threshold
-// ============================================================
-
-const OVERSIZED_WIDTH_THRESHOLD = 44; // inches
 
 // ============================================================
 // UTILITIES
@@ -224,14 +219,17 @@ export function calculateShippingCostByQuantity(method: ShippingMethod, totalQua
 // ============================================================
 
 /**
- * Detect if any cart items are oversized (width > 44 inches)
+ * Detect if any cart items are oversized (width > configured threshold)
  * Checks width_in from quotePayload selections for each item.
  */
-export function detectOversizedItems(cartItems: CartItem[]): boolean {
+export function detectOversizedItems(cartItems: CartItem[], threshold: number): boolean {
+  const oversizedThreshold = Number(threshold);
+  if (!Number.isFinite(oversizedThreshold)) return false;
+
   for (const item of cartItems) {
     const selections = item.quotePayload?.selections;
     const width = parseWidthInches(selections);
-    if (width !== null && width > OVERSIZED_WIDTH_THRESHOLD) {
+    if (width !== null && width > oversizedThreshold) {
       return true;
     }
   }
@@ -251,7 +249,7 @@ export function getAvailableShippingMethods(
   config: ShippingConfig,
   shippingTierSubtotal?: number,
 ): ShippingMethodOption[] {
-  const oversizedDetected = detectOversizedItems(cartItems);
+  const oversizedDetected = detectOversizedItems(cartItems, config.oversizedWidthThresholdIn);
   const subtotal = Number.isFinite(Number(shippingTierSubtotal))
     ? Number(shippingTierSubtotal)
     : calculateShippingTierSubtotalFromCartItems(cartItems);
@@ -317,7 +315,7 @@ export function getAvailableShippingMethods(
  * Get complete shipping summary for a cart
  */
 export function getShippingSummary(cartItems: CartItem[], config: ShippingConfig, shippingTierSubtotal?: number): ShippingSummary {
-  const oversizedDetected = detectOversizedItems(cartItems);
+  const oversizedDetected = detectOversizedItems(cartItems, config.oversizedWidthThresholdIn);
   const totalQuantity = calculateTotalQuantity(cartItems);
   const methods = getAvailableShippingMethods(cartItems, config, shippingTierSubtotal);
 

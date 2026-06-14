@@ -132,6 +132,7 @@ async function getShippingConfig() {
   return {
     enabled: Boolean((cfg as any)?.enabled ?? true),
     defaultFlatRate: parseFloat((cfg as any)?.default_flat_rate || 0),
+    oversizedWidthThresholdIn: parseFloat((cfg as any)?.oversized_width_threshold_in || 0),
     under100Rate: parseFloat((cfg as any)?.under_100_rate || 0),
     between100And199Rate: parseFloat((cfg as any)?.between_100_199_rate || 0),
     over200Rate: parseFloat((cfg as any)?.over_200_rate || 0),

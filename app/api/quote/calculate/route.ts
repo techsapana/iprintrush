@@ -184,6 +184,7 @@ quantityTiers: tiersToUse.map((t: any) => ({
     shipping: {
       enabled: Boolean(shippingConfig.enabled),
       defaultFlatRate: parseFloat(shippingConfig.default_flat_rate || 0),
+      oversizedWidthThresholdIn: parseFloat(shippingConfig.oversized_width_threshold_in || 0),
       under100Rate: parseFloat(shippingConfig.under_100_rate || 0),
       between100And199Rate: parseFloat(shippingConfig.between_100_199_rate || 0),
       over200Rate: parseFloat(shippingConfig.over_200_rate || 0),
