@@ -21,11 +21,11 @@ function createDefaultConfig(): QuoteConfigStore {
   const id = () => randomUUID() as UUID;
 
   const defaultTiers: QuantityTier[] = [
-    { id: id(), minQty: 1, maxQty: 5, unitPrice: 25, enabled: true },
-    { id: id(), minQty: 6, maxQty: 11, unitPrice: 20, enabled: true },
-    { id: id(), minQty: 12, maxQty: 23, unitPrice: 18, enabled: true },
-    { id: id(), minQty: 24, maxQty: 35, unitPrice: 16, enabled: true },
-    { id: id(), minQty: 36, maxQty: 71, unitPrice: 14, enabled: true },
+    { id: id(), minQty: 1, maxQty: 5, unitPrice: 25, discountType: 'NONE', discountValue: 0, enabled: true },
+    { id: id(), minQty: 6, maxQty: 11, unitPrice: 20, discountType: 'NONE', discountValue: 0, enabled: true },
+    { id: id(), minQty: 12, maxQty: 23, unitPrice: 18, discountType: 'NONE', discountValue: 0, enabled: true },
+    { id: id(), minQty: 24, maxQty: 35, unitPrice: 16, discountType: 'NONE', discountValue: 0, enabled: true },
+    { id: id(), minQty: 36, maxQty: 71, unitPrice: 14, discountType: 'NONE', discountValue: 0, enabled: true },
   ];
 
   const shipping: ShippingConfig = {

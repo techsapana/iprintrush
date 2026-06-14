@@ -4,7 +4,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceHTML, buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
-import { getShippingMethodLabel } from '../../lib/shippingEngine';
+
+const SHIPPING_METHOD_LABELS = {
+  pickup: 'Store Pickup',
+  local_delivery: 'Local Delivery',
+  standard_shipping: 'Standard Shipping',
+  review_required: 'Shipping Review Required',
+};
+
+function getShippingMethodLabel(method) {
+  if (!method) return 'Unknown';
+  return SHIPPING_METHOD_LABELS[method] || 'Unknown';
+}
 
 function debounce(fn, delay) {
   let timeoutId;
@@ -1298,12 +1309,15 @@ const renderDeliveryStep = () => {
     const showShippingReview = isShippingReviewRequired();
     const localMethod = shipping?.methods?.find((m) => m.type === 'local_delivery');
     const standardMethod = shipping?.methods?.find((m) => m.type === 'standard_shipping');
+    const reviewMethod = shipping?.methods?.find((m) => m.type === 'review_required');
+    // Auto-detect oversized scenario: review_required exists but standard_shipping is missing
+    const isOversizedMissingStandard = reviewMethod && !standardMethod;
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Delivery Option</h3>
-        {showShippingReview && (
+        {(showShippingReview || isOversizedMissingStandard) && (
           <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-            Shipping Review Required for oversized items (width exceeds 44"). Our team will contact you with shipping options.
+            Oversized product detected. Standard shipping is unavailable. Our team will review shipping options and contact you.
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1351,6 +1365,20 @@ const renderDeliveryStep = () => {
                 ${standardMethod.cost.toFixed(2)} shipping fee
                 {standardMethod.cost === 0 && ' (Free for 200+ items)'}
               </div>
+            </button>
+          )}
+          {reviewMethod && (
+            <button
+              type="button"
+              onClick={() => handleDeliveryMethodChange('review_required')}
+              className={`rounded-xl border px-4 py-3 text-left transition ${
+                deliveryMethod === 'review_required'
+                  ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
+                  : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
+              }`}
+            >
+              <div className="font-semibold text-gray-900">Shipping Review Required</div>
+              <div className="text-sm text-gray-600">Oversized items require manual shipping review.</div>
             </button>
           )}
         </div>

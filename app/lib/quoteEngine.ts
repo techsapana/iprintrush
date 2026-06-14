@@ -44,14 +44,15 @@ type TierWithDiscount = {
   minQty?: number;
   maxQty?: number | null;
   unitPrice?: number;
-  discountPercent?: number;
+  discountType?: 'NONE' | 'PERCENT' | 'FIXED';
+  discountValue?: number;
 };
 
 type QuoteLineItem = { label: string; amount: number };
 
-/** Reference unit price for % tier discounts (product base, else lowest qty tier value). */
+/** Reference unit price for PERCENT tier discounts (product base, else lowest qty tier value). */
 function getReferenceBaseUnitPrice(
-  tiers: { minQty: number; unitPrice: number; enabled?: boolean }[],
+  tiers: { minQty: number; unitPrice: number; discountType?: string; discountValue?: number; enabled?: boolean }[],
   catalogBaseUnitPrice?: number | null,
 ): number {
   if (catalogBaseUnitPrice != null && Number.isFinite(Number(catalogBaseUnitPrice))) {
@@ -71,57 +72,105 @@ function formatTierQtyLabel(tier: { minQty?: number; maxQty?: number | null }): 
 
 /**
  * Quantity tier merchandise:
- * - discountPercent > 0: qty × reference base, then reduce by % (ignore tier unitPrice value)
- * - else: qty × matched tier unitPrice (value field)
+ * - discountType = 'PERCENT': baseTotal × (discountValue / 100) discount
+ * - discountType = 'FIXED': subtract discountValue from base total
+ * - discountType = 'NONE' or default: use unitPrice × quantity
  */
 function resolveQuantityTierMerchandise(
-  allTiers: { minQty: number; maxQty: number | null; unitPrice: number; discountPercent?: number; enabled?: boolean }[],
+  allTiers: { minQty: number; maxQty: number | null; unitPrice: number; discountType?: 'NONE' | 'PERCENT' | 'FIXED'; discountValue?: number; enabled?: boolean }[],
   matchedTier: TierWithDiscount & { unitPrice?: number },
   totalQuantity: number,
   catalogBaseUnitPrice?: number | null,
-): { lineItems: QuoteLineItem[]; merchandiseSubtotal: number; merchandisePerUnit: number } {
-  const pct = Math.max(0, Number(matchedTier.discountPercent || 0));
+): { lineItems: QuoteLineItem[]; merchandiseSubtotal: number; merchandisePerUnit: number; discountApplied: number; discountType: 'NONE' | 'PERCENT' | 'FIXED'; discountValue: number } {
+  const discountType: 'NONE' | 'PERCENT' | 'FIXED' = matchedTier.discountType || 'NONE';
+  const safeDiscountValue = Number.isFinite(matchedTier.discountValue) ? matchedTier.discountValue! : 0;
   const tierLabel = formatTierQtyLabel(matchedTier);
+  const perUnit = Math.max(0, Number(matchedTier.unitPrice || 0));
+  const baseTotal = perUnit * totalQuantity;
 
-  if (pct > 0) {
-    const basePerUnit = getReferenceBaseUnitPrice(allTiers, catalogBaseUnitPrice);
-    const beforeDiscount = basePerUnit * totalQuantity;
-    const discountAmount = beforeDiscount * (pct / 100);
-    const afterDiscount = beforeDiscount - discountAmount;
+  // Development assertion: price integrity check
+  if (process.env.NODE_ENV === 'development') {
+    const calculatedBase = Math.max(0, Number(matchedTier.unitPrice || 0)) * totalQuantity;
+    if (Math.abs(calculatedBase - baseTotal) > 0.01) {
+      throw new Error("PRICE INTEGRITY VIOLATION: baseTotal mismatch in tier calculation");
+    }
+  }
+
+  let discountApplied = 0;
+  const clampedDiscount = discountType === 'PERCENT'
+    ? Math.min(100, Math.max(0, safeDiscountValue))
+    : Math.max(0, safeDiscountValue);
+
+  if (discountType === 'PERCENT') {
+    discountApplied = Math.min(baseTotal, (baseTotal * clampedDiscount) / 100);
+    const afterDiscount = Math.max(0, baseTotal - discountApplied);
     const lineItems: QuoteLineItem[] = [];
-    if (basePerUnit !== 0 || beforeDiscount !== 0) {
+    if (baseTotal > 0) {
       lineItems.push({
-        label: `Base price ($${basePerUnit.toFixed(2)} / pc × ${totalQuantity})`,
-        amount: beforeDiscount,
+        label: `Base price ($${perUnit.toFixed(2)} / pc × ${totalQuantity})`,
+        amount: baseTotal,
       });
       lineItems.push({
-        label: `Quantity tier discount (${pct}% off, qty ${tierLabel})`,
-        amount: -discountAmount,
+        label: `Quantity tier discount (${clampedDiscount}% off, qty ${tierLabel})`,
+        amount: -discountApplied,
       });
     }
     return {
       lineItems,
       merchandiseSubtotal: afterDiscount,
-      merchandisePerUnit: totalQuantity > 0 ? afterDiscount / totalQuantity : basePerUnit,
+      merchandisePerUnit: totalQuantity > 0 ? afterDiscount / totalQuantity : perUnit,
+      discountApplied,
+      discountType,
+      discountValue: clampedDiscount,
     };
   }
 
-  let perUnit = Math.max(0, Number(matchedTier.unitPrice || 0));
-  if (perUnit === 0 && catalogBaseUnitPrice != null && Number(catalogBaseUnitPrice) > 0) {
-    perUnit = Number(catalogBaseUnitPrice);
+  if (discountType === 'FIXED') {
+    discountApplied = Math.min(baseTotal, clampedDiscount);
+    const afterDiscount = Math.max(0, baseTotal - discountApplied);
+    const lineItems: QuoteLineItem[] = [];
+    if (baseTotal > 0) {
+      lineItems.push({
+        label: `Base price ($${perUnit.toFixed(2)} / pc × ${totalQuantity}, qty ${tierLabel})`,
+        amount: baseTotal,
+      });
+    }
+    if (discountApplied > 0) {
+      lineItems.push({
+        label: `Quantity tier discount ($${discountApplied.toFixed(2)} off, qty ${tierLabel})`,
+        amount: -discountApplied,
+      });
+    }
+    return {
+      lineItems,
+      merchandiseSubtotal: afterDiscount,
+      merchandisePerUnit: totalQuantity > 0 ? afterDiscount / totalQuantity : perUnit,
+      discountApplied,
+      discountType,
+      discountValue: clampedDiscount,
+    };
   }
-  const merchandiseSubtotal = perUnit * totalQuantity;
+
+  // NONE discount or default: use tier unitPrice × quantity
+  let finalPerUnit = perUnit;
+  if (finalPerUnit === 0 && catalogBaseUnitPrice != null && Number(catalogBaseUnitPrice) > 0) {
+    finalPerUnit = Number(catalogBaseUnitPrice);
+  }
+  const merchandiseSubtotal = Math.max(0, finalPerUnit * totalQuantity);
   const lineItems: QuoteLineItem[] = [];
-  if (perUnit !== 0) {
+  if (finalPerUnit !== 0) {
     lineItems.push({
-      label: `Base price ($${perUnit.toFixed(2)} / pc × ${totalQuantity}, qty ${tierLabel})`,
+      label: `Base price ($${finalPerUnit.toFixed(2)} / pc × ${totalQuantity}, qty ${tierLabel})`,
       amount: merchandiseSubtotal,
     });
   }
   return {
     lineItems,
     merchandiseSubtotal,
-    merchandisePerUnit: perUnit,
+    merchandisePerUnit: finalPerUnit,
+    discountApplied: 0,
+    discountType: 'NONE',
+    discountValue: 0,
   };
 }
 
@@ -422,7 +471,7 @@ export function calculateQuote(
   }
 
   const tierMerchandise = useMyCloth
-    ? { lineItems: [] as QuoteLineItem[], merchandiseSubtotal: 0, merchandisePerUnit: 0 }
+    ? { lineItems: [] as QuoteLineItem[], merchandiseSubtotal: 0, merchandisePerUnit: 0, discountApplied: 0, discountType: 'NONE' as const, discountValue: 0 }
     : resolveQuantityTierMerchandise(config.quantityTiers, tier, totalQuantity, null);
 
   if (selectedTurnaround) {
@@ -484,16 +533,23 @@ function findDynamicTier(
     minQty: number;
     maxQty: number | null;
     unitPrice: number;
-    discountPercent?: number;
+    discountType?: 'NONE' | 'PERCENT' | 'FIXED';
+    discountValue?: number;
   }[],
   totalQty: number,
 ): {
   minQty: number;
   maxQty: number | null;
   unitPrice: number;
-  discountPercent?: number;
+  discountType?: 'NONE' | 'PERCENT' | 'FIXED';
+  discountValue?: number;
 } | null {
-  const sorted = [...tiers].sort((a, b) => a.minQty - b.minQty);
+  const normalizedTiers = tiers.map(t => ({
+    ...t,
+    discountType: t.discountType ?? 'NONE',
+    discountValue: Number(t.discountValue ?? 0),
+  }));
+  const sorted = [...normalizedTiers].sort((a, b) => a.minQty - b.minQty);
   for (const tier of sorted) {
     const withinMin = totalQty >= tier.minQty;
     const withinMax = tier.maxQty == null || totalQty <= tier.maxQty;

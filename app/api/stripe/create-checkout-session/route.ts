@@ -366,8 +366,8 @@ export async function POST(req: NextRequest) {
       estimatedDeliveryDate: null,
       estimatedDeliveryLabel: null,
     };
-    shippingMeta = {
-      carrier: methodData.type === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
+shippingMeta = {
+       carrier: methodData.type === 'local_delivery' ? 'Local Delivery' : methodData.type === 'review_required' ? 'Shipping Review Required' : 'Standard Shipping',
       serviceType: methodData.type || methodData.id || 'rule_based',
       serviceName: methodData.label || 'Rule-Based Shipping',
       estimatedDeliveryDate: null,

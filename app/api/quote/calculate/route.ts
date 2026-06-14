@@ -154,14 +154,15 @@ async function getConfigWithCustomPrices(productId: string): Promise<QuoteConfig
       priceAddon: customPrices.sizes[s.id] ?? parseFloat(s.price_addon),
       baseEnabled: true,
     })),
-    quantityTiers: tiersToUse.map((t: any) => ({
-      id: t.id.toString(),
-      minQty: t.min_qty,
-      maxQty: t.max_qty,
-      unitPrice: parseFloat(t.unit_price),
-      discountPercent: t.discount_percent != null ? parseFloat(t.discount_percent) : 0,
-      enabled: true,
-    })),
+quantityTiers: tiersToUse.map((t: any) => ({
+       id: t.id.toString(),
+       minQty: t.min_qty,
+       maxQty: t.max_qty,
+       unitPrice: parseFloat(t.unit_price),
+       discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
+       discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
+       enabled: true,
+     })),
     printLocations: printLocations.map((p: any) => ({
       id: p.id,
       name: p.name,

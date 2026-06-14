@@ -21,10 +21,13 @@ export type QuantityTier = {
   maxQty: number | null; // null = no upper bound
   unitPrice: number;
   /**
-   * When > 0: apply this % off (qty × reference base unit price); tier unitPrice is ignored.
-   * When 0/empty: use tier unitPrice × qty as merchandise subtotal.
+   * Unified discount rule for tier pricing:
+   * - 'NONE': No discount, use unitPrice only
+   * - 'PERCENT': Apply discount_value % off base total
+   * - 'FIXED': Subtract discount_value dollars from base total
    */
-  discountPercent?: number;
+  discountType: 'NONE' | 'PERCENT' | 'FIXED';
+  discountValue: number; // percentage (e.g. 10 = 10%) or fixed dollar amount
   enabled: boolean;
 };
 
@@ -195,7 +198,7 @@ export type CustomizationPool = {
   selectionType: string;
   priceType: string;
   options: CustomizationOption[];
-  quantityTiers?: { minQty: number; maxQty: number | null; unitPrice: number; label?: string }[];
+  quantityTiers?: { minQty: number; maxQty: number | null; unitPrice: number; discountType?: 'NONE' | 'PERCENT' | 'FIXED'; discountValue?: number; label?: string }[];
 };
 
 export type DynamicQuoteRequestPayload = {

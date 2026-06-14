@@ -1,47 +1,62 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  getShippingMethodLabel,
-  getAvailableShippingMethods,
-  getShippingTierSubtotalFromCartItems,
-} from '../../lib/shippingEngine';
+
+const SHIPPING_METHOD_LABELS = {
+  pickup: 'Store Pickup',
+  local_delivery: 'Local Delivery',
+  standard_shipping: 'Standard Shipping',
+  review_required: 'Shipping Review Required',
+};
+
+function getShippingMethodLabel(method) {
+  if (!method) return 'Unknown';
+  return SHIPPING_METHOD_LABELS[method] || 'Unknown';
+}
 
 export function ShippingSelector({ selectedMethod, onMethodChange, showOversizedWarning = false, className = '', shippingEnabled = true, items = [], config: shippingConfig }) {
   const [shippingMethods, setShippingMethods] = useState([]);
 
-  // Get methods from unified function when config is provided
   useEffect(() => {
-    if (shippingConfig) {
-      const shippingTierSubtotal = getShippingTierSubtotalFromCartItems(items);
-      const methods = getAvailableShippingMethods(items, shippingConfig, shippingTierSubtotal);
-      setShippingMethods(methods);
-    } else {
-      // Fallback to API call for backwards compatibility
-      fetch('/api/shipping/methods', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: [] }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.success && Array.isArray(data.methods)) {
-            setShippingMethods(data.methods);
-          }
-        })
-        .catch(() => {});
+    if (!shippingConfig) {
+      setShippingMethods([]);
+      return;
     }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/shipping/methods', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items, shippingConfig }),
+        });
+        if (cancelled) return;
+        const data = await res.json().catch(() => ({}));
+        if (data?.success && Array.isArray(data.methods)) {
+          setShippingMethods(data.methods);
+        } else {
+          setShippingMethods([]);
+        }
+      } catch {
+        if (!cancelled) setShippingMethods([]);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
   }, [shippingConfig, items]);
 
   const localDeliveryMethod = shippingMethods.find((m) => m.type === 'local_delivery');
   const standardShippingMethod = shippingMethods.find((m) => m.type === 'standard_shipping');
   const reviewRequiredMethod = shippingMethods.find((m) => m.type === 'review_required');
 
+  const isOversizedScenario = reviewRequiredMethod && !standardShippingMethod;
+  const shouldShowWarning = showOversizedWarning || isOversizedScenario;
+
   return (
     <div className={`space-y-4 ${className}`}>
-      {showOversizedWarning && (
+      {shouldShowWarning && (
         <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-          Shipping Review Required for oversized items (width exceeds 44"). Our team will contact you with shipping options.
+          Oversized product detected. Standard shipping is unavailable. Our team will review shipping options and contact you.
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

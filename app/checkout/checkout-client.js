@@ -18,6 +18,11 @@ import {
 const inputClass =
   'w-full border border-gray-300 rounded-md px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]';
 
+const fileModeButtonClass = (active) =>
+  active
+    ? 'bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-semibold'
+    : 'border-gray-300 text-gray-700 hover:bg-gray-50';
+
 export default function CheckoutClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,6 +69,10 @@ export default function CheckoutClient() {
     process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true'
   );
   const [shippingAddressKey, setShippingAddressKey] = useState('');
+  const [fileUploadMode, setFileUploadMode] = useState('later');
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploadedPreview, setUploadedPreview] = useState(null);
+  const [isFinalConfirmed, setIsFinalConfirmed] = useState(false);
 
   async function fetchShippingMethods() {
     if (!useRuleBased) return;
@@ -222,6 +231,22 @@ export default function CheckoutClient() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleDesignFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadedFile(file);
+    setUploadedPreview(file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
+    setIsFinalConfirmed(false);
+    if (e.target) e.target.value = '';
+  };
+
+  const handleUploadLater = () => {
+    setFileUploadMode('later');
+    setUploadedFile(null);
+    setUploadedPreview(null);
+    setIsFinalConfirmed(false);
+  };
+
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -235,6 +260,14 @@ export default function CheckoutClient() {
     };
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (uploadedPreview) {
+        URL.revokeObjectURL(uploadedPreview);
+      }
+    };
+  }, [uploadedPreview]);
 
   useEffect(() => {
     const loadCoupons = async () => {
@@ -424,6 +457,9 @@ export default function CheckoutClient() {
       : 0;
   const taxAmount = (taxableBase + shippingAmount) * ((Number(taxRatePercent) || 0) / 100);
   const finalTotal = taxableBase + shippingAmount + taxAmount;
+  const canProceed =
+    fileUploadMode === 'later' ||
+    (fileUploadMode === 'now' && uploadedFile && isFinalConfirmed);
 
   if (!sessionReady) {
     return (
@@ -606,9 +642,16 @@ export default function CheckoutClient() {
               </div>
             )}
 
-            {formData.deliveryMethod === 'shipping' && useRuleBased && (
+{formData.deliveryMethod === 'shipping' && useRuleBased && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Methods</h2>
+                {/* Check if review_required method exists without standard_shipping */}
+                {shippingMethods.some((m) => m.type === 'review_required') &&
+                  !shippingMethods.some((m) => m.type === 'standard_shipping') && (
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm mb-4">
+                      Oversized product detected. Standard shipping is unavailable. Our team will review shipping options and contact you.
+                    </div>
+                  )}
                 {shippingMethods.length === 0 ? (
                   <p className="text-sm text-gray-500">
                     Enter street, city, state, and ZIP in Shipping Address to load shipping methods.
@@ -645,6 +688,81 @@ export default function CheckoutClient() {
             )}
 
             <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Upload Your Design (Optional but recommended)</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Upload your final design now, or continue and upload it later from dashboard.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <Button
+                  type="button"
+                  onClick={() => setFileUploadMode('now')}
+                  className={`w-full sm:w-auto ${fileModeButtonClass(fileUploadMode === 'now')}`}
+                >
+                  Upload Now
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleUploadLater}
+                  className={`w-full sm:w-auto ${fileModeButtonClass(fileUploadMode === 'later')}`}
+                >
+                  Upload Later
+                </Button>
+              </div>
+
+              {fileUploadMode === 'later' && (
+                <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+                  You can upload your file later from dashboard.
+                </p>
+              )}
+
+              {fileUploadMode === 'now' && (
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">Design file</label>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={handleDesignFileChange}
+                    className={inputClass}
+                  />
+
+                  {uploadedFile && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      {uploadedPreview ? (
+                        <img
+                          src={uploadedPreview}
+                          alt="Uploaded design preview"
+                          className="max-h-64 rounded-md border border-gray-200 bg-white object-contain mb-3"
+                        />
+                      ) : (
+                        <div className="rounded-md border border-gray-200 bg-white px-4 py-3 mb-3">
+                          <p className="text-sm font-medium text-gray-900">PDF preview unavailable</p>
+                          <p className="text-xs text-gray-600 mt-1">File selected: {uploadedFile.name}</p>
+                        </div>
+                      )}
+                      {!uploadedPreview && (
+                        <p className="text-xs text-gray-600">
+                          Selected file: {uploadedFile.name} ({Math.round(uploadedFile.size / 1024)} KB)
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {uploadedFile && (
+                    <label className="flex items-start gap-3 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={isFinalConfirmed}
+                        onChange={(e) => setIsFinalConfirmed(e.target.checked)}
+                        className="mt-1"
+                      />
+                      <span>Yes, this is my final design and I confirm it is correct</span>
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">Order notes (optional)</label>
               <textarea
                 name="notes"
@@ -662,7 +780,7 @@ export default function CheckoutClient() {
 
             <Button
               type="submit"
-              disabled={isPaying}
+              disabled={isPaying || !canProceed}
               className="w-full bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-semibold py-4 text-lg rounded-lg disabled:opacity-60"
             >
               {isPaying ? 'Redirecting to secure payment...' : 'Checkout'}

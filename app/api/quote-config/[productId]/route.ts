@@ -58,13 +58,14 @@ async function getFullConfig() {
       baseEnabled: Boolean(s.base_enabled),
     })),
 quantityTiers: (tiers as any[]).map((t: any) => ({
-      id: t.id.toString(),
-      minQty: t.min_qty,
-      maxQty: t.max_qty,
-      unitPrice: Number.isFinite(parseFloat(t.unit_price)) ? parseFloat(t.unit_price) : 0,
-      discountPercent: t.discount_percent != null ? (Number.isFinite(parseFloat(t.discount_percent)) ? parseFloat(t.discount_percent) : 0) : 0,
-      enabled: Boolean(t.enabled),
-    })),
+       id: t.id.toString(),
+       minQty: t.min_qty,
+       maxQty: t.max_qty,
+       unitPrice: Number.isFinite(parseFloat(t.unit_price)) ? parseFloat(t.unit_price) : 0,
+       discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
+       discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
+       enabled: Boolean(t.enabled),
+     })),
     printLocations: (printLocations as any[]).map((p: any) => ({
       id: p.id,
       name: p.name,
@@ -302,7 +303,8 @@ query(
             minQty: t.minQty,
             maxQty: t.maxQty,
             unitPrice: t.unitPrice,
-            discountPercent: t.discountPercent != null ? Number(t.discountPercent) : 0,
+            discountType: t.discountType || 'NONE',
+            discountValue: t.discountValue || 0,
             enabled: true,
           })),
       };
@@ -327,15 +329,15 @@ query(
           .filter((t) => t.enabled)
           .map((t) => t.id.toString()),
         customPrices,
-        customQuantityTiers: (customQuantityTiers as any[]).map((t: any) => ({
-          id: t.id.toString(),
-          minQty: t.min_qty,
-          maxQty: t.max_qty,
-          unitPrice: parseFloat(t.unit_price),
-          discountPercent:
-            t.discount_percent != null ? parseFloat(t.discount_percent) : 0,
-          enabled: Boolean(t.enabled),
-        })),
+customQuantityTiers: (customQuantityTiers as any[]).map((t: any) => ({
+           id: t.id.toString(),
+           minQty: t.min_qty,
+           maxQty: t.max_qty,
+           unitPrice: parseFloat(t.unit_price),
+           discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
+           discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
+           enabled: Boolean(t.enabled),
+         })),
         customTurnaroundPricing,
         allowCustomDimensions: Boolean(productWithCat?.allow_custom_dimensions),
       };
@@ -364,11 +366,16 @@ export async function PUT(
 
     if (body.customQuantityTiers && Array.isArray(body.customQuantityTiers)) {
       const bad = (body.customQuantityTiers as any[]).find(
-        (t) => Number(t.unitPrice || 0) > 0 && Number(t.discountPercent || 0) > 0,
+        (t) => {
+          const hasDiscount = t.discountType && t.discountValue != null && Number(t.discountValue) > 0;
+          const hasUnitPrice = Number(t.unitPrice || 0) > 0;
+          // PERCENT/FIXED discounts work WITH unitPrice now
+          return t.discountType === 'NONE' && hasDiscount;
+        }
       );
       if (bad) {
         return NextResponse.json(
-          { error: 'Each quantity tier must use either Unit Price OR Discount %, not both.' },
+          { error: 'Invalid discount configuration. Use PERCENT or FIXED discount type with a value.' },
           { status: 400 },
         );
       }
@@ -378,7 +385,10 @@ export async function PUT(
       for (const tiers of Object.values(body.poolQuantityTiers as Record<string, any[]>)) {
         if (!Array.isArray(tiers)) continue;
         const bad = tiers.find(
-          (t) => Number(t.unitPrice || 0) > 0 && Number(t.discountPercent || 0) > 0,
+          (t) => {
+            const hasDiscount = t.discountType && t.discountValue != null && Number(t.discountValue) > 0;
+            return t.discountType === 'NONE' && hasDiscount;
+          }
         );
         if (bad) {
           return NextResponse.json(
@@ -519,28 +529,30 @@ export async function PUT(
       }
     }
 
-    // Update custom quantity tiers
-    if (body.customQuantityTiers !== undefined) {
-      await query('DELETE FROM product_quantity_tiers WHERE product_id = ?', [productId]);
-      if (body.customQuantityTiers && body.customQuantityTiers.length > 0) {
-        const values = body.customQuantityTiers.map((tier: any, idx: number) => {
-          const discount = Number(tier.discountPercent);
-          return [
-            productId,
-            tier.minQty,
-            tier.maxQty || null,
-            tier.unitPrice,
-            Number.isFinite(discount) ? discount : 0,
-            tier.enabled !== false ? 1 : 0,
-            idx,
-          ];
-        });
-        await query(
-          'INSERT INTO product_quantity_tiers (product_id, min_qty, max_qty, unit_price, discount_percent, enabled, display_order) VALUES ?',
-          [values]
-        );
-      }
-    }
+// Update custom quantity tiers
+     if (body.customQuantityTiers !== undefined) {
+       await query('DELETE FROM product_quantity_tiers WHERE product_id = ?', [productId]);
+       if (body.customQuantityTiers && body.customQuantityTiers.length > 0) {
+         const values = body.customQuantityTiers.map((tier: any, idx: number) => {
+           const discountType = tier.discountType === 'PERCENT' || tier.discountType === 'FIXED' ? tier.discountType : 'NONE';
+           const discountValue = Number.isFinite(Number(tier.discountValue)) ? Number(tier.discountValue) : 0;
+           return [
+             productId,
+             tier.minQty,
+             tier.maxQty || null,
+             tier.unitPrice,
+             discountType,
+             discountValue,
+             tier.enabled !== false ? 1 : 0,
+             idx,
+           ];
+         });
+         await query(
+           'INSERT INTO product_quantity_tiers (product_id, min_qty, max_qty, unit_price, discount_type, discount_value, enabled, display_order) VALUES ?',
+           [values]
+         );
+       }
+     }
 
     // Update product pool options (for print_product categories)
     if (body.poolOptions !== undefined) {
@@ -568,37 +580,39 @@ export async function PUT(
       }
     }
 
-    // Update product pool quantity tiers (for print_product quantity pools)
-    if (body.poolQuantityTiers !== undefined && body.poolQuantityTiers && typeof body.poolQuantityTiers === 'object') {
-      await query('DELETE FROM product_pool_quantity_tiers WHERE product_id = ?', [productId]);
-      for (const [poolId, tiers] of Object.entries(body.poolQuantityTiers as Record<string, any[]>)) {
-        if (!Array.isArray(tiers) || tiers.length === 0) continue;
-        const values = tiers
-          .map((tier: any, idx: number) => {
-            const discount = Number(tier.discountPercent);
-            return [
-              productId,
-              poolId,
-              tier.minQty,
-              tier.maxQty || null,
-              tier.unitPrice,
-              Number.isFinite(discount) ? discount : 0,
-              tier.enabled !== false ? 1 : 0,
-              idx,
-            ];
-          })
-          .filter(
-            (row: any[]) =>
-              Number.isFinite(Number(row[2])) && Number.isFinite(Number(row[4])),
-          );
-        if (values.length > 0) {
-          await query(
-            'INSERT INTO product_pool_quantity_tiers (product_id, pool_id, min_qty, max_qty, unit_price, discount_percent, enabled, display_order) VALUES ?',
-            [values]
-          );
-        }
-      }
-    }
+// Update product pool quantity tiers (for print_product quantity pools)
+     if (body.poolQuantityTiers !== undefined && body.poolQuantityTiers && typeof body.poolQuantityTiers === 'object') {
+       await query('DELETE FROM product_pool_quantity_tiers WHERE product_id = ?', [productId]);
+       for (const [poolId, tiers] of Object.entries(body.poolQuantityTiers as Record<string, any[]>)) {
+         if (!Array.isArray(tiers) || tiers.length === 0) continue;
+         const values = tiers
+           .map((tier: any, idx: number) => {
+             const discountType = tier.discountType === 'PERCENT' || tier.discountType === 'FIXED' ? tier.discountType : 'NONE';
+             const discountValue = Number.isFinite(Number(tier.discountValue)) ? Number(tier.discountValue) : 0;
+             return [
+               productId,
+               poolId,
+               tier.minQty,
+               tier.maxQty || null,
+               tier.unitPrice,
+               discountType,
+               discountValue,
+               tier.enabled !== false ? 1 : 0,
+               idx,
+             ];
+           })
+           .filter(
+             (row: any[]) =>
+               Number.isFinite(Number(row[2])) && Number.isFinite(Number(row[4])),
+           );
+         if (values.length > 0) {
+           await query(
+             'INSERT INTO product_pool_quantity_tiers (product_id, pool_id, min_qty, max_qty, unit_price, discount_type, discount_value, enabled, display_order) VALUES ?',
+             [values]
+           );
+         }
+       }
+     }
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {

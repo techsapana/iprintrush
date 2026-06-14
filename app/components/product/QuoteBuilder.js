@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { DynamicQuoteBuilder } from './DynamicQuoteBuilder';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
-import { getShippingMethodLabel } from '../../lib/shippingEngine';
 import { ShippingSelector, getShippingDisplayLabel } from '../shared/ShippingSelector';
 
 function debounce(fn, delay) {
@@ -918,6 +917,7 @@ const renderDeliveryStep = () => {
           selectedMethod={deliveryMethod}
           onMethodChange={handleDeliveryMethodChange}
           shippingEnabled={config?.shipping?.enabled !== false}
+          config={config?.shipping}
         />
       </div>
     );

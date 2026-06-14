@@ -96,13 +96,14 @@ export async function getDynamicConfig(
       });
 
     const tiersToUse = (productQtyTiers as any[]).length > 0 ? productQtyTiers : qtyTiers;
-    const quantityTiers = (tiersToUse as any[]).map((t: any) => ({
-      minQty: t.min_qty,
-      maxQty: t.max_qty,
-      unitPrice: parseFloat(t.unit_price),
-      discountPercent: t.discount_percent != null ? parseFloat(t.discount_percent) : 0,
-      label: t.label,
-    }));
+const quantityTiers = (tiersToUse as any[]).map((t: any) => ({
+       minQty: t.min_qty,
+       maxQty: t.max_qty,
+       unitPrice: parseFloat(t.unit_price),
+       discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
+       discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
+       label: t.label,
+     }));
 
     const mappedPool = {
       id: pool.id,
