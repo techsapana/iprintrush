@@ -101,10 +101,10 @@ const buildInvoiceHTML = (quoteSummary, productInfo) => {
 
     <div class="invoice-section">
       <div class="section-title">Price Summary</div>
-    ${!lineItems.some(item => item.amount < 0) ? '' : `<div class="totals-row"><span>Subtotal:</span><span>$${Number(subtotal + (lineItems.filter(i => i.amount < 0).reduce((s, i) => s + Math.abs(i.amount), 0))).toFixed(2)}</span></div>`}
-    ${!lineItems.some(item => item.amount < 0) ? '' : `<div class="totals-row discount"><span>Discount:</span><span>-$${Number(lineItems.filter(i => i.amount < 0).reduce((s, i) => s + Math.abs(i.amount), 0)).toFixed(2)}</span></div>`}
-    <div class="totals-row"><span>Shipping:</span><span>$${Number(shipping).toFixed(2)}</span></div>
-    <div class="totals-row final"><span>Grand Total:</span><span>$${Number(grandTotal).toFixed(2)}</span></div>
+      <div class="totals-row"><span>Subtotal:</span><span>$${Number(subtotal).toFixed(2)}</span></div>
+      ${!lineItems.some(item => item.amount < 0) ? '' : `<div class="totals-row discount"><span>Quantity Discount Applied:</span><span>-$${Number(lineItems.filter(i => i.amount < 0).reduce((s, i) => s + Math.abs(i.amount), 0)).toFixed(2)}</span></div>`}
+      <div class="totals-row"><span>Shipping:</span><span>$${Number(shipping).toFixed(2)}</span></div>
+      <div class="totals-row final"><span>Grand Total:</span><span>$${Number(grandTotal).toFixed(2)}</span></div>
     </div>
 
     <div class="footer">
@@ -138,8 +138,8 @@ const buildInvoiceText = (quoteSummary, productInfo) => {
     `Quote for: ${productName}`,
     `Total Quantity: ${totalQuantity} pcs`,
     `Unit Price: $${Number(unitPrice).toFixed(2)}`,
-    `Subtotal: $${Number(subtotal + discountAmount).toFixed(2)}`,
-    discountAmount > 0 ? `Discount: -$${discountAmount.toFixed(2)}` : null,
+    `Subtotal: $${Number(subtotal).toFixed(2)}`,
+    discountAmount > 0 ? `Quantity Discount Applied: -$${discountAmount.toFixed(2)}` : null,
     `Shipping: $${Number(shipping).toFixed(2)}`,
     `Grand Total: $${Number(grandTotal).toFixed(2)}`,
     '',

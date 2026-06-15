@@ -1217,13 +1217,11 @@ const renderDeliveryStep = () => {
           <div className="px-4 sm:px-6 py-4 space-y-2">
             <div className="flex justify-between text-sm text-gray-900">
               <span>Subtotal</span>
-              <span>${(typeof quoteSummary.subtotal === 'number'
-                ? quoteSummary.subtotal + discountAmount
-                : discountAmount).toFixed(2)}</span>
+              <span>${(typeof quoteSummary.subtotal === 'number' ? quoteSummary.subtotal : 0).toFixed(2)}</span>
             </div>
             {discountAmount > 0 && (
               <div className="flex justify-between text-sm text-emerald-700">
-                <span>Discount</span>
+                <span>Quantity Discount Applied</span>
                 <span>-${discountAmount.toFixed(2)}</span>
               </div>
             )}
