@@ -24,7 +24,6 @@ function debounce(fn, delay) {
     timeoutId = setTimeout(() => fn(...args), delay);
   };
 }
-
 function normalizeSelectionType(value) {
   const raw = String(value || '').toLowerCase();
   if (raw === 'single' || raw === 'one' || raw === 'radio' || raw === 'single_select') return 'single';

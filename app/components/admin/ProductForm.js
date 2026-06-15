@@ -549,7 +549,7 @@ setCustomizationMode('print_product');
       ...prev,
       [poolId]: [
         ...(prev[poolId] || []),
-        { minQty: 1, maxQty: null, unitPrice: 0, discountPercent: 0, enabled: true },
+        { minQty: 1, maxQty: null, unitPrice: 0, discountType: 'NONE', discountValue: 0, enabled: true },
       ],
     }));
   };
@@ -559,13 +559,7 @@ setCustomizationMode('print_product');
       ...prev,
       [poolId]: (prev[poolId] || []).map((tier, i) => {
         if (i !== index) return tier;
-        const next = { ...tier, [field]: parseQuantityTierField(field, value) };
-        if (field === 'unitPrice') {
-          if (next.unitPrice > 0) next.discountPercent = 0;
-        } else if (field === 'discountPercent') {
-          if (next.discountPercent > 0) next.unitPrice = 0;
-        }
-        return next;
+        return { ...tier, [field]: parseQuantityTierField(field, value) };
       }),
     }));
   };
@@ -858,7 +852,8 @@ setCustomizationMode('print_product');
   const parseQuantityTierField = (field, value) => {
     if (field === 'enabled') return value;
     if (field === 'maxQty') return value === '' || value == null ? null : parseFloat(value);
-    if (field === 'discountPercent') {
+    if (field === 'discountType') return value;
+    if (field === 'discountValue' || field === 'unitPrice' || field === 'minQty') {
       if (value === '' || value == null) return 0;
       const n = parseFloat(value);
       return Number.isFinite(n) ? n : 0;
@@ -867,11 +862,6 @@ setCustomizationMode('print_product');
   };
 
   const normalizeQuantityTierForSave = (tier) => {
-    const discountRaw = tier?.discountPercent;
-    const discount =
-      discountRaw === '' || discountRaw == null || !Number.isFinite(Number(discountRaw))
-        ? 0
-        : Number(discountRaw);
     return {
       minQty: Number(tier.minQty) || 1,
       maxQty:
@@ -879,7 +869,8 @@ setCustomizationMode('print_product');
           ? null
           : Number(tier.maxQty),
       unitPrice: Number.isFinite(Number(tier.unitPrice)) ? Number(tier.unitPrice) : 0,
-      discountPercent: discount,
+      discountType: tier.discountType === 'PERCENT' || tier.discountType === 'FIXED' ? tier.discountType : 'NONE',
+      discountValue: Number.isFinite(Number(tier.discountValue)) ? Number(tier.discountValue) : 0,
       enabled: tier.enabled !== false,
     };
   };
@@ -888,7 +879,8 @@ setCustomizationMode('print_product');
     minQty: t.minQty,
     maxQty: t.maxQty ?? null,
     unitPrice: t.unitPrice,
-    discountPercent: t.discountPercent != null ? Number(t.discountPercent) : 0,
+    discountType: t.discountType === 'PERCENT' || t.discountType === 'FIXED' ? t.discountType : 'NONE',
+    discountValue: Number.isFinite(Number(t.discountValue)) ? Number(t.discountValue) : 0,
     enabled: t.enabled !== false,
   });
 
@@ -896,7 +888,7 @@ setCustomizationMode('print_product');
   const addCustomTier = () => {
     setCustomQuantityTiers((prev) => [
       ...prev,
-      { minQty: 1, maxQty: null, unitPrice: 0, discountPercent: 0, enabled: true },
+      { minQty: 1, maxQty: null, unitPrice: 0, discountType: 'NONE', discountValue: 0, enabled: true },
     ]);
   };
 
@@ -905,13 +897,7 @@ setCustomizationMode('print_product');
     setCustomQuantityTiers((prev) =>
       prev.map((tier, i) => {
         if (i !== index) return tier;
-        const next = { ...tier, [field]: parseQuantityTierField(field, value) };
-        if (field === 'unitPrice') {
-          if (next.unitPrice > 0) next.discountPercent = 0;
-        } else if (field === 'discountPercent') {
-          if (next.discountPercent > 0) next.unitPrice = 0;
-        }
-        return next;
+        return { ...tier, [field]: parseQuantityTierField(field, value) };
       }),
     );
   };
@@ -2111,13 +2097,16 @@ const productData = {
                       <div className="text-sm text-gray-600">
                         Configure product-specific quantity tiers for this pool.
                       </div>
-                      <p className="text-xs text-[#29b6f6]">Choose either Unit Price OR Discount %, not both.</p>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {(poolQuantityTiers[pool.id] || []).map((tier, idx) => {
-                          const unitPriceDisabled = tier.discountPercent > 0;
-                          const discountDisabled = tier.unitPrice > 0;
+                          const discountType = tier.discountType || 'NONE';
+                          const discountValue = Number(tier.discountValue || 0);
+                          const unitPrice = Number(tier.unitPrice || 0);
+                          const isValidPercent = discountType !== 'PERCENT' || (discountValue >= 0 && discountValue <= 100);
+                          const isValidUnitPrice = unitPrice > 0 || discountType === 'NONE';
+                          const tierError = !isValidPercent || !isValidUnitPrice;
                           return (
-                            <div key={`${pool.id}-tier-${idx}`} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center">
+                            <div key={`${pool.id}-tier-${idx}`} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-start">
                               <input
                                 type="number"
                                 placeholder="Min Qty"
@@ -2139,35 +2128,42 @@ const productData = {
                                 step="0.01"
                                 placeholder="Unit Price"
                                 value={tier.unitPrice ?? ''}
-                                disabled={disabledPoolIds.includes(pool.id) || unitPriceDisabled}
-                                onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'unitPrice', e.target.value)}
-                                className={`px-2 py-1 text-sm border rounded ${unitPriceDisabled ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-300'}`}
-                              />
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                max="100"
-                                placeholder="Discount %"
-                                value={tier.discountPercent ?? ''}
-                                disabled={disabledPoolIds.includes(pool.id) || discountDisabled}
-                                onChange={(e) =>
-                                  updatePoolQuantityTier(pool.id, idx, 'discountPercent', e.target.value)
-                                }
-                                className={`px-2 py-1 text-sm border rounded ${discountDisabled ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-300'}`}
-                              />
-                              <button
-                                type="button"
                                 disabled={disabledPoolIds.includes(pool.id)}
-                                onClick={() => removePoolQuantityTier(pool.id, idx)}
-                                className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
+                                onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'unitPrice', e.target.value)}
+                                className={`px-2 py-1 text-sm border rounded ${!isValidUnitPrice ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
+                              />
+                              <select
+                                value={discountType}
+                                disabled={disabledPoolIds.includes(pool.id)}
+                                onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'discountType', e.target.value)}
+                                className="px-2 py-1 text-sm border border-gray-300 rounded"
                               >
-                                Remove Tier
-                              </button>
+                                <option value="NONE">None</option>
+                                <option value="PERCENT">Percent</option>
+                                <option value="FIXED">Fixed Amount</option>
+                              </select>
+                              {discountType !== 'NONE' && (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min={discountType === 'PERCENT' ? '0' : '0'}
+                                  max={discountType === 'PERCENT' ? '100' : undefined}
+                                  placeholder={discountType === 'PERCENT' ? 'Discount %' : 'Discount $'}
+                                  value={tier.discountValue ?? ''}
+                                  disabled={disabledPoolIds.includes(pool.id)}
+                                  onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'discountValue', e.target.value)}
+                                  className={`px-2 py-1 text-sm border rounded ${!isValidPercent ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
+                                />
+                              )}
                             </div>
                           );
                         })}
                       </div>
+                      {tierError && (
+                        <p className="text-xs text-red-600">
+                          Unit price must be greater than 0 when no discount is applied. Percent discount must be 0-100.
+                        </p>
+                      )}
                       <button
                         type="button"
                         disabled={disabledPoolIds.includes(pool.id)}
@@ -2178,7 +2174,7 @@ const productData = {
                       </button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                       {(pool.options || []).map((opt) => {
                         const selected = isPoolOptionSelected(pool.id, opt.id);
                         const sel = (poolSelections[pool.id] || []).find((x) => x.id === opt.id);
@@ -2283,15 +2279,18 @@ const productData = {
           <p className="text-xs text-gray-500 mb-4">
             Quantity tier pricing is product-specific. Configure tiers for this product only.
           </p>
-          <p className="text-xs text-[#29b6f6] mb-4">Choose either Unit Price OR Discount %, not both.</p>
           <div className="space-y-4">
-            <div className="grid gap-3">
+            <div className="space-y-4">
               {customQuantityTiers.map((tier, index) => {
-                const unitPriceDisabled = tier.discountPercent > 0;
-                const discountDisabled = tier.unitPrice > 0;
+                const discountType = tier.discountType || 'NONE';
+                const discountValue = Number(tier.discountValue || 0);
+                const unitPrice = Number(tier.unitPrice || 0);
+                const isValidPercent = discountType !== 'PERCENT' || (discountValue >= 0 && discountValue <= 100);
+                const isValidUnitPrice = unitPrice > 0 || discountType === 'NONE';
+                const tierError = !isValidPercent || !isValidUnitPrice;
                 return (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div key={index} className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-3">
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">Min Qty</label>
                         <input
@@ -2316,34 +2315,53 @@ const productData = {
                         <input
                           type="number"
                           step="0.01"
-                          value={tier.unitPrice || ''}
-                          disabled={unitPriceDisabled}
+                          value={tier.unitPrice ?? ''}
                           onChange={(e) => updateCustomTier(index, 'unitPrice', e.target.value)}
-                          className={`w-full px-3 py-1.5 text-sm border rounded ${unitPriceDisabled ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-300'}`}
+                          className={`w-full px-3 py-1.5 text-sm border rounded ${!isValidUnitPrice ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">Discount %</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="100"
-                          value={tier.discountPercent ?? ''}
-                          disabled={discountDisabled}
-                          onChange={(e) => updateCustomTier(index, 'discountPercent', e.target.value)}
-                          placeholder="0"
-                          className={`w-full px-3 py-1.5 text-sm border rounded ${discountDisabled ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-300'}`}
-                        />
+                        <label className="block text-xs text-gray-600 mb-1">Discount Type</label>
+                        <select
+                          value={discountType}
+                          onChange={(e) => updateCustomTier(index, 'discountType', e.target.value)}
+                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded"
+                        >
+                          <option value="NONE">None</option>
+                          <option value="PERCENT">Percent</option>
+                          <option value="FIXED">Fixed Amount</option>
+                        </select>
                       </div>
+                      {discountType !== 'NONE' && (
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">
+                            {discountType === 'PERCENT' ? 'Discount (%)' : 'Discount Amount ($)'}
+                          </label>
+                          <input
+                            type="number"
+                            step={discountType === 'PERCENT' ? '0.01' : '0.01'}
+                            min={discountType === 'PERCENT' ? '0' : '0'}
+                            max={discountType === 'PERCENT' ? '100' : undefined}
+                            value={tier.discountValue ?? ''}
+                            onChange={(e) => updateCustomTier(index, 'discountValue', e.target.value)}
+                            className={`w-full px-3 py-1.5 text-sm border rounded ${!isValidPercent ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
+                          />
+                        </div>
+                      )}
                     </div>
                     <button
                       type="button"
                       onClick={() => removeCustomTier(index)}
-                      className="text-red-600 hover:text-red-800 text-sm"
+                      className="text-red-600 hover:text-red-800 text-sm mt-6"
                     >
                       Remove
                     </button>
+                    {tierError && (
+                      <p className="text-xs text-red-600 mt-1">
+                        {!isValidUnitPrice ? 'Unit price must be greater than 0 when no discount is applied. ' : ''}
+                        {!isValidPercent ? 'Percent discount must be 0-100. ' : ''}
+                      </p>
+                    )}
                   </div>
                 );
               })}
@@ -2374,6 +2392,7 @@ const productData = {
         </div>
       )}
 
+        
       {/* Colors Tab */}
       {activeTab === 'colors' && quoteConfig && (
         <div className="bg-white rounded-lg shadow p-6">

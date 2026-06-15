@@ -8,6 +8,9 @@ ALTER TABLE shipping_config
 -- seed default values
 UPDATE shipping_config
 SET under_100_rate = 12.99,
+
     between_100_199_rate = 9.99,
     over_200_rate = 0.00
-WHERE id = 1;
+WHERE id = 1; 
+
+

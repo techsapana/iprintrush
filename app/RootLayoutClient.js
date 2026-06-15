@@ -22,6 +22,7 @@ export function RootLayoutClient({ children }) {
               <main className="flex-1">{children}</main>
               {!isAdminRoute && <Footer />}
             </div>
+            
           </AuthProvider>
         </WishlistProvider>
       </CartProvider>
