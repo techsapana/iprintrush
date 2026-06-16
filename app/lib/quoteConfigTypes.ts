@@ -19,16 +19,16 @@ export type QuantityTier = {
   id: UUID;
   minQty: number;
   maxQty: number | null; // null = no upper bound
-  unitPrice: number;
+  enabled: boolean;
   /**
-   * Unified discount rule for tier pricing:
-   * - 'NONE': No discount, use unitPrice only
-   * - 'PERCENT': Apply discount_value % off base total
-   * - 'FIXED': Subtract discount_value dollars from base total
+   * Discount rule for tier (applies to final subtotal):
+   * - 'NONE': No discount
+   * - 'PERCENT': Apply discountValue % off subtotal (printing + addons + production)
+   * - 'FIXED': Subtract discountValue dollars from subtotal (max discount = subtotal)
    */
   discountType: 'NONE' | 'PERCENT' | 'FIXED';
   discountValue: number; // percentage (e.g. 10 = 10%) or fixed dollar amount
-  enabled: boolean;
+  displayOrder?: number;
 };
 
 export type SizeOption = {
@@ -78,6 +78,7 @@ export type ShippingConfig = {
   enabled: boolean;
   defaultFlatRate: number;
   oversizedWidthThresholdIn: number;
+  oversizedWeightThresholdLb: number;
   under100Rate: number;
   between100And199Rate: number;
   over200Rate: number;
@@ -199,7 +200,7 @@ export type CustomizationPool = {
   selectionType: string;
   priceType: string;
   options: CustomizationOption[];
-  quantityTiers?: { minQty: number; maxQty: number | null; unitPrice: number; discountType?: 'NONE' | 'PERCENT' | 'FIXED'; discountValue?: number; label?: string }[];
+  quantityTiers?: { minQty: number; maxQty: number | null; discountType?: 'NONE' | 'PERCENT' | 'FIXED'; discountValue?: number; label?: string; enabled?: boolean }[];
 };
 
 export type DynamicQuoteRequestPayload = {

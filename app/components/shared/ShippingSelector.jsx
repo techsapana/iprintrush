@@ -16,10 +16,12 @@ function getShippingMethodLabel(method) {
 
 export function ShippingSelector({ selectedMethod, onMethodChange, showOversizedWarning = false, className = '', shippingEnabled = true, items = [], config: shippingConfig }) {
   const [shippingMethods, setShippingMethods] = useState([]);
+  const [oversizedDetails, setOversizedDetails] = useState(null);
 
   useEffect(() => {
     if (!shippingConfig) {
       setShippingMethods([]);
+      setOversizedDetails(null);
       return;
     }
     let cancelled = false;
@@ -34,11 +36,16 @@ export function ShippingSelector({ selectedMethod, onMethodChange, showOversized
         const data = await res.json().catch(() => ({}));
         if (data?.success && Array.isArray(data.methods)) {
           setShippingMethods(data.methods);
+          setOversizedDetails(data.oversizedDetails || null);
         } else {
           setShippingMethods([]);
+          setOversizedDetails(null);
         }
       } catch {
-        if (!cancelled) setShippingMethods([]);
+        if (!cancelled) {
+          setShippingMethods([]);
+          setOversizedDetails(null);
+        }
       }
     };
     load();
@@ -57,6 +64,16 @@ export function ShippingSelector({ selectedMethod, onMethodChange, showOversized
       {shouldShowWarning && (
         <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
           Oversized product detected. Standard shipping is unavailable. Our team will review shipping options and contact you.
+          {oversizedDetails?.widthExceeded && (
+            <div className="mt-1">
+              Selected Width: {oversizedDetails.widthExceeded.selectedWidth}" | Maximum Allowed Width: {oversizedDetails.widthExceeded.maxAllowedWidth}"
+            </div>
+          )}
+          {oversizedDetails?.weightExceeded && (
+            <div className="mt-1">
+              Product Weight: {oversizedDetails.weightExceeded.productWeight} lbs | Maximum Allowed Weight: {oversizedDetails.weightExceeded.maxAllowedWeight} lbs
+            </div>
+          )}
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

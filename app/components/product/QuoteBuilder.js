@@ -25,6 +25,7 @@ export function QuoteBuilder({
   maxOrderValue: maxOrderValueProp,
   prefillQuote = null,
   onQuoteReady,
+  weightLb = null,
 }) {
   const [loading, setLoading] = useState(true);
   const [configMode, setConfigMode] = useState(null);
@@ -612,6 +613,7 @@ const invalidateQuote = () => {
         maxQuantity={quantityMax}
         prefillQuote={prefillQuote}
         onQuoteReady={onQuoteReady}
+        weightLb={weightLb}
       />
     );
   }

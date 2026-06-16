@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceHTML, buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
+import { ShippingSelector } from '../shared/ShippingSelector';
 
 const SHIPPING_METHOD_LABELS = {
   pickup: 'Store Pickup',
@@ -42,6 +43,7 @@ export function DynamicQuoteBuilder({
   maxOrderValue: productMaxValue = null,
   prefillQuote = null,
   onQuoteReady,
+  weightLb = null,
 }) {
    const [loading, setLoading] = useState(true);
    const [schema, setSchema] = useState(null);
@@ -277,10 +279,18 @@ const artworkFileRef = useRef(null);
     setHasCalculated(false);
   };
 
-  const isShippingReviewRequired = () => {
+const isShippingReviewRequired = () => {
     const w = parseFloat(widthIn);
     const threshold = Number(shipping?.oversizedWidthThresholdIn);
-    return Number.isFinite(w) && Number.isFinite(threshold) && w > threshold;
+    const weightThreshold = Number(shipping?.oversizedWeightThresholdLb);
+    // Width check
+    const widthExceeded = Number.isFinite(w) && Number.isFinite(threshold) && w > threshold;
+    // Weight check - base weight multiplied by quantity
+    const qty = Math.max(1, totalQuantity || 1);
+    const baseWeight = Number(weightLb || 0);
+    const totalWeight = baseWeight * qty;
+    const weightExceeded = Number.isFinite(weightThreshold) && weightThreshold > 0 && Number.isFinite(totalWeight) && totalWeight > weightThreshold;
+    return widthExceeded || weightExceeded;
   };
 
   const hasCalculatedRef = useRef(hasCalculated);
@@ -731,13 +741,13 @@ customizationsDisplay.Delivery =
             />
           </div>
           
-          {selectedTier && (
-            <div className="text-sm text-gray-600">
-              Unit Price: ${selectedTier.unitPrice.toFixed(2)} per item
-              {selectedTier.maxQty && ` (${selectedTier.minQty}-${selectedTier.maxQty} items)`}
-              {!selectedTier.maxQty && ` (${selectedTier.minQty}+ items)`}
-            </div>
-          )}
+{selectedTier && selectedTier.discountType !== 'NONE' && (
+             <div className="text-sm text-gray-600">
+               Discount: {selectedTier.discountType === 'PERCENT' ? selectedTier.discountValue + '%' : '$' + selectedTier.discountValue.toFixed(2)} off subtotal
+               {selectedTier.maxQty && ` (${selectedTier.minQty}-${selectedTier.maxQty} items)`}
+               {!selectedTier.maxQty && ` (${selectedTier.minQty}+ items)`}
+             </div>
+           )}
         </div>
 
       </div>
@@ -1305,82 +1315,26 @@ onChange={async (e) => {
   );
 
 const renderDeliveryStep = () => {
-    const showShippingReview = isShippingReviewRequired();
-    const localMethod = shipping?.methods?.find((m) => m.type === 'local_delivery');
-    const standardMethod = shipping?.methods?.find((m) => m.type === 'standard_shipping');
-    const reviewMethod = shipping?.methods?.find((m) => m.type === 'review_required');
-    // Auto-detect oversized scenario: review_required exists but standard_shipping is missing
-    const isOversizedMissingStandard = reviewMethod && !standardMethod;
+    const items = [{
+      id: productId,
+      quantity: totalQuantity > 0 ? totalQuantity : 1,
+      quotePayload: {
+        mode: 'print_product',
+        selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn) } : {}) },
+      },
+      product: { weight_lb: weightLb },
+    }];
+
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Delivery Option</h3>
-        {(showShippingReview || isOversizedMissingStandard) && (
-          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-            Oversized product detected. Standard shipping is unavailable. Our team will review shipping options and contact you.
-          </div>
-        )}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <button
-            type="button"
-            onClick={() => handleDeliveryMethodChange('pickup')}
-            className={`rounded-xl border px-4 py-3 text-left transition ${
-              deliveryMethod === 'pickup'
-                ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-            }`}
-          >
-            <div className="font-semibold text-gray-900">Store Pickup FREE</div>
-            <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
-          </button>
-          {shipping?.enabled !== false && localMethod && (
-            <button
-              type="button"
-              onClick={() => handleDeliveryMethodChange('local_delivery')}
-              className={`rounded-xl border px-4 py-3 text-left transition ${
-                deliveryMethod === 'local_delivery'
-                  ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                  : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-              }`}
-            >
-              <div className="font-semibold text-gray-900">Local Delivery</div>
-              <div className="text-sm text-gray-600">
-                ${localMethod.cost.toFixed(2)} delivery fee
-                {localMethod.cost === 0 && ' (Free for 200+ items)'}
-              </div>
-            </button>
-          )}
-          {shipping?.enabled !== false && standardMethod && (
-            <button
-              type="button"
-              onClick={() => handleDeliveryMethodChange('standard_shipping')}
-              className={`rounded-xl border px-4 py-3 text-left transition ${
-                deliveryMethod === 'standard_shipping'
-                  ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                  : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-              }`}
-            >
-              <div className="font-semibold text-gray-900">Standard Shipping</div>
-              <div className="text-sm text-gray-600">
-                ${standardMethod.cost.toFixed(2)} shipping fee
-                {standardMethod.cost === 0 && ' (Free for 200+ items)'}
-              </div>
-            </button>
-          )}
-          {reviewMethod && (
-            <button
-              type="button"
-              onClick={() => handleDeliveryMethodChange('review_required')}
-              className={`rounded-xl border px-4 py-3 text-left transition ${
-                deliveryMethod === 'review_required'
-                  ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                  : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-              }`}
-            >
-              <div className="font-semibold text-gray-900">Shipping Review Required</div>
-              <div className="text-sm text-gray-600">Oversized items require manual shipping review.</div>
-            </button>
-          )}
-        </div>
+        <ShippingSelector
+          selectedMethod={deliveryMethod}
+          onMethodChange={handleDeliveryMethodChange}
+          shippingEnabled={shipping?.enabled !== false}
+          config={shipping}
+          items={items}
+        />
       </div>
     );
   };

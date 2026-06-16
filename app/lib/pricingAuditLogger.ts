@@ -3,7 +3,7 @@ type PricingAuditLog = {
   productId: string;
   tierId?: string;
   quantity: number;
-  unitPrice: number;
+  effectiveUnitPrice: number; // price after discount per unit
   baseTotal: number;
   discountType: 'NONE' | 'PERCENT' | 'FIXED';
   discountValue: number;
@@ -31,7 +31,7 @@ export function createAuditLog(
   params: {
     tierId?: string;
     quantity: number;
-    unitPrice: number;
+    effectiveUnitPrice: number;
     baseTotal: number;
     discountType: 'NONE' | 'PERCENT' | 'FIXED';
     discountValue: number;

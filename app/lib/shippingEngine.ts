@@ -69,6 +69,7 @@ export type ShippingConfig = {
   enabled: boolean;
   defaultFlatRate: number;
   oversizedWidthThresholdIn: number;
+  oversizedWeightThresholdLb: number;
   under100Rate: number;
   between100And199Rate: number;
   over200Rate: number;
@@ -111,6 +112,16 @@ function parseWidthInches(selections: Record<string, unknown> | undefined): numb
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
   return null;
+}
+
+/**
+ * Get weight for an item (base weight * quantity)
+ */
+function getItemWeight(item: CartItem): number | null {
+  const baseWeight = item.product?.weight_lb;
+  if (baseWeight == null || !Number.isFinite(baseWeight) || baseWeight <= 0) return null;
+  const qty = Math.max(1, item.quantity || 1);
+  return baseWeight * qty;
 }
 
 /**
@@ -219,21 +230,62 @@ export function calculateShippingCostByQuantity(method: ShippingMethod, totalQua
 // ============================================================
 
 /**
- * Detect if any cart items are oversized (width > configured threshold)
- * Checks width_in from quotePayload selections for each item.
+ * Get detailed oversized detection info for UI warnings
  */
-export function detectOversizedItems(cartItems: CartItem[], threshold: number): boolean {
-  const oversizedThreshold = Number(threshold);
-  if (!Number.isFinite(oversizedThreshold)) return false;
+export type OversizedReason = {
+  widthExceeded?: {
+    selectedWidth: number;
+    maxAllowedWidth: number;
+  };
+  weightExceeded?: {
+    productWeight: number;
+    maxAllowedWeight: number;
+  };
+  anyOversized: boolean;
+};
 
+/**
+ * Detect oversized items and return detailed reasons
+ */
+export function getOversizedDetails(cartItems: CartItem[], config: ShippingConfig): OversizedReason {
+  const widthThreshold = Number(config.oversizedWidthThresholdIn);
+  const weightThreshold = Number(config.oversizedWeightThresholdLb);
+  
+  let widthExceeded: { selectedWidth: number; maxAllowedWidth: number } | undefined;
+  let weightExceeded: { productWeight: number; maxAllowedWeight: number } | undefined;
+  
   for (const item of cartItems) {
     const selections = item.quotePayload?.selections;
     const width = parseWidthInches(selections);
-    if (width !== null && width > oversizedThreshold) {
-      return true;
+    
+    // Check width threshold
+    if (Number.isFinite(widthThreshold) && width !== null && width > widthThreshold) {
+      widthExceeded = { selectedWidth: width, maxAllowedWidth: widthThreshold };
+      break; // Found one, that's enough
+    }
+    
+    // Check weight threshold
+    const weight = getItemWeight(item);
+    if (Number.isFinite(weightThreshold) && weightThreshold > 0 && weight !== null && weight > weightThreshold) {
+      weightExceeded = { productWeight: weight, maxAllowedWeight: weightThreshold };
+      break; // Found one, that's enough
     }
   }
-  return false;
+  
+  return {
+    widthExceeded,
+    weightExceeded,
+    anyOversized: widthExceeded !== undefined || weightExceeded !== undefined,
+  };
+}
+
+/**
+ * Detect if any cart items are oversized (width OR weight > configured thresholds)
+ * Checks width_in from quotePayload selections for width.
+ * Checks product.weight_lb (multiplied by quantity) for weight.
+ */
+export function detectOversizedItems(cartItems: CartItem[], config: ShippingConfig): boolean {
+  return getOversizedDetails(cartItems, config).anyOversized;
 }
 
 // ============================================================
@@ -249,7 +301,7 @@ export function getAvailableShippingMethods(
   config: ShippingConfig,
   shippingTierSubtotal?: number,
 ): ShippingMethodOption[] {
-  const oversizedDetected = detectOversizedItems(cartItems, config.oversizedWidthThresholdIn);
+  const oversizedDetected = detectOversizedItems(cartItems, config);
   const subtotal = Number.isFinite(Number(shippingTierSubtotal))
     ? Number(shippingTierSubtotal)
     : calculateShippingTierSubtotalFromCartItems(cartItems);
@@ -315,7 +367,7 @@ export function getAvailableShippingMethods(
  * Get complete shipping summary for a cart
  */
 export function getShippingSummary(cartItems: CartItem[], config: ShippingConfig, shippingTierSubtotal?: number): ShippingSummary {
-  const oversizedDetected = detectOversizedItems(cartItems, config.oversizedWidthThresholdIn);
+  const oversizedDetected = detectOversizedItems(cartItems, config);
   const totalQuantity = calculateTotalQuantity(cartItems);
   const methods = getAvailableShippingMethods(cartItems, config, shippingTierSubtotal);
 

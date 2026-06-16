@@ -77,6 +77,7 @@ quantityTiers: tiers.map((t: any) => ({
       enabled: Boolean(shippingConfig?.enabled ?? true),
       defaultFlatRate: parseFloat(shippingConfig?.default_flat_rate || 0),
       oversizedWidthThresholdIn: parseFloat(shippingConfig?.oversized_width_threshold_in || 0),
+      oversizedWeightThresholdLb: parseFloat(shippingConfig?.oversized_weight_threshold_lb || 0),
       under100Rate: parseFloat(shippingConfig?.under_100_rate || 0),
       between100And199Rate: parseFloat(shippingConfig?.between_100_199_rate || 0),
       over200Rate: parseFloat(shippingConfig?.over_200_rate || 0),
@@ -210,13 +211,14 @@ export async function PUT(req: NextRequest) {
 
     // Update shipping config if provided
     if (body.shipping) {
-      const currentShippingConfig = await queryOne('SELECT oversized_width_threshold_in FROM shipping_config LIMIT 1');
+      const currentShippingConfig = await queryOne('SELECT oversized_width_threshold_in, oversized_weight_threshold_lb FROM shipping_config LIMIT 1');
       await query(
-        `UPDATE shipping_config SET enabled = ?, default_flat_rate = ?, oversized_width_threshold_in = ?, under_100_rate = ?, between_100_199_rate = ?, over_200_rate = ?, local_under_100_rate = ?, local_between_100_199_rate = ?, local_over_200_rate = ?`,
+        `UPDATE shipping_config SET enabled = ?, default_flat_rate = ?, oversized_width_threshold_in = ?, oversized_weight_threshold_lb = ?, under_100_rate = ?, between_100_199_rate = ?, over_200_rate = ?, local_under_100_rate = ?, local_between_100_199_rate = ?, local_over_200_rate = ?`,
         [
           body.shipping.enabled !== false ? 1 : 0,
           body.shipping.defaultFlatRate || 0,
           body.shipping.oversizedWidthThresholdIn ?? parseFloat(currentShippingConfig?.oversized_width_threshold_in || 0),
+          body.shipping.oversizedWeightThresholdLb ?? parseFloat(currentShippingConfig?.oversized_weight_threshold_lb || 0),
           body.shipping.under100Rate || 0,
           body.shipping.between100And199Rate || 0,
           body.shipping.over200Rate || 0,

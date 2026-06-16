@@ -47,8 +47,8 @@ async function getProductOrderValueBounds(productId: string): Promise<{ min: num
   const min = row.min_order_value != null ? Number(row.min_order_value) : null;
   const max = row.max_order_value != null ? Number(row.max_order_value) : null;
   return {
-    min: Number.isFinite(min) && min > 0 ? min : null,
-    max: Number.isFinite(max) && max > 0 ? max : null,
+    min: min != null && Number.isFinite(min) && min > 0 ? min : null,
+    max: max != null && Number.isFinite(max) && max > 0 ? max : null,
   };
 }
 
@@ -155,26 +155,33 @@ async function getConfigWithCustomPrices(productId: string): Promise<QuoteConfig
       baseEnabled: true,
     })),
 quantityTiers: tiersToUse.map((t: any) => ({
-       id: t.id.toString(),
-       minQty: t.min_qty,
-       maxQty: t.max_qty,
-       unitPrice: parseFloat(t.unit_price),
-       discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
-       discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
-       enabled: true,
-     })),
+        id: t.id.toString(),
+        minQty: t.min_qty,
+        maxQty: t.max_qty,
+        discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
+        discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
+        enabled: true,
+      })),
     printLocations: printLocations.map((p: any) => ({
       id: p.id,
       name: p.name,
       priceModifier: customPrices.printLocations[p.id] ?? parseFloat(p.price_modifier),
       enabled: true,
     })),
-    turnarounds: turnarounds.map((t: any) => ({
-      id: t.id,
-      name: t.name,
-      priceModifier: customPrices.turnarounds[t.id] ?? parseFloat(t.price_modifier),
-      enabled: true,
-    })),
+   turnarounds: turnarounds.map((t: any) => {
+  const productOverride = productTurnarounds?.find(
+    (p: any) => p.turnaround_option_id === t.id
+  );
+
+  return {
+    id: t.id,
+    name: t.name,
+    priceModifier: productOverride?.custom_price ?? parseFloat(t.price_modifier),
+    pricingType: productOverride?.pricing_type ?? t.pricing_type,
+    percentageValue: productOverride?.percentage_value ?? t.percentage_value,
+    enabled: true,
+  };
+}),
     designerHelp: designerHelp.map((d: any) => ({
       id: d.id,
       name: d.name,
@@ -185,6 +192,7 @@ quantityTiers: tiersToUse.map((t: any) => ({
       enabled: Boolean(shippingConfig.enabled),
       defaultFlatRate: parseFloat(shippingConfig.default_flat_rate || 0),
       oversizedWidthThresholdIn: parseFloat(shippingConfig.oversized_width_threshold_in || 0),
+      oversizedWeightThresholdLb: parseFloat(shippingConfig.oversized_weight_threshold_lb || 0),
       under100Rate: parseFloat(shippingConfig.under_100_rate || 0),
       between100And199Rate: parseFloat(shippingConfig.between_100_199_rate || 0),
       over200Rate: parseFloat(shippingConfig.over_200_rate || 0),

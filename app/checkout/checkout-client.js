@@ -62,6 +62,7 @@ export default function CheckoutClient() {
     unavailable: false,
     message: '',
   });
+  const [oversizedDetails, setOversizedDetails] = useState(null);
   const [selectedShipping, setSelectedShipping] = useState(null);
   const [shippingMethods, setShippingMethods] = useState([]);
   const [selectedMethod, setSelectedMethod] = useState(null);
@@ -85,6 +86,7 @@ export default function CheckoutClient() {
             id: i.id,
             quantity: i.quantity,
             quotePayload: i.options?.quotePayload || null,
+            product: { weight_lb: i.weightLb ?? null },
           })),
           shippingAddress: {
             address: formData.shippingAddress.trim(),
@@ -97,6 +99,9 @@ export default function CheckoutClient() {
       const data = await res.json().catch(() => ({}));
       if (data?.success && Array.isArray(data.methods)) {
         setShippingMethods(data.methods);
+        if (data.oversizedDetails) {
+          setOversizedDetails(data.oversizedDetails);
+        }
       } else {
         setShippingMethods([]);
       }
@@ -128,6 +133,7 @@ export default function CheckoutClient() {
         id: i.id,
         quantity: i.quantity,
         quotePayload: i.options?.quotePayload || null,
+        product: { weight_lb: i.weightLb ?? null },
       })),
     [checkoutItems],
   );
@@ -643,15 +649,26 @@ export default function CheckoutClient() {
             )}
 
 {formData.deliveryMethod === 'shipping' && useRuleBased && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Methods</h2>
-                {/* Check if review_required method exists without standard_shipping */}
-                {shippingMethods.some((m) => m.type === 'review_required') &&
-                  !shippingMethods.some((m) => m.type === 'standard_shipping') && (
-                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm mb-4">
-                      Oversized product detected. Standard shipping is unavailable. Our team will review shipping options and contact you.
-                    </div>
-                  )}
+               <div className="bg-white rounded-lg shadow-sm p-6">
+                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Methods</h2>
+                 {/* Check if review_required method exists without standard_shipping */}
+                 {shippingMethods.some((m) => m.type === 'review_required') &&
+                   !shippingMethods.some((m) => m.type === 'standard_shipping') && oversizedDetails && (
+                     <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm mb-4">
+                       <div className="font-semibold mb-2">Shipping Review Required</div>
+                       {oversizedDetails.widthExceeded && (
+                         <div className="mb-1">
+                           Maximum allowed width: {oversizedDetails.widthExceeded.maxAllowedWidth} in. Selected: {oversizedDetails.widthExceeded.selectedWidth} in.
+                         </div>
+                       )}
+                       {oversizedDetails.weightExceeded && (
+                         <div className="mb-1">
+                           Maximum allowed weight: {oversizedDetails.weightExceeded.maxAllowedWeight} lb. Product weight: {oversizedDetails.weightExceeded.productWeight} lb.
+                         </div>
+                       )}
+                       <div>Our team will review shipping options and contact you.</div>
+                     </div>
+                   )}
                 {shippingMethods.length === 0 ? (
                   <p className="text-sm text-gray-500">
                     Enter street, city, state, and ZIP in Shipping Address to load shipping methods.

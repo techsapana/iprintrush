@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query } from "@/app/lib/db";
 import {
   detectOversizedItems,
+  getOversizedDetails,
   getAvailableShippingMethods,
   ShippingConfig,
 } from "@/app/lib/shippingEngine";
@@ -24,6 +25,7 @@ export async function POST(req: Request) {
       enabled: Boolean(row.enabled ?? true),
       defaultFlatRate: parseFloat(row.default_flat_rate || 0),
       oversizedWidthThresholdIn: parseFloat(row.oversized_width_threshold_in || 0),
+      oversizedWeightThresholdLb: parseFloat(row.oversized_weight_threshold_lb || 0),
       under100Rate: parseFloat(row.under_100_rate || 0),
       between100And199Rate: parseFloat(row.between_100_199_rate || 0),
       over200Rate: parseFloat(row.over_200_rate || 0),
@@ -33,7 +35,8 @@ export async function POST(req: Request) {
       rules: [],
     };
 
-    const oversized = detectOversizedItems(items, config.oversizedWidthThresholdIn);
+    const oversized = detectOversizedItems(items, config);
+    const oversizedDetails = getOversizedDetails(items, config);
     const methodsOptions = getAvailableShippingMethods(items, config);
     const availableMethods = methodsOptions
       .filter((m) => m.available)
@@ -45,6 +48,7 @@ export async function POST(req: Request) {
       oversized,
       availableMethods,
       reviewRequired,
+      oversizedDetails,
     });
   } catch (err) {
     return NextResponse.json(

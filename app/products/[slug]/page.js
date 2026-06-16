@@ -480,19 +480,20 @@ export default function ProductDetailPage({ params }) {
                   </Button>
                 </div>
               </div>
-            ) : (
-              <QuoteBuilder
-                productId={product.id}
-                productName={product.name}
-                productCategory={product.category || product.categorySlug || ''}
-                minQuantity={product.minQuantity}
-                maxQuantity={product.maxQuantity}
-                minOrderValue={product.minOrderValue}
-                maxOrderValue={product.maxOrderValue}
-                prefillQuote={quotePrefill}
-                onQuoteReady={setCurrentQuote}
-              />
-            )}
+) : (
+               <QuoteBuilder
+                 productId={product.id}
+                 productName={product.name}
+                 productCategory={product.category || product.categorySlug || ''}
+                 minQuantity={product.minQuantity}
+                 maxQuantity={product.maxQuantity}
+                 minOrderValue={product.minOrderValue}
+                 maxOrderValue={product.maxOrderValue}
+                 prefillQuote={quotePrefill}
+                 onQuoteReady={setCurrentQuote}
+                 weightLb={product.weightLb}
+               />
+             )}
 
             {/* Notary pricing chart (separate from mailbox rental) */}
             {isMailboxNotaryCategory && (

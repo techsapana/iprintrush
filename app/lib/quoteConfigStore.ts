@@ -21,17 +21,18 @@ function createDefaultConfig(): QuoteConfigStore {
   const id = () => randomUUID() as UUID;
 
   const defaultTiers: QuantityTier[] = [
-    { id: id(), minQty: 1, maxQty: 5, unitPrice: 25, discountType: 'NONE', discountValue: 0, enabled: true },
-    { id: id(), minQty: 6, maxQty: 11, unitPrice: 20, discountType: 'NONE', discountValue: 0, enabled: true },
-    { id: id(), minQty: 12, maxQty: 23, unitPrice: 18, discountType: 'NONE', discountValue: 0, enabled: true },
-    { id: id(), minQty: 24, maxQty: 35, unitPrice: 16, discountType: 'NONE', discountValue: 0, enabled: true },
-    { id: id(), minQty: 36, maxQty: 71, unitPrice: 14, discountType: 'NONE', discountValue: 0, enabled: true },
+    { id: id(), minQty: 1, maxQty: 5, discountType: 'NONE', discountValue: 0, enabled: true },
+    { id: id(), minQty: 6, maxQty: 11, discountType: 'NONE', discountValue: 0, enabled: true },
+    { id: id(), minQty: 12, maxQty: 23, discountType: 'NONE', discountValue: 0, enabled: true },
+    { id: id(), minQty: 24, maxQty: 35, discountType: 'NONE', discountValue: 0, enabled: true },
+    { id: id(), minQty: 36, maxQty: 71, discountType: 'NONE', discountValue: 0, enabled: true },
   ];
 
   const shipping: ShippingConfig = {
     enabled: true,
     defaultFlatRate: 15,
     oversizedWidthThresholdIn: 44,
+    oversizedWeightThresholdLb: 20,
     under100Rate: 0,
     between100And199Rate: 0,
     over200Rate: 0,

@@ -95,15 +95,14 @@ export async function getDynamicConfig(
         };
       });
 
-    const tiersToUse = (productQtyTiers as any[]).length > 0 ? productQtyTiers : qtyTiers;
-const quantityTiers = (tiersToUse as any[]).map((t: any) => ({
-       minQty: t.min_qty,
-       maxQty: t.max_qty,
-       unitPrice: parseFloat(t.unit_price),
-       discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
-       discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
-       label: t.label,
-     }));
+const tiersToUse = (productQtyTiers as any[]).length > 0 ? productQtyTiers : qtyTiers;
+    const quantityTiers = (tiersToUse as any[]).map((t: any) => ({
+        minQty: t.min_qty,
+        maxQty: t.max_qty,
+        discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
+        discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
+        label: t.label,
+      }));
 
     const mappedPool = {
       id: pool.id,
@@ -133,6 +132,7 @@ async function getShippingConfig() {
     enabled: Boolean((cfg as any)?.enabled ?? true),
     defaultFlatRate: parseFloat((cfg as any)?.default_flat_rate || 0),
     oversizedWidthThresholdIn: parseFloat((cfg as any)?.oversized_width_threshold_in || 0),
+    oversizedWeightThresholdLb: parseFloat((cfg as any)?.oversized_weight_threshold_lb || 0),
     under100Rate: parseFloat((cfg as any)?.under_100_rate || 0),
     between100And199Rate: parseFloat((cfg as any)?.between_100_199_rate || 0),
     over200Rate: parseFloat((cfg as any)?.over_200_rate || 0),
