@@ -859,12 +859,12 @@ export default function CheckoutClient() {
                          ? `Shipping (${selectedShipping.serviceName}):`
                          : 'Shipping:'}
                      </span>
-                     {useRuleBased && shippingMethods.find((m) => m.type === selectedMethod) ? (
-                       <span className="shrink-0 font-medium">${shippingAmount.toFixed(2)}</span>
-                     ) : selectedShipping ? (
-                       <span className="shrink-0 font-medium">${shippingAmount.toFixed(2)}</span>
-                     ) : useRuleBased ? (
-                       <span className="shrink-0 font-medium">$0.00</span>
+                      {useRuleBased && shippingMethods.find((m) => m.type === selectedMethod) ? (
+                        <span className="shrink-0 font-medium">{shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}</span>
+                      ) : selectedShipping ? (
+                        <span className="shrink-0 font-medium">{shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}</span>
+                      ) : useRuleBased ? (
+                        <span className="shrink-0 font-medium">FREE</span>
                      ) : (
                        <Button
                          type="button"

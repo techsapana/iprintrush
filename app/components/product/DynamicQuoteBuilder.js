@@ -967,7 +967,7 @@ const renderDimensionStep = (group, pool, value) => {
       `Total Quantity: ${displayTotalQuantity} pcs`,
       `Unit Price: $${quoteSummary.unitPrice.toFixed(2)}`,
       `Subtotal: $${quoteSummary.subtotal.toFixed(2)}`,
-      `Shipping: $${quoteSummary.shipping.toFixed(2)}`,
+      `Shipping: ${quoteSummary.shipping === 0 ? 'FREE' : `$${quoteSummary.shipping.toFixed(2)}`}`,
       `Grand Total: $${quoteSummary.grandTotal.toFixed(2)}`,
       '',
       'Selections:',
@@ -1142,7 +1142,7 @@ const renderDimensionStep = (group, pool, value) => {
             )}
             <div className="flex justify-between text-sm">
               <span>Shipping</span>
-              <span>${quoteSummary.shipping.toFixed(2)}</span>
+              <span>{quoteSummary.shipping === 0 ? 'FREE' : `$${quoteSummary.shipping.toFixed(2)}`}</span>
             </div>
             <div className="flex justify-between text-base font-semibold">
               <span>Grand Total</span>

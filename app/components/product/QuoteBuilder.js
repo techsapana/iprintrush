@@ -1229,7 +1229,7 @@ const renderDeliveryStep = () => {
             )}
             <div className="flex justify-between text-sm text-gray-900">
               <span>Shipping</span>
-              <span>${(typeof quoteSummary.shipping === 'number' ? quoteSummary.shipping : 0).toFixed(2)}</span>
+              <span>{(typeof quoteSummary.shipping === 'number' ? quoteSummary.shipping : 0) === 0 ? 'FREE' : `$${(typeof quoteSummary.shipping === 'number' ? quoteSummary.shipping : 0).toFixed(2)}`}</span>
             </div>
             <div className="flex justify-between text-base font-semibold text-gray-900">
               <span>Grand Total</span>
