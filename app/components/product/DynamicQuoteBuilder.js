@@ -77,6 +77,7 @@ const artworkFileRef = useRef(null);
   const [customSizeNote, setCustomSizeNote] = useState('');
   const [artworkUploading, setArtworkUploading] = useState(false);
   const [artworkError, setArtworkError] = useState('');
+  const [artworkConfirmed, setArtworkConfirmed] = useState(false);
 
   const latestCalcRequestIdRef = useRef(0);
   const hasEverCalculatedRef = useRef(false);
@@ -158,12 +159,18 @@ const artworkFileRef = useRef(null);
         if (Array.isArray(prefillPayload?.tempArtworkFiles)) {
           setTempArtworkFiles(prefillPayload.tempArtworkFiles);
         }
-        if (Array.isArray(prefillQuote?.artworkFiles)) {
-          setArtworkFiles(prefillQuote.artworkFiles);
+        if (Array.isArray(prefillPayload?.artworkFiles)) {
+          setArtworkFiles(prefillPayload.artworkFiles);
           if (!artworkReadyChoice) setArtworkReadyChoice('ready');
         }
-        if (typeof prefillQuote?.customSizeNote === 'string') {
-          setCustomSizeNote(prefillQuote.customSizeNote);
+        if (
+          (Array.isArray(prefillPayload?.tempArtworkFiles) && prefillPayload.tempArtworkFiles.length > 0) ||
+          (Array.isArray(prefillPayload?.artworkFiles) && prefillPayload.artworkFiles.length > 0)
+        ) {
+          setArtworkConfirmed(true);
+        }
+        if (typeof prefillPayload?.customSizeNote === 'string') {
+          setCustomSizeNote(prefillPayload.customSizeNote);
         }
         if (prefillQuote?.summary) {
           setQuoteSummary(prefillQuote.summary);
@@ -307,6 +314,7 @@ const isShippingReviewRequired = () => {
   const handleArtworkReadyChange = (value) => {
     invalidateQuote();
     setArtworkReadyChoice(value);
+    setArtworkConfirmed(false);
     scheduleRecalculation();
   };
 
@@ -319,12 +327,14 @@ const isShippingReviewRequired = () => {
   const handleTempArtworkFilesChange = (newFiles) => {
     invalidateQuote();
     setTempArtworkFiles(newFiles);
+    setArtworkConfirmed(false);
     scheduleRecalculation();
   };
 
   const handleArtworkFilesChange = (files) => {
     invalidateQuote();
     setArtworkFiles(files);
+    setArtworkConfirmed(false);
     scheduleRecalculation();
   };
 
@@ -1296,8 +1306,19 @@ onChange={async (e) => {
           {tempArtworkFiles.length > 0 && (
             <div className="text-xs text-gray-600">{tempArtworkFiles.length} artwork file(s) uploaded.</div>
           )}
-{artworkFiles.length > 0 && (
+          {artworkFiles.length > 0 && (
             <div className="text-xs text-gray-600">{artworkFiles.length} existing artwork file(s) will be reused.</div>
+          )}
+          {artworkReadyChoice === 'ready' && (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && (
+            <label className="flex items-center gap-2 text-sm text-gray-700 mt-2">
+              <input
+                type="checkbox"
+                checked={artworkConfirmed}
+                onChange={(e) => setArtworkConfirmed(e.target.checked)}
+                className="rounded border-gray-300 text-[#29b6f6] focus:ring-[#29b6f6]"
+              />
+              I confirm this is the correct artwork file.
+            </label>
           )}
         </div>
       )}
@@ -1397,7 +1418,7 @@ const renderDeliveryStep = () => {
     if (step === artworkStepIndex) {
       return (
         Boolean(artworkReadyChoice) &&
-        (artworkReadyChoice === 'not_ready' || tempArtworkFiles.length > 0 || artworkFiles.length > 0)
+        (artworkReadyChoice === 'not_ready' || (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && artworkConfirmed)
       );
     }
 

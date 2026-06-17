@@ -216,7 +216,21 @@ export async function POST(req: NextRequest) {
         let resolvedUnitPrice = 0;
         let customizationJson: string | null = null;
 
-        if (item.quotePayload && item.quoteSummary) {
+        if (
+          item.splitQuote === true &&
+          Number.isFinite(Number(item.customLineTotal)) &&
+          Number.isFinite(Number(item.customUnitPrice))
+        ) {
+          itemTotal = Number(item.customLineTotal || 0);
+          resolvedUnitPrice = Number(item.customUnitPrice || 0);
+          customizationJson = JSON.stringify({
+            lineItems: item.quoteSummary?.lineItems || [],
+            customizationsDisplay: item.customizationsDisplay || {},
+            mode: 'split_quote',
+            quotePayload: null,
+            quoteSummary: item.quoteSummary || null,
+          });
+        } else if (item.quotePayload && item.quoteSummary) {
           const calcRes = await fetch(`${baseUrl}/api/quote/calculate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -241,20 +255,6 @@ export async function POST(req: NextRequest) {
             quoteSummary: serverSummary || null,
           });
           resolvedUnitPrice = item.quantity > 0 ? itemTotal / item.quantity : 0;
-        } else if (
-          item.splitQuote === true &&
-          Number.isFinite(Number(item.customLineTotal)) &&
-          Number.isFinite(Number(item.customUnitPrice))
-        ) {
-          itemTotal = Number(item.customLineTotal || 0);
-          resolvedUnitPrice = Number(item.customUnitPrice || 0);
-          customizationJson = JSON.stringify({
-            lineItems: item.quoteSummary?.lineItems || [],
-            customizationsDisplay: item.customizationsDisplay || {},
-            mode: 'split_quote',
-            quotePayload: null,
-            quoteSummary: item.quoteSummary || null,
-          });
         } else {
           const unitPrice = Number(p.price || 0);
           itemTotal = unitPrice * item.quantity;

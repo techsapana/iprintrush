@@ -43,7 +43,8 @@ export function QuoteBuilder({
   const [artworkFiles, setArtworkFiles] = useState([]);
   const [customSizeNote, setCustomSizeNote] = useState('');
   const [artworkUploading, setArtworkUploading] = useState(false);
-const [artworkError, setArtworkError] = useState('');
+  const [artworkError, setArtworkError] = useState('');
+  const [artworkConfirmed, setArtworkConfirmed] = useState(false);
    const [showEmailForm, setShowEmailForm] = useState(false);
   const [emailTo, setEmailTo] = useState('');
   const [showTextForm, setShowTextForm] = useState(false);
@@ -168,7 +169,7 @@ const [deliveryMethod, setDeliveryMethod] = useState('pickup');
     if (p.decorationOptionId) setDecorationId(p.decorationOptionId);
     if (p.colorOptionId) setColorId(p.colorOptionId);
     if (p.turnaroundOptionId) setTurnaroundId(p.turnaroundOptionId);
-    if (p.designerHelpOptionId) setDesignerHelpId(p.designerHelpId);
+    if (p.designerHelpOptionId) setDesignerHelpId(p.designerHelpOptionId);
     if (Array.isArray(p.printLocationIds)) setPrintLocationIds(p.printLocationIds);
     if (p.deliveryMethod) setDeliveryMethod(p.deliveryMethod);
     if (p.isCustomApparels) setFabricChoice(p.useMyCloth ? 'own' : 'shop');
@@ -188,6 +189,12 @@ const [deliveryMethod, setDeliveryMethod] = useState('pickup');
     // If we have restored artworkFiles, treat artwork as already available
     if (Array.isArray(p.artworkFiles) && p.artworkFiles.length > 0) {
       setArtworkReadyChoice('ready');
+    }
+    if (
+      (Array.isArray(p.tempArtworkFiles) && p.tempArtworkFiles.length > 0) ||
+      (Array.isArray(p.artworkFiles) && p.artworkFiles.length > 0)
+    ) {
+      setArtworkConfirmed(true);
     }
     if (prefillQuote.summary) {
       setQuoteSummary(prefillQuote.summary);
@@ -463,18 +470,21 @@ const invalidateQuote = () => {
   const handleArtworkReadyChange = (value) => {
     invalidateQuote();
     setArtworkReadyChoice(value);
+    setArtworkConfirmed(false);
     scheduleRecalculation();
   };
 
   const handleTempArtworkFilesChange = (files) => {
     invalidateQuote();
     setTempArtworkFiles(files);
+    setArtworkConfirmed(false);
     scheduleRecalculation();
   };
 
   const handleArtworkFilesChange = (files) => {
     invalidateQuote();
     setArtworkFiles(files);
+    setArtworkConfirmed(false);
     scheduleRecalculation();
   };
 
@@ -1337,7 +1347,7 @@ const renderDeliveryStep = () => {
               type="radio"
               name="quote-artwork-ready"
               checked={artworkReadyChoice === 'ready'}
-              onChange={() => setArtworkReadyChoice('ready')}
+              onChange={() => handleArtworkReadyChange('ready')}
             />
             Upload file now
           </label>
@@ -1347,7 +1357,7 @@ const renderDeliveryStep = () => {
               name="quote-artwork-ready"
               checked={artworkReadyChoice === 'not_ready'}
               onChange={() => {
-                setArtworkReadyChoice('not_ready');
+                handleArtworkReadyChange('not_ready');
                 setTempArtworkFiles([]);
               }}
             />
@@ -1396,6 +1406,17 @@ const renderDeliveryStep = () => {
             )}
             {tempArtworkFiles.length > 0 && (
               <div className="text-xs text-gray-600">{tempArtworkFiles.length} artwork file(s) uploaded.</div>
+            )}
+            {artworkReadyChoice === 'ready' && (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && (
+              <label className="flex items-center gap-2 text-sm text-gray-700 mt-2">
+                <input
+                  type="checkbox"
+                  checked={artworkConfirmed}
+                  onChange={(e) => setArtworkConfirmed(e.target.checked)}
+                  className="rounded border-gray-300 text-[#29b6f6] focus:ring-[#29b6f6]"
+                />
+                I confirm this is the correct artwork file.
+              </label>
             )}
           </div>
         )}
@@ -1457,7 +1478,7 @@ const renderDeliveryStep = () => {
          case 6:
            return (
              Boolean(artworkReadyChoice) &&
-             (artworkReadyChoice === 'not_ready' || tempArtworkFiles.length > 0 || artworkFiles.length > 0)
+             (artworkReadyChoice === 'not_ready' || (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && artworkConfirmed)
            );
         case 7:
           return Boolean(designerHelpId);
@@ -1485,7 +1506,7 @@ const renderDeliveryStep = () => {
        case 5:
          return (
            Boolean(artworkReadyChoice) &&
-           (artworkReadyChoice === 'not_ready' || tempArtworkFiles.length > 0 || artworkFiles.length > 0)
+           (artworkReadyChoice === 'not_ready' || (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && artworkConfirmed)
          );
       case 6:
         return Boolean(designerHelpId);

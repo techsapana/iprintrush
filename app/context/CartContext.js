@@ -38,22 +38,31 @@ export function CartProvider({ children }) {
 
   const addToCart = useCallback((product, options = {}) => {
     setItems((prevItems) => {
-      const existingItem = prevItems.find(
-        (item) =>
-          item.id === product.id &&
-          JSON.stringify(item.options) === JSON.stringify(options)
-      );
+      const isQuoteBackedItem =
+        options?.quotePayload ||
+        options?.splitQuote === true ||
+        options?.customLineTotal != null;
+      const existingItem = isQuoteBackedItem
+        ? null
+        : prevItems.find(
+            (item) =>
+              item.id === product.id &&
+              JSON.stringify(item.options) === JSON.stringify(options),
+          );
 
       if (existingItem) {
         return prevItems.map((item) =>
           item.id === product.id &&
           JSON.stringify(item.options) === JSON.stringify(options)
             ? { ...item, quantity: item.quantity + (options.quantity || 1) }
-            : item
+            : item,
         );
       }
 
-      return [...prevItems, { ...product, options, quantity: options.quantity || 1 }];
+      return [
+        ...prevItems,
+        { ...product, options, quantity: options.quantity || 1 },
+      ];
     });
   }, []);
 
@@ -61,25 +70,41 @@ export function CartProvider({ children }) {
     setItems((prevItems) =>
       prevItems.filter(
         (item) =>
-          !(item.id === productId && JSON.stringify(item.options) === JSON.stringify(options))
-      )
+          !(
+            item.id === productId &&
+            JSON.stringify(item.options) === JSON.stringify(options)
+          ),
+      ),
     );
   }, []);
 
-  const updateQuantity = useCallback((productId, quantity, options = {}) => {
-    if (quantity <= 0) {
-      removeFromCart(productId, options);
-      return;
-    }
+  const updateQuantity = useCallback(
+    (productId, quantity, options = {}) => {
+      const isQuoteItem =
+        options?.quotePayload ||
+        options?.splitQuote === true ||
+        options?.customLineTotal != null;
 
-    setItems((prevItems) =>
-      prevItems.map((item) =>
-        item.id === productId && JSON.stringify(item.options) === JSON.stringify(options)
-          ? { ...item, quantity }
-          : item
-      )
-    );
-  }, [removeFromCart]);
+      if (isQuoteItem) {
+        return;
+      }
+
+      if (quantity <= 0) {
+        removeFromCart(productId, options);
+        return;
+      }
+
+      setItems((prevItems) =>
+        prevItems.map((item) =>
+          item.id === productId &&
+          JSON.stringify(item.options) === JSON.stringify(options)
+            ? { ...item, quantity }
+            : item,
+        ),
+      );
+    },
+    [removeFromCart],
+  );
 
   const clearCart = useCallback(() => {
     setItems([]);
@@ -116,7 +141,7 @@ export function CartProvider({ children }) {
     updateQuantity,
     clearCart,
     getTotal,
-    getItemCount
+    getItemCount,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
