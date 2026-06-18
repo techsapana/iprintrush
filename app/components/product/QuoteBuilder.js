@@ -870,12 +870,14 @@ const renderSizesStep = () => {
                 }`}
               >
                 <div className="font-semibold text-gray-900">{opt.name}</div>
-                {typeof effectivePrice === 'number' && effectivePrice !== 0 && (
+                {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
+                  <div className="text-sm text-gray-600">+{opt.percentageValue}%</div>
+                ) : typeof effectivePrice === 'number' && effectivePrice !== 0 ? (
                   <div className="text-sm text-gray-600">
                     {effectivePrice > 0 ? '+' : '-'}$
                     {Math.abs(effectivePrice).toFixed(2)} per order
                   </div>
-                )}
+                ) : null}
               </button>
             );
           })}

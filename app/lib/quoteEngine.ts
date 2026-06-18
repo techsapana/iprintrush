@@ -393,7 +393,8 @@ export function calculateQuote(
     const pricingType = selectedTurnaround.pricingType || 'flat';
     if (pricingType === 'percentage' && selectedTurnaround.percentageValue != null) {
       const addonsTotal = addonsPerUnit * totalQuantity;
-      const baseForPct = tierMerchandise.merchandiseSubtotal + addonsTotal;
+      const designerHelpTotal = flatFees.reduce((sum, f) => sum + f.amount, 0);
+      const baseForPct = tierMerchandise.merchandiseSubtotal + addonsTotal + designerHelpTotal;
       productionTimeTotal = baseForPct * (selectedTurnaround.percentageValue / 100);
     } else if (selectedTurnaround.priceModifier !== 0) {
       productionTimeTotal = selectedTurnaround.priceModifier;
@@ -623,7 +624,8 @@ const tierMerchandise = resolveQuantityTierMerchandise(
           const pricingType = opt.pricingType || 'flat';
           if (pricingType === 'percentage' && opt.percentageValue != null) {
             const addonsTotal = addonsPerUnit * totalQuantity;
-            const baseForPct = tierMerchandise.merchandiseSubtotal + addonsTotal;
+            const designerHelpTotal = flatFees.reduce((sum, f) => sum + f.amount, 0);
+            const baseForPct = tierMerchandise.merchandiseSubtotal + addonsTotal + designerHelpTotal;
             productionTimeTotal = baseForPct * (opt.percentageValue / 100);
           } else if (opt.priceModifier !== 0) {
             productionTimeTotal = opt.priceModifier;
@@ -761,13 +763,15 @@ export function calculateUnifiedQuote(
   );
 
   // Calculate production time / turnaround
+  const designerHelpTotal = flatFees.reduce((sum, f) => sum + f.amount, 0);
   const { productionTimeTotal, productionTimeLabel } = resolveProductionTimeForMode(
     config,
     pools,
     selections,
     totalQuantity,
     addonsPerUnit + sizeAddonPerUnit,
-    tierMerchandise.merchandiseSubtotal
+    tierMerchandise.merchandiseSubtotal,
+    designerHelpTotal
   );
 
   // Build final pricing
@@ -1001,7 +1005,8 @@ function resolveProductionTimeForMode(
   selections: Record<string, any>,
   totalQuantity: number,
   addonsPerUnit: number,
-  merchandiseSubtotal: number
+  merchandiseSubtotal: number,
+  designerHelpTotal: number
 ): { productionTimeTotal: number; productionTimeLabel: string } {
   const poolMap = new Map(pools.map(p => [p.key, p]));
 
@@ -1014,14 +1019,14 @@ function resolveProductionTimeForMode(
       if (typeof id === 'string') {
         const opt = productionPool.options.find(o => o.id === id);
         if (opt) {
-          const pricingType = opt.pricingType || 'flat';
-          if (pricingType === 'percentage' && opt.percentageValue != null) {
-            const addonsTotal = addonsPerUnit * totalQuantity;
-            const baseForPct = merchandiseSubtotal + addonsTotal;
-            return {
-              productionTimeTotal: baseForPct * (opt.percentageValue / 100),
-              productionTimeLabel: `${productionPool.name} (${opt.label})`,
-            };
+            const pricingType = opt.pricingType || 'flat';
+            if (pricingType === 'percentage' && opt.percentageValue != null) {
+              const addonsTotal = addonsPerUnit * totalQuantity;
+              const baseForPct = merchandiseSubtotal + addonsTotal + designerHelpTotal;
+              return {
+                productionTimeTotal: baseForPct * (opt.percentageValue / 100),
+                productionTimeLabel: `${productionPool.name} (${opt.label})`,
+              };
           } else if (opt.priceModifier !== 0) {
             return {
               productionTimeTotal: opt.priceModifier,
@@ -1041,7 +1046,7 @@ function resolveProductionTimeForMode(
       const pricingType = selectedTurnaround.pricingType || 'flat';
       if (pricingType === 'percentage' && selectedTurnaround.percentageValue != null) {
         const addonsTotal = addonsPerUnit * totalQuantity;
-        const baseForPct = merchandiseSubtotal + addonsTotal;
+        const baseForPct = merchandiseSubtotal + addonsTotal + designerHelpTotal;
         return {
           productionTimeTotal: baseForPct * (selectedTurnaround.percentageValue / 100),
           productionTimeLabel: `Turnaround (${selectedTurnaround.name})`,

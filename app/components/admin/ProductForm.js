@@ -2512,7 +2512,7 @@ const productData = {
                             className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
                           />
                           <p className="mt-1 text-xs text-gray-500">
-                            Applied on merchandise subtotal + addons
+                            Applied on merchandise subtotal + addons + designer help
                           </p>
                         </div>
                       )}

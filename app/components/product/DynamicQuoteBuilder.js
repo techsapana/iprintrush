@@ -807,11 +807,13 @@ customizationsDisplay.Delivery =
                 }`}
               >
                 <div className="font-semibold text-gray-900">{opt.label}</div>
-                {opt.priceModifier !== 0 && (
+                {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
+                  <div className="text-sm text-gray-600">+{opt.percentageValue}%</div>
+                ) : opt.priceModifier !== 0 ? (
                   <div className="text-sm text-gray-600">
                     {opt.priceModifier > 0 ? '+' : ''}${opt.priceModifier.toFixed(2)} {pool.priceType === 'per_unit' ? 'per piece' : 'per order'}
                   </div>
-                )}
+                ) : null}
               </button>
             );
           })}
@@ -844,15 +846,17 @@ customizationsDisplay.Delivery =
                 className={`rounded-lg border px-4 py-3 text-left transition ${
                   selected
                     ? 'border-[#29b6f6] bg-[#29b6f6]/5'
-                    : 'border-gray-200 hover:border-[#29b6f6]/60'
+                    : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
                 }`}
               >
                 <div className="font-semibold text-gray-900">{opt.label}</div>
-                {opt.priceModifier !== 0 && (
+                {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
+                  <div className="text-sm text-gray-600">+{opt.percentageValue}%</div>
+                ) : opt.priceModifier !== 0 ? (
                   <div className="text-sm text-gray-600">
                     {opt.priceModifier > 0 ? '+' : ''}${opt.priceModifier.toFixed(2)} {pool.priceType === 'per_unit' ? 'per piece' : 'per order'}
                   </div>
-                )}
+                ) : null}
               </button>
             );
           })}
