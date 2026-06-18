@@ -3,6 +3,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/app/lib/db';
 
+async function resolveProductId(productId: string) {
+  const productById = await queryOne('SELECT id FROM products WHERE id = ? LIMIT 1', [productId]);
+  if (productById?.id) return productById.id;
+  const productBySlug = await queryOne('SELECT id FROM products WHERE slug = ? LIMIT 1', [productId]);
+  return productBySlug?.id || null;
+}
+
 async function getProductWithCategory(productId: string) {
    const product = await queryOne(
      `SELECT p.*, c.id as cat_id, c.customization_schema, p.allow_custom_dimensions
@@ -58,14 +65,14 @@ async function getFullConfig() {
       baseEnabled: Boolean(s.base_enabled),
     })),
 quantityTiers: (tiers as any[]).map((t: any) => ({
-       id: t.id.toString(),
-       minQty: t.min_qty,
-       maxQty: t.max_qty,
-       unitPrice: Number.isFinite(parseFloat(t.unit_price)) ? parseFloat(t.unit_price) : 0,
-       discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
-       discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
-       enabled: Boolean(t.enabled),
-     })),
+        id: t.id.toString(),
+        minQty: t.min_qty,
+        maxQty: t.max_qty,
+        unitPrice: t.unit_price != null ? parseFloat(t.unit_price) : null,
+        discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
+        discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
+        enabled: Boolean(t.enabled),
+      })),
     printLocations: (printLocations as any[]).map((p: any) => ({
       id: p.id,
       name: p.name,
@@ -117,11 +124,19 @@ export async function GET(
     const { productId } = await params;
     const forAdmin = request.nextUrl.searchParams.get('admin') === '1';
 
+    const actualProductId = await resolveProductId(productId);
+    if (!actualProductId) {
+      return NextResponse.json(
+        { error: 'Product not found. Cannot load quote configuration.' },
+        { status: 404 }
+      );
+    }
+
     let schema: { mode?: string; groups?: any[] } | null = null;
     let productWithCat: any = null;
     
     try {
-      productWithCat = await getProductWithCategory(productId);
+      productWithCat = await getProductWithCategory(actualProductId);
       if (productWithCat?.customization_schema) {
         schema = typeof productWithCat.customization_schema === 'string'
           ? JSON.parse(productWithCat.customization_schema)
@@ -134,7 +149,7 @@ export async function GET(
     // Dynamic print_product mode: return schema + pools
     if (schema?.mode === 'print_product') {
       const { getDynamicConfig } = await import('@/app/lib/dynamicQuoteConfig');
-      const { pools, shipping } = await getDynamicConfig(productId, {
+      const { pools, shipping } = await getDynamicConfig(actualProductId, {
         mode: schema.mode || 'print_product',
         groups: schema.groups || [],
       }, { includeDisabledPools: forAdmin });
@@ -147,7 +162,7 @@ export async function GET(
 
       const productSettings = await queryOne(
         'SELECT disabled_pool_ids_json FROM product_quote_settings WHERE product_id = ? LIMIT 1',
-        [productId],
+        [actualProductId],
       );
       let disabledPoolIds: string[] = [];
       if (productSettings?.disabled_pool_ids_json) {
@@ -164,7 +179,7 @@ export async function GET(
 
       const enabledRow = await queryOne(
         'SELECT enabled FROM product_quote_settings WHERE product_id = ? LIMIT 1',
-        [productId],
+        [actualProductId],
       );
       const enabled = enabledRow ? Boolean(enabledRow.enabled) : true;
 
@@ -204,7 +219,7 @@ export async function GET(
     // Get product-specific settings
     const productSettings = await queryOne(
       'SELECT * FROM product_quote_settings WHERE product_id = ?',
-      [productId]
+      [actualProductId]
     );
 
     // Get all option IDs and custom prices for this product
@@ -219,31 +234,31 @@ export async function GET(
     ] = (await Promise.all([
       query(
         'SELECT decoration_option_id as id, custom_price FROM product_decoration_options WHERE product_id = ?',
-        [productId]
+        [actualProductId]
       ),
       query(
         'SELECT color_option_id as id FROM product_color_options WHERE product_id = ?',
-        [productId]
+        [actualProductId]
       ),
       query(
         'SELECT size_option_id as id, custom_price FROM product_size_options WHERE product_id = ?',
-        [productId]
+        [actualProductId]
       ),
       query(
         'SELECT print_location_option_id as id, custom_price FROM product_print_location_options WHERE product_id = ?',
-        [productId]
+        [actualProductId]
       ),
-query(
+ query(
          'SELECT turnaround_option_id as id, custom_price, pricing_type, percentage_value FROM product_turnaround_options WHERE product_id = ?',
-         [productId]
+         [actualProductId]
        ),
       query(
         'SELECT designer_help_option_id as id, custom_price FROM product_designer_help_options WHERE product_id = ?',
-        [productId]
+        [actualProductId]
       ),
       query(
         'SELECT * FROM product_quantity_tiers WHERE product_id = ? ORDER BY display_order, min_qty',
-        [productId]
+        [actualProductId]
       ),
     ])) as any[];
 
@@ -277,7 +292,7 @@ query(
     // If no settings exist, create default with all enabled options
     if (!productSettings) {
       const defaultSettings = {
-        productId,
+        productId: actualProductId,
         enabled: true,
         useCustomQuantityTiers: true,
         decorationOptionIds: config.decorations
@@ -318,7 +333,7 @@ query(
     }
 
      const settings = {
-        productId,
+        productId: actualProductId,
         enabled: Boolean(productSettings.enabled),
         useCustomQuantityTiers: Boolean(productSettings.use_custom_quantity_tiers),
         decorationOptionIds: (decorationOptions as any[]).map((r: any) => r.id),
@@ -332,14 +347,14 @@ query(
           .map((t) => t.id.toString()),
         customPrices,
 customQuantityTiers: (customQuantityTiers as any[]).map((t: any) => ({
-           id: t.id.toString(),
-           minQty: t.min_qty,
-           maxQty: t.max_qty,
-           unitPrice: parseFloat(t.unit_price),
-           discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
-           discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
-           enabled: Boolean(t.enabled),
-         })),
+            id: t.id.toString(),
+            minQty: t.min_qty,
+            maxQty: t.max_qty,
+            unitPrice: t.unit_price != null ? parseFloat(t.unit_price) : null,
+            discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
+            discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
+            enabled: Boolean(t.enabled),
+          })),
         customTurnaroundPricing,
         allowCustomDimensions: Boolean(productWithCat?.allow_custom_dimensions),
       };
@@ -358,13 +373,35 @@ customQuantityTiers: (customQuantityTiers as any[]).map((t: any) => ({
 }
 
 export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ productId: string }> },
-) {
-  try {
-    const { productId } = await params;
-    const body = await req.json();
-    const customPrices = body.customPrices || {};
+   req: NextRequest,
+   { params }: { params: Promise<{ productId: string }> },
+ ) {
+   try {
+     const { productId } = await params;
+     
+     // STEP 2: ALWAYS VERIFY PRODUCT EXISTS IN DB before any insert/update
+     let verifiedProductId: string | null = null;
+     const productById = await queryOne('SELECT id FROM products WHERE id = ? LIMIT 1', [productId]);
+     if (productById?.id) {
+       verifiedProductId = productById.id;
+     } else {
+       // Try slug lookup
+       const productBySlug = await queryOne('SELECT id FROM products WHERE slug = ? LIMIT 1', [productId]);
+       if (productBySlug?.id) {
+         verifiedProductId = productBySlug.id;
+       }
+     }
+     
+     if (!verifiedProductId) {
+       return NextResponse.json(
+         { error: 'Product not found. Cannot save quote configuration.' },
+         { status: 404 }
+       );
+     }
+     
+     const body = await req.json();
+     const actualProductId = verifiedProductId;
+     const customPrices = body.customPrices || {};
 
     if (body.customQuantityTiers && Array.isArray(body.customQuantityTiers)) {
       const bad = (body.customQuantityTiers as any[]).find(
@@ -410,211 +447,209 @@ export async function PUT(
          use_custom_quantity_tiers = VALUES(use_custom_quantity_tiers),
          disabled_pool_ids_json = VALUES(disabled_pool_ids_json)`,
       [
-        productId, 
+        actualProductId, 
         body.enabled !== false ? 1 : 0,
         body.useCustomQuantityTiers ? 1 : 0,
         JSON.stringify(Array.isArray(body.disabledPoolIds) ? body.disabledPoolIds : []),
       ]
     );
 
-    // Update decoration options with custom prices
-    if (body.decorationOptionIds) {
-      await query(
-        'DELETE FROM product_decoration_options WHERE product_id = ?',
-        [productId]
-      );
-      if (body.decorationOptionIds.length > 0) {
-        const values = body.decorationOptionIds.map((id: string) => [
-          productId,
-          id,
-          customPrices.decorations?.[id] ?? null,
-        ]);
-        await query(
-          'INSERT INTO product_decoration_options (product_id, decoration_option_id, custom_price) VALUES ?',
-          [values]
-        );
-      }
-    }
-
-    // Update color options (no custom prices for colors)
-    if (body.colorOptionIds) {
-      await query('DELETE FROM product_color_options WHERE product_id = ?', [
-        productId,
-      ]);
-      if (body.colorOptionIds.length > 0) {
-        const values = body.colorOptionIds.map((id: string) => [productId, id]);
-        await query(
-          'INSERT INTO product_color_options (product_id, color_option_id) VALUES ?',
-          [values]
-        );
-      }
-    }
-
-    // Update size options with custom prices
-    if (body.sizeOptionIds) {
-      await query('DELETE FROM product_size_options WHERE product_id = ?', [
-        productId,
-      ]);
-      if (body.sizeOptionIds.length > 0) {
-        const values = body.sizeOptionIds.map((id: string) => [
-          productId, 
-          id,
-          customPrices.sizes?.[id] ?? null,
-        ]);
-        await query(
-          'INSERT INTO product_size_options (product_id, size_option_id, custom_price) VALUES ?',
-          [values]
-        );
-      }
-    }
-
-    // Update print location options with custom prices
-    if (body.printLocationOptionIds) {
-      await query(
-        'DELETE FROM product_print_location_options WHERE product_id = ?',
-        [productId]
-      );
-      if (body.printLocationOptionIds.length > 0) {
-        const values = body.printLocationOptionIds.map((id: string) => [
-          productId,
-          id,
-          customPrices.printLocations?.[id] ?? null,
-        ]);
-        await query(
-          'INSERT INTO product_print_location_options (product_id, print_location_option_id, custom_price) VALUES ?',
-          [values]
-        );
-      }
-    }
-
-     // Update turnaround options with custom prices
-     if (body.turnaroundOptionIds) {
+if (body.decorationOptionIds) {
        await query(
-         'DELETE FROM product_turnaround_options WHERE product_id = ?',
-         [productId]
+         'DELETE FROM product_decoration_options WHERE product_id = ?',
+         [actualProductId]
        );
-       if (body.turnaroundOptionIds.length > 0) {
-         const values = body.turnaroundOptionIds.map((id: string) => {
-           const customPrice = customPrices.turnarounds?.[id] ?? null;
-           const turnaroundPricing = body.customTurnaroundPricing?.[id] || {};
-           return [
-             productId,
-             id,
-             customPrice,
-             turnaroundPricing.pricingType ?? 'flat',
-             turnaroundPricing.percentageValue ?? null,
-           ];
-         });
+       if (body.decorationOptionIds.length > 0) {
+         const values = body.decorationOptionIds.map((id: string) => [
+           actualProductId,
+           id,
+           customPrices.decorations?.[id] ?? null,
+         ]);
          await query(
-           'INSERT INTO product_turnaround_options (product_id, turnaround_option_id, custom_price, pricing_type, percentage_value) VALUES ?',
+           'INSERT INTO product_decoration_options (product_id, decoration_option_id, custom_price) VALUES ?',
            [values]
          );
        }
      }
 
-    // Update designer help options with custom prices
-    if (body.designerHelpOptionIds) {
-      await query(
-        'DELETE FROM product_designer_help_options WHERE product_id = ?',
-        [productId]
-      );
-      if (body.designerHelpOptionIds.length > 0) {
-        const values = body.designerHelpOptionIds.map((id: string) => [
-          productId,
-          id,
-          customPrices.designerHelp?.[id] ?? null,
-        ]);
+if (body.colorOptionIds) {
+       await query('DELETE FROM product_color_options WHERE product_id = ?', [
+         actualProductId,
+       ]);
+       if (body.colorOptionIds.length > 0) {
+         const values = body.colorOptionIds.map((id: string) => [actualProductId, id]);
+         await query(
+           'INSERT INTO product_color_options (product_id, color_option_id) VALUES ?',
+           [values]
+         );
+       }
+     }
+
+// Update size options with custom prices
+     if (body.sizeOptionIds) {
+       await query('DELETE FROM product_size_options WHERE product_id = ?', [
+         actualProductId,
+       ]);
+       if (body.sizeOptionIds.length > 0) {
+         const values = body.sizeOptionIds.map((id: string) => [
+           actualProductId, 
+           id,
+           customPrices.sizes?.[id] ?? null,
+         ]);
+         await query(
+           'INSERT INTO product_size_options (product_id, size_option_id, custom_price) VALUES ?',
+           [values]
+         );
+       }
+     }
+
+     // Update print location options with custom prices
+     if (body.printLocationOptionIds) {
+       await query(
+         'DELETE FROM product_print_location_options WHERE product_id = ?',
+         [actualProductId]
+       );
+       if (body.printLocationOptionIds.length > 0) {
+         const values = body.printLocationOptionIds.map((id: string) => [
+           actualProductId,
+           id,
+           customPrices.printLocations?.[id] ?? null,
+         ]);
+         await query(
+           'INSERT INTO product_print_location_options (product_id, print_location_option_id, custom_price) VALUES ?',
+           [values]
+         );
+       }
+     }
+
+      // Update turnaround options with custom prices
+      if (body.turnaroundOptionIds) {
         await query(
-          'INSERT INTO product_designer_help_options (product_id, designer_help_option_id, custom_price) VALUES ?',
-          [values]
+          'DELETE FROM product_turnaround_options WHERE product_id = ?',
+          [actualProductId]
         );
+        if (body.turnaroundOptionIds.length > 0) {
+          const values = body.turnaroundOptionIds.map((id: string) => {
+            const customPrice = customPrices.turnarounds?.[id] ?? null;
+            const turnaroundPricing = body.customTurnaroundPricing?.[id] || {};
+            return [
+              actualProductId,
+              id,
+              customPrice,
+              turnaroundPricing.pricingType ?? 'flat',
+              turnaroundPricing.percentageValue ?? null,
+            ];
+          });
+          await query(
+            'INSERT INTO product_turnaround_options (product_id, turnaround_option_id, custom_price, pricing_type, percentage_value) VALUES ?',
+            [values]
+          );
+        }
       }
-    }
+
+     // Update designer help options with custom prices
+     if (body.designerHelpOptionIds) {
+       await query(
+         'DELETE FROM product_designer_help_options WHERE product_id = ?',
+         [actualProductId]
+       );
+       if (body.designerHelpOptionIds.length > 0) {
+         const values = body.designerHelpOptionIds.map((id: string) => [
+           actualProductId,
+           id,
+           customPrices.designerHelp?.[id] ?? null,
+         ]);
+         await query(
+           'INSERT INTO product_designer_help_options (product_id, designer_help_option_id, custom_price) VALUES ?',
+           [values]
+         );
+       }
+     }
 
 // Update custom quantity tiers
-     if (body.customQuantityTiers !== undefined) {
-       await query('DELETE FROM product_quantity_tiers WHERE product_id = ?', [productId]);
-       if (body.customQuantityTiers && body.customQuantityTiers.length > 0) {
-         const values = body.customQuantityTiers.map((tier: any, idx: number) => {
-           const discountType = tier.discountType === 'PERCENT' || tier.discountType === 'FIXED' ? tier.discountType : 'NONE';
-           const discountValue = Number.isFinite(Number(tier.discountValue)) ? Number(tier.discountValue) : 0;
-           return [
-             productId,
-             tier.minQty,
-             tier.maxQty || null,
-             tier.unitPrice,
-             discountType,
-             discountValue,
-             tier.enabled !== false ? 1 : 0,
-             idx,
-           ];
-         });
-         await query(
-           'INSERT INTO product_quantity_tiers (product_id, min_qty, max_qty, unit_price, discount_type, discount_value, enabled, display_order) VALUES ?',
-           [values]
-         );
+      if (body.customQuantityTiers !== undefined) {
+        await query('DELETE FROM product_quantity_tiers WHERE product_id = ?', [actualProductId]);
+        if (body.customQuantityTiers && body.customQuantityTiers.length > 0) {
+          const values = body.customQuantityTiers.map((tier: any, idx: number) => {
+            const discountType = tier.discountType === 'PERCENT' || tier.discountType === 'FIXED' ? tier.discountType : 'NONE';
+            const discountValue = Number.isFinite(Number(tier.discountValue)) ? Number(tier.discountValue) : 0;
+            return [
+              actualProductId,
+              tier.minQty,
+              tier.maxQty || null,
+              tier.unitPrice ?? null,
+              discountType,
+              discountValue,
+              tier.enabled !== false ? 1 : 0,
+              idx,
+            ];
+          });
+          await query(
+            'INSERT INTO product_quantity_tiers (product_id, min_qty, max_qty, unit_price, discount_type, discount_value, enabled, display_order) VALUES ?',
+            [values]
+          );
+        }
+      }
+
+     // Update product pool options (for print_product categories)
+     if (body.poolOptions !== undefined) {
+       await query('DELETE FROM product_pool_options WHERE product_id = ?', [actualProductId]);
+       const poolOptions = body.poolOptions as Record<string, Array<{ id: string; customPrice?: number | null; pricingType?: string; percentageValue?: number | null }>>;
+       if (poolOptions && typeof poolOptions === 'object') {
+         for (const [poolId, opts] of Object.entries(poolOptions)) {
+           if (!Array.isArray(opts) || opts.length === 0) continue;
+           const values = opts.map((opt: any, idx: number) => {
+             const optionId = typeof opt === 'object' && opt?.id ? opt.id : opt;
+             const customPrice =
+               typeof opt === 'object' && opt?.customPrice != null ? opt.customPrice : null;
+             const pricingType = typeof opt === 'object' && opt?.pricingType ? opt.pricingType : 'flat';
+             const percentageValue =
+               typeof opt === 'object' && opt?.percentageValue != null ? opt.percentageValue : null;
+             return [actualProductId, poolId, optionId, customPrice, pricingType, percentageValue, 1, idx];
+           });
+           if (values.length > 0) {
+             await query(
+               'INSERT INTO product_pool_options (product_id, pool_id, option_id, custom_price, pricing_type, percentage_value, enabled, display_order) VALUES ?',
+               [values]
+             );
+           }
+         }
        }
      }
 
-    // Update product pool options (for print_product categories)
-    if (body.poolOptions !== undefined) {
-      await query('DELETE FROM product_pool_options WHERE product_id = ?', [productId]);
-      const poolOptions = body.poolOptions as Record<string, Array<{ id: string; customPrice?: number | null; pricingType?: string; percentageValue?: number | null }>>;
-      if (poolOptions && typeof poolOptions === 'object') {
-        for (const [poolId, opts] of Object.entries(poolOptions)) {
-          if (!Array.isArray(opts) || opts.length === 0) continue;
-          const values = opts.map((opt: any, idx: number) => {
-            const optionId = typeof opt === 'object' && opt?.id ? opt.id : opt;
-            const customPrice =
-              typeof opt === 'object' && opt?.customPrice != null ? opt.customPrice : null;
-            const pricingType = typeof opt === 'object' && opt?.pricingType ? opt.pricingType : 'flat';
-            const percentageValue =
-              typeof opt === 'object' && opt?.percentageValue != null ? opt.percentageValue : null;
-            return [productId, poolId, optionId, customPrice, pricingType, percentageValue, 1, idx];
-          });
+// Update product pool quantity tiers (for print_product quantity pools)
+      if (body.poolQuantityTiers !== undefined && body.poolQuantityTiers && typeof body.poolQuantityTiers === 'object') {
+        await query('DELETE FROM product_pool_quantity_tiers WHERE product_id = ?', [actualProductId]);
+        for (const [poolId, tiers] of Object.entries(body.poolQuantityTiers as Record<string, any[]>)) {
+          if (!Array.isArray(tiers) || tiers.length === 0) continue;
+          const values = tiers
+            .map((tier: any, idx: number) => {
+              const discountType = tier.discountType === 'PERCENT' || tier.discountType === 'FIXED' ? tier.discountType : 'NONE';
+              const discountValue = Number.isFinite(Number(tier.discountValue)) ? Number(tier.discountValue) : 0;
+              return [
+                actualProductId,
+                poolId,
+                tier.minQty,
+                tier.maxQty || null,
+                tier.unitPrice ?? null,
+                discountType,
+                discountValue,
+                tier.enabled !== false ? 1 : 0,
+                idx,
+              ];
+            })
+            .filter(
+              (row: any[]) =>
+                Number.isFinite(Number(row[2])),
+            );
           if (values.length > 0) {
             await query(
-              'INSERT INTO product_pool_options (product_id, pool_id, option_id, custom_price, pricing_type, percentage_value, enabled, display_order) VALUES ?',
+              'INSERT INTO product_pool_quantity_tiers (product_id, pool_id, min_qty, max_qty, unit_price, discount_type, discount_value, enabled, display_order) VALUES ?',
               [values]
             );
           }
         }
       }
-    }
-
-// Update product pool quantity tiers (for print_product quantity pools)
-     if (body.poolQuantityTiers !== undefined && body.poolQuantityTiers && typeof body.poolQuantityTiers === 'object') {
-       await query('DELETE FROM product_pool_quantity_tiers WHERE product_id = ?', [productId]);
-       for (const [poolId, tiers] of Object.entries(body.poolQuantityTiers as Record<string, any[]>)) {
-         if (!Array.isArray(tiers) || tiers.length === 0) continue;
-         const values = tiers
-           .map((tier: any, idx: number) => {
-             const discountType = tier.discountType === 'PERCENT' || tier.discountType === 'FIXED' ? tier.discountType : 'NONE';
-             const discountValue = Number.isFinite(Number(tier.discountValue)) ? Number(tier.discountValue) : 0;
-             return [
-               productId,
-               poolId,
-               tier.minQty,
-               tier.maxQty || null,
-               tier.unitPrice,
-               discountType,
-               discountValue,
-               tier.enabled !== false ? 1 : 0,
-               idx,
-             ];
-           })
-           .filter(
-             (row: any[]) =>
-               Number.isFinite(Number(row[2])) && Number.isFinite(Number(row[4])),
-           );
-         if (values.length > 0) {
-           await query(
-             'INSERT INTO product_pool_quantity_tiers (product_id, pool_id, min_qty, max_qty, unit_price, discount_type, discount_value, enabled, display_order) VALUES ?',
-             [values]
-           );
-         }
-       }
-     }
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {

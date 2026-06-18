@@ -63,6 +63,17 @@ async function ensureShippingColumns() {
   }
 }
 
+async function verifyProductIdOrSlug(productId: string, productSlug: string) {
+  const dbVerifiedProduct = await queryOne(
+    'SELECT id FROM products WHERE id = ? OR slug = ? LIMIT 1',
+    [productId, productSlug]
+  );
+  if (!dbVerifiedProduct?.id) {
+    throw new Error('Product creation failed - no DB record found after insert');
+  }
+  return dbVerifiedProduct;
+}
+
 export async function GET(request: NextRequest) {
    try {
      await ensureLCategoryColumn();
@@ -341,36 +352,9 @@ const productId = id || `product-${Date.now()}`;
     
     console.log('Product insertion completed');
 
-    // Get the actual product ID (either from form or from database)
-    let actualProductId;
-    if (id) {
-      // For existing products, use the provided ID
-      actualProductId = { id };
-      console.log('Using existing product ID:', id);
-    } else {
-      // For new products, find the inserted product by slug
-      console.log('Looking for new product with slug:', productSlug);
-      try {
-        const insertedProduct = await queryOne('SELECT id FROM products WHERE slug = ? LIMIT 1', [productSlug]);
-        console.log('Found inserted product:', insertedProduct);
-        if (insertedProduct && insertedProduct.id) {
-          actualProductId = insertedProduct;
-        } else {
-          console.error('Could not find inserted product with slug:', productSlug);
-          // Try to find by name as fallback
-          const productByName = await queryOne('SELECT id FROM products WHERE name = ? LIMIT 1', [name]);
-          console.log('Found product by name:', productByName);
-          if (productByName && productByName.id) {
-            actualProductId = productByName;
-          } else {
-            throw new Error('Failed to retrieve created product');
-          }
-        }
-      } catch (error) {
-        console.error('Error finding inserted product:', error);
-        throw new Error('Failed to retrieve created product');
-      }
-    }
+    // ALWAYS verify product exists in DB - never trust the frontend-supplied ID blindly
+    const actualProductId = await verifyProductIdOrSlug(productId, productSlug);
+    console.log('Verified product ID from DB:', actualProductId.id);
 
     console.log('Final actualProductId:', actualProductId);
 

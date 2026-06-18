@@ -53,7 +53,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
    try {
       const body = await request.json();
-      const { minQty, maxQty, discountType, discountValue = 0, enabled = true, displayOrder = 0 } = body;
+      const { minQty, maxQty, discountType, discountValue = 0, enabled = true, displayOrder = 0, unitPrice } = body;
 
       // Validate discount configuration
       const validation = validateTierDiscount(discountType, discountValue);
@@ -65,11 +65,12 @@ export async function POST(request: NextRequest) {
       }
 
       const result = await query(
-        `INSERT INTO quantity_tiers (min_qty, max_qty, discount_type, discount_value, enabled, display_order)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO quantity_tiers (min_qty, max_qty, unit_price, discount_type, discount_value, enabled, display_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           minQty,
           maxQty || null,
+          unitPrice ?? null,
           validation.normalizedType,
           validation.normalizedValue,
           enabled ? 1 : 0,

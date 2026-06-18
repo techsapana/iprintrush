@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS quantity_tiers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     min_qty INT NOT NULL,
     max_qty INT COMMENT 'NULL means no upper limit',
-    unit_price DECIMAL(10, 2) NOT NULL,
+    unit_price DECIMAL(10, 2) NULL,
     discount_type ENUM('NONE','PERCENT','FIXED') DEFAULT 'NONE',
     discount_value DECIMAL(10,2) DEFAULT 0,
     enabled BOOLEAN DEFAULT TRUE,
@@ -295,7 +295,7 @@ CREATE TABLE IF NOT EXISTS product_quantity_tiers (
     product_id VARCHAR(50) NOT NULL,
     min_qty INT NOT NULL,
     max_qty INT COMMENT 'NULL means no upper limit',
-    unit_price DECIMAL(10, 2) NOT NULL,
+    unit_price DECIMAL(10, 2) NULL,
     discount_type ENUM('NONE','PERCENT','FIXED') DEFAULT 'NONE',
     discount_value DECIMAL(10,2) DEFAULT 0,
     enabled BOOLEAN DEFAULT TRUE,
@@ -342,7 +342,7 @@ CREATE TABLE IF NOT EXISTS quotes (
     shipping DECIMAL(10, 2) DEFAULT 0.00,
     grand_total DECIMAL(10, 2) NOT NULL,
     total_quantity INT NOT NULL,
-    unit_price DECIMAL(10, 2) NOT NULL,
+    unit_price DECIMAL(10, 2) NULL,
     decoration_option_id VARCHAR(50),
     color_option_id VARCHAR(50),
     turnaround_option_id VARCHAR(50),
@@ -614,3 +614,5 @@ INSERT INTO notary_discount_rules (min_signatures, max_signatures, discount_perc
 (11, 20, 15.00),
 (21, NULL, 25.00)
 ON DUPLICATE KEY UPDATE discount_percent=VALUES(discount_percent);
+
+

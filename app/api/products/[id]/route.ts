@@ -67,6 +67,24 @@ async function ensureShippingColumns() {
   }
 }
 
+async function resolveProductIdOrSlug(idOrSlug: string) {
+  const byId = await queryOne('SELECT id FROM products WHERE id = ? LIMIT 1', [idOrSlug]);
+  if (byId?.id) return byId.id;
+  const bySlug = await queryOne('SELECT id FROM products WHERE slug = ? LIMIT 1', [idOrSlug]);
+  return bySlug?.id || null;
+}
+
+async function verifyProductIdOrSlug(productId: string, productSlug: string) {
+  const dbVerifiedProduct = await queryOne(
+    'SELECT id FROM products WHERE id = ? OR slug = ? LIMIT 1',
+    [productId, productSlug]
+  );
+  if (!dbVerifiedProduct?.id) {
+    throw new Error('Product update failed - no DB record found after save');
+  }
+  return dbVerifiedProduct.id;
+}
+
 export async function GET(
    request: NextRequest,
    { params }: { params: { id: string } | Promise<{ id: string }> }
@@ -219,13 +237,18 @@ export async function PUT(
     const body = await request.json();
     const resolvedParams = await params;
     
-    // Ensure we have a valid ID - use params.id, body.id, or generate one
-    const id = resolvedParams.id && resolvedParams.id !== 'undefined' && resolvedParams.id !== 'null' 
+    const requestedProductId = resolvedParams.id && resolvedParams.id !== 'undefined' && resolvedParams.id !== 'null' 
       ? resolvedParams.id 
-      : (body.id || `product-${Date.now()}`);
+      : body.id;
 
-    // Check if product exists
-    const existing = await queryOne('SELECT id FROM products WHERE id = ?', [id]);
+    if (!requestedProductId) {
+      throw new Error('Product ID is required');
+    }
+
+    const existingProductId = await resolveProductIdOrSlug(requestedProductId);
+    let actualProductId = existingProductId || (body.id || `product-${Date.now()}`);
+    const productId = actualProductId;
+    const productSlug = body.slug || body.name?.toLowerCase().replace(/\s+/g, '-') || productId;
     
     // Get category ID if category is provided
     let categoryId = null;
@@ -237,9 +260,8 @@ export async function PUT(
       categoryId = cat?.id || null;
     }
 
-if (!existing) {
+if (!existingProductId) {
       // Product doesn't exist - create it (upsert behavior)
-      const productSlug = body.slug || body.name?.toLowerCase().replace(/\s+/g, '-') || id;
       
       await query(
 `INSERT INTO products (id, name, slug, description, price, min_quantity, max_quantity, min_order_value, max_order_value, min_width_in, max_width_in, min_height_in, max_height_in, price_per_sq_inch, mailbox_price_per_month, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, enabled)
@@ -275,8 +297,8 @@ if (!existing) {
            local_delivery_eligible = VALUES(local_delivery_eligible),
            shipping_category = VALUES(shipping_category),
            updated_at = CURRENT_TIMESTAMP`,
-[
-           id,
+ [
+           productId,
            body.name,
            productSlug,
            body.description || '',
@@ -306,12 +328,14 @@ if (!existing) {
            body.shippingEnabled !== false,
            body.localDeliveryEligible ? 1 : 0,
            body.shippingCategory || 'standard',
-          ]
-      );
-    } else {
-      // Product exists - update it
-      const updates: string[] = [];
-      const values: any[] = [];
+]
+       );
+
+       actualProductId = await verifyProductIdOrSlug(productId, productSlug);
+      } else {
+       // Product exists - update it
+       const updates: string[] = [];
+       const values: any[] = [];
 
       if (body.name !== undefined) {
         updates.push('name = ?');
@@ -440,20 +464,22 @@ if (body.allow_custom_dimensions !== undefined) {
 
       if (updates.length > 0) {
         updates.push('updated_at = CURRENT_TIMESTAMP');
-        values.push(id);
+        values.push(actualProductId);
         await query(
           `UPDATE products SET ${updates.join(', ')} WHERE id = ?`,
           values
         );
       }
+
+      actualProductId = await verifyProductIdOrSlug(productId, productSlug);
     }
 
     // Update features if provided
     if (body.features !== undefined && Array.isArray(body.features)) {
-      await query('DELETE FROM product_features WHERE product_id = ?', [id]);
+      await query('DELETE FROM product_features WHERE product_id = ?', [actualProductId]);
       if (body.features.length > 0) {
         const featureValues = body.features.map((f: string, idx: number) => [
-          id,
+          actualProductId,
           f.trim(),
           idx,
         ]);
@@ -466,10 +492,10 @@ if (body.allow_custom_dimensions !== undefined) {
 
     // Update gallery images if provided
     if (body.galleryImages !== undefined && Array.isArray(body.galleryImages)) {
-      await query('DELETE FROM product_images WHERE product_id = ?', [id]);
+      await query('DELETE FROM product_images WHERE product_id = ?', [actualProductId]);
       if (body.galleryImages.length > 0) {
         const values = body.galleryImages
-          .map((url: string, idx: number) => [id, url, idx])
+          .map((url: string, idx: number) => [actualProductId, url, idx])
           .filter(([_id, url]: [string, string, number]) => url && String(url).trim().length > 0);
         if (values.length > 0) {
           await query(
@@ -484,11 +510,11 @@ if (body.allow_custom_dimensions !== undefined) {
     if (body.videos !== undefined && Array.isArray(body.videos)) {
       const includeVideos = await hasProductVideosTable();
       if (includeVideos) {
-        await query('DELETE FROM product_videos WHERE product_id = ?', [id]);
+        await query('DELETE FROM product_videos WHERE product_id = ?', [actualProductId]);
         if (body.videos.length > 0) {
           const values = body.videos
             .map((video: any, idx: number) => [
-              id,
+              actualProductId,
               video?.url,
               video?.title || `Video ${idx + 1}`,
               video?.description || '',
@@ -509,10 +535,10 @@ if (body.allow_custom_dimensions !== undefined) {
 
     // Update coupon codes if provided
     if (body.couponCodes !== undefined && Array.isArray(body.couponCodes)) {
-      await query('DELETE FROM product_coupon_codes WHERE product_id = ?', [id]);
+      await query('DELETE FROM product_coupon_codes WHERE product_id = ?', [actualProductId]);
       const values = body.couponCodes
         .map((c: any) => [
-          id,
+          actualProductId,
           String(c.code || '').trim().toUpperCase(),
           Number(c.discountPercent || 0),
           c.isActive === false ? 0 : 1,
@@ -526,7 +552,7 @@ if (body.allow_custom_dimensions !== undefined) {
       }
     }
 
-    return NextResponse.json({ success: true, id });
+    return NextResponse.json({ success: true, id: actualProductId });
   } catch (error: any) {
     console.error('Error updating product:', error);
     return NextResponse.json(

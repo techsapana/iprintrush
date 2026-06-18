@@ -79,7 +79,7 @@ export function AdminProvider({ children }) {
       if (res.ok) {
         const data = await res.json();
         await fetchProducts(); // Refresh list
-        return { success: true, id: data.id || id };
+        return { success: true, id: data.id };
       }
       const error = await res.json();
       throw new Error(error.error || 'Failed to update product');

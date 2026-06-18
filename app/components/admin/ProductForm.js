@@ -983,16 +983,16 @@ const productData = {
 
       let productId;
       if (initialProduct && initialProduct.id) {
-        // Ensure product data includes the ID for upsert
         const dataWithId = { ...productData, id: initialProduct.id };
         const result = await updateProduct(initialProduct.id, dataWithId);
-        productId = result?.id || initialProduct.id;
+        productId = result?.id;
+        if (!productId) throw new Error('Product save failed - no verified product ID returned');
       } else {
-        // Generate ID for new product
         const newId = `product-${Date.now()}`;
         const dataWithId = { ...productData, id: newId };
         const result = await addProduct(dataWithId);
-        productId = result?.id || newId;
+        productId = result?.id;
+        if (!productId) throw new Error('Product save failed - no verified product ID returned');
       }
 
       // Build custom prices object
@@ -1740,46 +1740,39 @@ const productData = {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Product Image</label>
                 <div className="space-y-3">
-                  {/* Image Preview */}
-                  {(() => {
-                    const src = imagePreview || formData.image;
-                    return src && src !== '/placeholder.jpg';
-                  })() && (
-                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-gray-300">
-                      <img
-                        src={imagePreview || formData.image}
-                        alt="Product preview"
-                        className="w-full h-full object-cover"
-</input>
-                                )}
-                              </div>
-                            );
-                          })}
-                       </div>
+{/* Image Preview */}
+                   {(() => {
+                     const src = imagePreview || formData.image;
+                     return src && src !== '/placeholder.jpg';
+                   })() && (
+                     <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-gray-300">
+                       <img
+                         src={imagePreview || formData.image}
+                         alt="Product preview"
+                         className="w-full h-full object-cover"
+                       />
                        <button
-                        type="button"
-                        onClick={() => {
-                          setImagePreview(null);
-                          setFormData((prev) => ({ ...prev, image: '/placeholder.jpg' }));
-                          // User explicitly cleared the image — keep it dirty so
-                          // sessionStorage doesn't restore the old upload.
-                          dirtyMediaFields.current.add('image');
-                          try {
-                            if (stableProductId) {
-                              sessionStorage.removeItem(pendingMainImageStorageKey(stableProductId));
-                            }
-                          } catch {
-                            // ignore
-                          }
-                        }}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* Upload Input */}
+                         type="button"
+                         onClick={() => {
+                           setImagePreview(null);
+                           setFormData((prev) => ({ ...prev, image: '/placeholder.jpg' }));
+                           dirtyMediaFields.current.add('image');
+                           try {
+                             if (stableProductId) {
+                               sessionStorage.removeItem(pendingMainImageStorageKey(stableProductId));
+                             }
+                           } catch {
+                             // ignore
+                           }
+                         }}
+                         className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                       >
+                         ×
+                       </button>
+                     </div>
+                   )}
+                   
+                   {/* Upload Input */}
                   <div className="flex items-center gap-3">
                     <button
                       type="button"

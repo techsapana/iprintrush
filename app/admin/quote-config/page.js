@@ -439,22 +439,10 @@ function SizesSection({ items, editing, formData, onEdit, onSave, onDelete, onCa
 
 function TiersSection({ items, editing, formData, onEdit, onSave, onDelete, onCancel, setFormData }) {
    const pricingType = formData?.discountType || 'NONE';
-   const unitPrice = formData?.unitPrice;
    const discountValue = Number(formData?.discountValue || 0);
    
-   // Validation checks
-   const hasUnitPrice = unitPrice != null && Number(unitPrice) > 0;
    const showHighDiscountWarning = pricingType === 'PERCENT' && discountValue > 50;
-   const disableSave = !hasUnitPrice && pricingType !== 'NONE';
    const discountValueError = discountValue < 0 || (!Number.isFinite(discountValue) && formData?.discountValue !== undefined);
-   
-   const handleSave = (data) => {
-     if (disableSave) {
-       alert('Cannot save: Discount requires a valid unit price');
-       return;
-     }
-     onSave('tiers', data);
-   };
    
     return (
       <div>
@@ -471,25 +459,23 @@ function TiersSection({ items, editing, formData, onEdit, onSave, onDelete, onCa
           editing={editing}
           formData={formData}
           onEdit={onEdit}
-          onSave={handleSave}
+          onSave={(data) => onSave('tiers', data)}
           onDelete={(id) => onDelete('tiers', id)}
           onCancel={onCancel}
           setFormData={setFormData}
           fields={[
             { key: 'minQty', label: 'Min Quantity', type: 'number', required: true },
             { key: 'maxQty', label: 'Max Quantity (leave empty for no limit)', type: 'number', optionalNumber: true },
-            { key: 'unitPrice', label: 'Unit Price ($)', type: 'number', step: '0.01', required: true },
             { key: 'discountType', label: 'Discount Type', type: 'select', options: ['NONE', 'PERCENT', 'FIXED'] },
             { key: 'discountValue', label: 'Discount Value', type: 'number', step: '0.01', show: pricingType !== 'NONE', error: discountValueError, errorMessage: 'Must be 0-100 for percent, any positive value for fixed' },
             { key: 'enabled', label: 'Enabled', type: 'checkbox' },
             { key: 'displayOrder', label: 'Display Order', type: 'number' },
           ]}
-          columns={['Min Qty', 'Max Qty', 'Unit Price', 'Discount', 'Enabled', 'Actions']}
+          columns={['Min Qty', 'Max Qty', 'Discount', 'Enabled', 'Actions']}
           renderRow={(item) => (
             <>
               <td className="px-6 py-4 font-medium text-gray-900">{item.minQty}</td>
               <td className="px-6 py-4 text-gray-600">{item.maxQty || '∞'}</td>
-              <td className="px-6 py-4 text-gray-600">${item.unitPrice.toFixed(2)}</td>
               <td className="px-6 py-4 text-gray-600">
                 {item.discountType && item.discountType !== 'NONE' 
                   ? `${item.discountType === 'PERCENT' ? item.discountValue + '%' : '$' + item.discountValue} off`

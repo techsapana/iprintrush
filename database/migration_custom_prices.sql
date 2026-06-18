@@ -1,4 +1,4 @@
--- Migration: Add custom price columns to product-option relationship tables
+﻿-- Migration: Add custom price columns to product-option relationship tables
 -- This allows per-product price customization (overriding global defaults)
 -- Run this migration on your existing database
 
@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS product_quantity_tiers (
     product_id VARCHAR(50) NOT NULL,
     min_qty INT NOT NULL,
     max_qty INT COMMENT 'NULL means no upper limit',
-    unit_price DECIMAL(10, 2) NOT NULL,
+    unit_price DECIMAL(10, 2) NULL,
+    discount_type ENUM('NONE','PERCENT','FIXED') DEFAULT 'NONE',
+    discount_value DECIMAL(10,2) DEFAULT 0,
     enabled BOOLEAN DEFAULT TRUE,
     display_order INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

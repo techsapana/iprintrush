@@ -48,7 +48,7 @@ quantityTiers: tiers.map((t: any) => ({
        id: t.id.toString(),
        minQty: t.min_qty,
        maxQty: t.max_qty,
-       unitPrice: parseFloat(t.unit_price),
+       unitPrice: t.unit_price != null ? parseFloat(t.unit_price) : null,
        discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
        discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
        enabled: Boolean(t.enabled),
@@ -180,34 +180,34 @@ export async function PUT(req: NextRequest) {
     }
 
 // Update quantity tiers if provided
-     if (body.quantityTiers) {
-       for (const tier of body.quantityTiers) {
-         const discountType = tier.discountType === 'PERCENT' || tier.discountType === 'FIXED' ? tier.discountType : 'NONE';
-         const discountValue = Number(tier.discountValue) || 0;
-         await query(
-           `INSERT INTO quantity_tiers (id, min_qty, max_qty, unit_price, discount_type, discount_value, enabled, display_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-              min_qty = VALUES(min_qty),
-              max_qty = VALUES(max_qty),
-              unit_price = VALUES(unit_price),
-              discount_type = VALUES(discount_type),
-              discount_value = VALUES(discount_value),
-              enabled = VALUES(enabled),
-              display_order = VALUES(display_order)`,
-           [
-             tier.id ? parseInt(tier.id) : null,
-             tier.minQty,
-             tier.maxQty || null,
-             tier.unitPrice,
-             discountType,
-             Number.isFinite(discountValue) ? discountValue : 0,
-             tier.enabled !== false ? 1 : 0,
-             tier.displayOrder || 0,
-           ]
-         );
-       }
-     }
+      if (body.quantityTiers) {
+        for (const tier of body.quantityTiers) {
+          const discountType = tier.discountType === 'PERCENT' || tier.discountType === 'FIXED' ? tier.discountType : 'NONE';
+          const discountValue = Number(tier.discountValue) || 0;
+          await query(
+            `INSERT INTO quantity_tiers (id, min_qty, max_qty, unit_price, discount_type, discount_value, enabled, display_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+               min_qty = VALUES(min_qty),
+               max_qty = VALUES(max_qty),
+               unit_price = VALUES(unit_price),
+               discount_type = VALUES(discount_type),
+               discount_value = VALUES(discount_value),
+               enabled = VALUES(enabled),
+               display_order = VALUES(display_order)`,
+            [
+              tier.id ? parseInt(tier.id) : null,
+              tier.minQty,
+              tier.maxQty || null,
+              tier.unitPrice ?? null,
+              discountType,
+              Number.isFinite(discountValue) ? discountValue : 0,
+              tier.enabled !== false ? 1 : 0,
+              tier.displayOrder || 0,
+            ]
+          );
+        }
+      }
 
     // Update shipping config if provided
     if (body.shipping) {
@@ -238,3 +238,4 @@ export async function PUT(req: NextRequest) {
     );
   }
 }
+

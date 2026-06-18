@@ -75,7 +75,7 @@ quantityTiers:
              ? (qtyTiers as any[]).map((t: any) => ({
                  minQty: t.min_qty,
                  maxQty: t.max_qty,
-                 unitPrice: parseFloat(t.unit_price),
+                 unitPrice: t.unit_price != null ? parseFloat(t.unit_price) : null,
                  discountType: (t.discount_type === 'PERCENT' || t.discount_type === 'FIXED') ? t.discount_type : 'NONE',
                  discountValue: Number.isFinite(parseFloat(t.discount_value)) ? parseFloat(t.discount_value) : 0,
                  label: t.label,
@@ -90,3 +90,4 @@ quantityTiers:
     return NextResponse.json({ schema: null, pools: [] });
   }
 }
+

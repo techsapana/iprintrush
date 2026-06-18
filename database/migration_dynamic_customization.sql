@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS customization_quantity_tiers (
     pool_id VARCHAR(50) NOT NULL,
     min_qty INT NOT NULL,
     max_qty INT COMMENT 'NULL = no upper limit',
-    unit_price DECIMAL(10, 2) NOT NULL,
+    unit_price DECIMAL(10, 2) NULL,
     discount_type ENUM('NONE','PERCENT','FIXED') DEFAULT 'NONE',
     discount_value DECIMAL(10,2) DEFAULT 0,
     label VARCHAR(100) COMMENT 'e.g. "25-99"',
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS product_pool_quantity_tiers (
     pool_id VARCHAR(50) NOT NULL,
     min_qty INT NOT NULL,
     max_qty INT,
-    unit_price DECIMAL(10, 2) NOT NULL,
+    unit_price DECIMAL(10, 2) NULL,
     discount_type ENUM('NONE','PERCENT','FIXED') DEFAULT 'NONE',
     discount_value DECIMAL(10,2) DEFAULT 0,
     enabled BOOLEAN DEFAULT TRUE,
@@ -298,3 +298,4 @@ UPDATE categories SET customization_schema = JSON_OBJECT('mode', 'apparel') WHER
 -- Trade Show, Mailbox - minimal or no customization for now
 UPDATE categories SET customization_schema = JSON_OBJECT('mode', 'print_product', 'groups', JSON_ARRAY()) 
 WHERE id IN ('cat-trade', 'cat-mailbox') AND customization_schema IS NULL;
+

@@ -2,19 +2,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/app/lib/db';
 
-// Validation helper for tier discount configuration
-function validateTierDiscount(discountType: string | undefined, discountValue: unknown, unitPrice: number | undefined): { valid: boolean; error?: string; normalizedType?: 'NONE' | 'PERCENT' | 'FIXED'; normalizedValue?: number } {
-  const hasUnitPrice = unitPrice != null && Number(unitPrice) > 0;
-
-  // If no unit price, only NONE is allowed
-  if (!hasUnitPrice && discountType !== 'NONE' && discountType !== undefined) {
-    return { valid: false, error: 'Discount not allowed when unitPrice is 0 or missing' };
-  }
-
+// Validation helper for tier discount configuration - unitPrice is OPTIONAL now
+function validateTierDiscount(discountType: string | undefined, discountValue: unknown): { valid: boolean; error?: string; normalizedType?: 'NONE' | 'PERCENT' | 'FIXED'; normalizedValue?: number } {
   const normalizedType: 'NONE' | 'PERCENT' | 'FIXED' = (discountType === 'PERCENT' || discountType === 'FIXED') ? discountType : 'NONE';
   const value = Number(discountValue);
   
-  // Validate discountValue is numeric and non-negative
+  // Validate discountValue is numeric and non-negative when provided
   if (discountType !== undefined && (!Number.isFinite(value) || value < 0)) {
     return { valid: false, error: 'Discount value must be a valid non-negative number' };
   }
@@ -23,12 +16,12 @@ function validateTierDiscount(discountType: string | undefined, discountValue: u
   if (normalizedType === 'PERCENT' && value > 100) {
     return { valid: false, error: 'Percentage discount cannot exceed 100%' };
   }
-
+  
   // FIXED discount sanity cap
   if (normalizedType === 'FIXED' && value > 100000) {
     return { valid: false, error: 'Fixed discount too large (max $100,000)' };
   }
-
+  
   return { valid: true, normalizedType, normalizedValue: value };
 }
 
@@ -57,7 +50,7 @@ export async function GET(
         id: tier.id.toString(),
         minQty: tier.min_qty,
         maxQty: tier.max_qty,
-        unitPrice: parseFloat(tier.unit_price),
+        unitPrice: tier.unit_price != null ? parseFloat(tier.unit_price) : null,
         discountType: (tier.discount_type === 'PERCENT' || tier.discount_type === 'FIXED') ? tier.discount_type : 'NONE',
         discountValue: Number.isFinite(parseFloat(tier.discount_value)) ? parseFloat(tier.discount_value) : 0,
         enabled: Boolean(tier.enabled),
@@ -84,10 +77,10 @@ export async function PUT(
          { status: 400 }
        );
      }
-     const body = await request.json();
-     
-     // Validate discount configuration
-     const validation = validateTierDiscount(body.discountType, body.discountValue, body.unitPrice);
+const body = await request.json();
+      
+      // Validate discount configuration (unitPrice is optional)
+      const validation = validateTierDiscount(body.discountType, body.discountValue);
      if (!validation.valid) {
        return NextResponse.json(
          { error: validation.error || 'Invalid tier discount configuration' },
@@ -106,10 +99,10 @@ export async function PUT(
        updates.push('max_qty = ?');
        values.push(body.maxQty !== null ? body.maxQty : null);
      }
-     if (body.unitPrice !== undefined) {
-       updates.push('unit_price = ?');
-       values.push(body.unitPrice);
-     }
+if (body.unitPrice !== undefined) {
+        updates.push('unit_price = ?');
+        values.push(body.unitPrice ?? null);
+      }
      if (body.discountType !== undefined) {
        updates.push('discount_type = ?');
        values.push(validation.normalizedType);
