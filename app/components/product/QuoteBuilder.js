@@ -26,6 +26,7 @@ export function QuoteBuilder({
   prefillQuote = null,
   onQuoteReady,
   weightLb = null,
+  packageWidthIn = null,
 }) {
   const [loading, setLoading] = useState(true);
   const [configMode, setConfigMode] = useState(null);
@@ -624,6 +625,7 @@ const invalidateQuote = () => {
         prefillQuote={prefillQuote}
         onQuoteReady={onQuoteReady}
         weightLb={weightLb}
+        packageWidthIn={packageWidthIn}
       />
     );
   }

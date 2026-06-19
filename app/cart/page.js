@@ -277,10 +277,18 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {/* Same-Day Status */}
+{/* Same-Day Status */}
               <div className="mb-6">
                 <SameDayNotice />
               </div>
+
+              {/* Shipping Review Warning */}
+              {items.some((item) => item.options?.quoteSummary?.shippingReviewRequired || item.options?.shippingReviewRequired) && (
+                <div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+                  <span className="font-semibold">Shipping Review Required</span>
+                  <p className="text-sm mt-1">Your order contains oversized items. Final shipping cost will be determined after manual review.</p>
+                </div>
+              )}
 
               {/* Checkout Button */}
               <Button

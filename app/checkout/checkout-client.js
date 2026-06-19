@@ -86,7 +86,7 @@ export default function CheckoutClient() {
             id: i.id,
             quantity: i.quantity,
             quotePayload: i.options?.quotePayload || null,
-            product: { weight_lb: i.weightLb ?? null },
+            product: { weight_lb: i.weightLb ?? null, package_width_in: i.packageWidthIn ?? null },
           })),
           shippingAddress: {
             address: formData.shippingAddress.trim(),
@@ -133,7 +133,7 @@ export default function CheckoutClient() {
         id: i.id,
         quantity: i.quantity,
         quotePayload: i.options?.quotePayload || null,
-        product: { weight_lb: i.weightLb ?? null },
+        product: { weight_lb: i.weightLb ?? null, package_width_in: i.packageWidthIn ?? null },
       })),
     [checkoutItems],
   );
@@ -851,34 +851,38 @@ export default function CheckoutClient() {
                   </div>
                 )}
 {formData.deliveryMethod === 'shipping' && (
-                   <div className="flex justify-between items-center text-sm text-gray-700 gap-2">
-                     <span className="min-w-0">
-                       {useRuleBased && shippingMethods.find((m) => m.type === selectedMethod)
-                         ? `Shipping (${shippingMethods.find((m) => m.type === selectedMethod)?.label}):`
-                         : !useRuleBased && selectedShipping
-                         ? `Shipping (${selectedShipping.serviceName}):`
-                         : 'Shipping:'}
-                     </span>
-                      {useRuleBased && shippingMethods.find((m) => m.type === selectedMethod) ? (
-                        <span className="shrink-0 font-medium">{shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}</span>
-                      ) : selectedShipping ? (
-                        <span className="shrink-0 font-medium">{shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}</span>
-                      ) : useRuleBased ? (
-                        <span className="shrink-0 font-medium">FREE</span>
-                     ) : (
-                       <Button
-                         type="button"
-                         variant="outline"
-                         size="sm"
-                         className="shrink-0 text-xs h-8"
-                         onClick={handleCalculateShipping}
-                         disabled={!canCalculateShipping() || fedexRates.loading}
-                       >
-                         {fedexRates.loading ? 'Calculating…' : 'Calculate shipping'}
-                       </Button>
-                     )}
-                   </div>
-                 )}
+                <div className="flex justify-between items-center text-sm text-gray-700 gap-2">
+                  <span className="min-w-0">
+                    {useRuleBased && shippingMethods.find((m) => m.type === selectedMethod)
+                      ? `Shipping (${shippingMethods.find((m) => m.type === selectedMethod)?.label}):`
+                      : !useRuleBased && selectedShipping
+                      ? `Shipping (${selectedShipping.serviceName}):`
+                      : 'Shipping:'}
+                  </span>
+                  {useRuleBased && shippingMethods.find((m) => m.type === selectedMethod) ? (
+                    <span className="shrink-0 font-medium">
+                      {selectedMethod === 'review_required' ? 'Under review' : shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}
+                    </span>
+                  ) : selectedShipping ? (
+                    <span className="shrink-0 font-medium">
+                      {selectedMethod === 'review_required' ? 'Under review' : shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}
+                    </span>
+                  ) : useRuleBased ? (
+                    <span className="shrink-0 font-medium text-amber-600">Shipping methods pending</span>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 text-xs h-8"
+                      onClick={handleCalculateShipping}
+                      disabled={!canCalculateShipping() || fedexRates.loading}
+                    >
+                      {fedexRates.loading ? 'Calculating…' : 'Calculate shipping'}
+                    </Button>
+                  )}
+                </div>
+              )}
                 <div className="flex justify-between text-sm text-gray-700">
                   <span>Tax:</span>
                   <span>${(taxAmount || 0).toFixed(2)}</span>

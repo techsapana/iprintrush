@@ -7,6 +7,7 @@ import { mkdir, rename } from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
 import crypto from 'crypto';
+import { buildShippingConfig, getOversizedDetails } from '@/app/lib/shippingEngine';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -113,11 +114,6 @@ async function ensureOrderShippingColumns() {
   }
 }
 
-async function getOversizedWidthThresholdIn() {
-  const row: any = await queryOne('SELECT oversized_width_threshold_in FROM shipping_config LIMIT 1');
-  return parseFloat(row?.oversized_width_threshold_in || 0);
-}
-
 export async function POST(req: NextRequest) {
   try {
     const payload = CreateCheckoutSessionSchema.parse(await req.json());
@@ -153,10 +149,11 @@ export async function POST(req: NextRequest) {
       shippingRatesUnavailable?: boolean;
       useRuleBasedShipping?: boolean;
       selectedMethod?: string;
-      shippingMethodsData?: { type?: string; id?: string; label?: string; cost: number } | null;
+      shippingMethodsData?: { type?: string; id?: string; serviceType?: string; label?: string; cost: number } | null;
     } & Record<string, unknown>;
 
-    const oversizedWidthThresholdIn = await getOversizedWidthThresholdIn();
+    const configRows = (await query('SELECT * FROM shipping_config LIMIT 1')) as any[];
+    const shippingConfig = buildShippingConfig(configRows[0] || {});
 
     const productIds = [...new Set(payload.items.map((i) => i.id))];
     const rows = await query(
@@ -176,20 +173,40 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const oversizedItems = payload.items.map((item) => {
+      const product = productMap.get(item.id);
+      return {
+        id: item.id,
+        quantity: item.quantity,
+        quotePayload: item.quotePayload || null,
+        product: {
+          id: product?.id,
+          weight_lb: product?.weight_lb ?? null,
+          package_width_in: product?.package_width_in ?? null,
+        },
+      };
+    });
+    const oversizedDetails = getOversizedDetails(oversizedItems, shippingConfig);
+    const oversized = oversizedDetails.anyOversized;
+    const selectedStandardShipping =
+      checkoutCustomer.selectedMethod === 'standard_shipping' ||
+      checkoutCustomer.deliveryMethod === 'standard_shipping' ||
+      checkoutCustomer.shippingMethodsData?.type === 'standard_shipping' ||
+      checkoutCustomer.shippingMethodsData?.id === 'standard_shipping' ||
+      checkoutCustomer.shippingMethodsData?.serviceType === 'standard_shipping';
+
+    if (oversized && selectedStandardShipping) {
+      return NextResponse.json(
+        { error: 'Standard shipping is unavailable for oversized items. Shipping review is required.' },
+        { status: 400 },
+      );
+    }
+
     const conn = await beginTransaction();
     try {
-      // Detect if any item requires shipping review using configured oversized threshold
-      // OR if customer selected review_required shipping method
       const useRuleBased = checkoutCustomer.useRuleBasedShipping === true;
       const selectedMethodIsReviewRequired = useRuleBased && checkoutCustomer.selectedMethod === 'review_required';
-      let shippingReviewRequired = selectedMethodIsReviewRequired;
-      for (const item of payload.items) {
-        const width = Number(item.quotePayload?.selections?.width_in ?? 0);
-        if (Number.isFinite(width) && width > oversizedWidthThresholdIn) {
-          shippingReviewRequired = true;
-          break;
-        }
-      }
+      const shippingReviewRequired = oversized || selectedMethodIsReviewRequired;
 
       const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
       const orderItemRows: {
@@ -380,8 +397,8 @@ shippingMeta = {
       estimatedDeliveryDate: null,
       estimatedDeliveryLabel: null,
       selectedByCustomer: true,
-      shippingReviewRequired: selectedMethodIsReviewRequired,
-      ...(selectedMethodIsReviewRequired && {
+      shippingReviewRequired,
+      ...(shippingReviewRequired && {
         message: 'Oversized items require manual shipping review. Our team will contact you with options.',
       }),
       destination: {

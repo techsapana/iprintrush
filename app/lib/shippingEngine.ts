@@ -36,10 +36,10 @@ export type CartItem = {
     id: string;
     localDeliveryEligible?: boolean | null;
     shippingCategory?: string | null;
-    weight_lb?: number | null;
-    package_length_in?: number | null;
-    package_width_in?: number | null;
-    package_height_in?: number | null;
+    weight_lb?: number | string | null;
+    package_length_in?: number | string | null;
+    package_width_in?: number | string | null;
+    package_height_in?: number | string | null;
   } | null;
 };
 
@@ -88,38 +88,84 @@ export type ShippingRule = {
   enabled: boolean;
 };
 
+export function buildShippingConfig(row: Record<string, unknown> | null | undefined): ShippingConfig {
+  const data = row || {};
+  return {
+    enabled: Boolean(data.enabled ?? true),
+    defaultFlatRate: Number(data.default_flat_rate ?? 0),
+    oversizedWidthThresholdIn: Number(data.oversized_width_threshold_in ?? 0),
+    oversizedWeightThresholdLb: Number(data.oversized_weight_threshold_lb ?? 0),
+    under100Rate: Number(data.under_100_rate ?? 0),
+    between100And199Rate: Number(data.between_100_199_rate ?? 0),
+    over200Rate: Number(data.over_200_rate ?? 0),
+    localUnder100Rate: Number(data.local_under_100_rate ?? 0),
+    localBetween100And199Rate: Number(data.local_between_100_199_rate ?? 0),
+    localOver200Rate: Number(data.local_over_200_rate ?? 0),
+    rules: [],
+  };
+}
+
 export type ShippingCostResult = {
   cost: number;
   flagReviewRequired?: boolean;
   oversizedDetected?: boolean;
 };
 
+export type ShippingDecision = {
+  status: 'OK' | 'REVIEW_REQUIRED';
+  isOversized: boolean;
+  allowedMethods: ShippingMethod[];
+  blockedMethods: ShippingMethod[];
+  shippingReviewRequired: boolean;
+  message: string;
+  details?: {
+    widthExceeded?: { selectedWidth: number; maxAllowedWidth: number };
+    weightExceeded?: { productWeight: number; maxAllowedWeight: number };
+  };
+};
+
 // ============================================================
 // UTILITIES
 // ============================================================
 
-/**
- * Parse width from dimension selections (inches)
- */
-function parseWidthInches(selections: Record<string, unknown> | undefined): number | null {
-  if (!selections) return null;
-  const widthRaw = selections.width_in;
-  if (typeof widthRaw === 'number') {
-    return Number.isFinite(widthRaw) && widthRaw > 0 ? widthRaw : null;
+function toPositiveNumber(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
   }
-  if (typeof widthRaw === 'string') {
-    const parsed = Number.parseFloat(widthRaw);
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
   return null;
 }
 
 /**
+ * Parse width from dimension selections (inches)
+ */
+function parseWidthInches(selections: Record<string, unknown> | undefined): number | null {
+  if (!selections) return null;
+  return toPositiveNumber(selections.width_in);
+}
+
+function getPackageWidthInches(item: CartItem): number | null {
+  return toPositiveNumber(item.product?.package_width_in);
+}
+
+export function getEffectiveItemWidth(item: CartItem): number | null {
+  const selectedWidth = parseWidthInches(item.quotePayload?.selections);
+  const packageWidth = getPackageWidthInches(item);
+
+  if (selectedWidth == null) return packageWidth;
+  if (packageWidth == null) return selectedWidth;
+  return Math.max(selectedWidth, packageWidth);
+}
+
+/**
  * Get weight for an item (base weight * quantity)
  */
 function getItemWeight(item: CartItem): number | null {
-  const baseWeight = item.product?.weight_lb;
-  if (baseWeight == null || !Number.isFinite(baseWeight) || baseWeight <= 0) return null;
+  const baseWeight = toPositiveNumber(item.product?.weight_lb);
+  if (baseWeight == null) return null;
   const qty = Math.max(1, item.quantity || 1);
   return baseWeight * qty;
 }
@@ -208,6 +254,40 @@ export function getShippingCost(
 // BACKWARD COMPATIBILITY - Legacy function (uses getShippingCost)
 // ============================================================
 
+/**
+ * Single source of truth for shipping eligibility decisions.
+ * Returns unified decision object for all consumers.
+ */
+export function getShippingDecision(
+  items: CartItem[],
+  config: ShippingConfig
+): ShippingDecision {
+  const oversizedDetails = getOversizedDetails(items, config);
+  const isOversized = oversizedDetails.anyOversized;
+
+  if (isOversized) {
+    return {
+      status: 'REVIEW_REQUIRED',
+      isOversized: true,
+      allowedMethods: ['pickup', 'review_required'],
+      blockedMethods: ['local_delivery', 'standard_shipping'],
+      shippingReviewRequired: true,
+      message: 'This item requires manual shipping review',
+      details: oversizedDetails,
+    };
+  }
+
+  return {
+    status: 'OK',
+    isOversized: false,
+    allowedMethods: ['pickup', 'local_delivery', 'standard_shipping'],
+    blockedMethods: [],
+    shippingReviewRequired: false,
+    message: 'Shipping available normally',
+    details: undefined,
+  };
+}
+
 export function calculateShippingCostByQuantity(method: ShippingMethod, totalQuantity: number): ShippingCostResult {
   // This function now requires config - for backward compatibility, return 0
   // Real usage should call getShippingCost() with config from DB
@@ -246,6 +326,8 @@ export type OversizedReason = {
 
 /**
  * Detect oversized items and return detailed reasons
+ * Checks max(selections.width_in, product.package_width_in) for width.
+ * Checks product.weight_lb (multiplied by quantity) for weight.
  */
 export function getOversizedDetails(cartItems: CartItem[], config: ShippingConfig): OversizedReason {
   const widthThreshold = Number(config.oversizedWidthThresholdIn);
@@ -255,20 +337,21 @@ export function getOversizedDetails(cartItems: CartItem[], config: ShippingConfi
   let weightExceeded: { productWeight: number; maxAllowedWeight: number } | undefined;
   
   for (const item of cartItems) {
-    const selections = item.quotePayload?.selections;
-    const width = parseWidthInches(selections);
+    const width = getEffectiveItemWidth(item);
     
     // Check width threshold
     if (Number.isFinite(widthThreshold) && width !== null && width > widthThreshold) {
       widthExceeded = { selectedWidth: width, maxAllowedWidth: widthThreshold };
-      break; // Found one, that's enough
     }
     
     // Check weight threshold
     const weight = getItemWeight(item);
     if (Number.isFinite(weightThreshold) && weightThreshold > 0 && weight !== null && weight > weightThreshold) {
       weightExceeded = { productWeight: weight, maxAllowedWeight: weightThreshold };
-      break; // Found one, that's enough
+    }
+
+    if (widthExceeded || weightExceeded) {
+      break;
     }
   }
   
@@ -281,7 +364,7 @@ export function getOversizedDetails(cartItems: CartItem[], config: ShippingConfi
 
 /**
  * Detect if any cart items are oversized (width OR weight > configured thresholds)
- * Checks width_in from quotePayload selections for width.
+ * Checks max(selections.width_in, product.package_width_in) for width.
  * Checks product.weight_lb (multiplied by quantity) for weight.
  */
 export function detectOversizedItems(cartItems: CartItem[], config: ShippingConfig): boolean {

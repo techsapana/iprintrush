@@ -44,6 +44,7 @@ export function DynamicQuoteBuilder({
   prefillQuote = null,
   onQuoteReady,
   weightLb = null,
+  packageWidthIn = null,
 }) {
    const [loading, setLoading] = useState(true);
    const [schema, setSchema] = useState(null);
@@ -1347,7 +1348,7 @@ const renderDeliveryStep = () => {
         mode: 'print_product',
         selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn) } : {}) },
       },
-      product: { weight_lb: weightLb },
+      product: { weight_lb: weightLb, package_width_in: packageWidthIn },
     }];
 
     return (

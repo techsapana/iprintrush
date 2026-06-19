@@ -14,11 +14,23 @@ function getShippingMethodLabel(method) {
   return SHIPPING_METHOD_LABELS[method] || 'Unknown';
 }
 
-export function ShippingSelector({ selectedMethod, onMethodChange, showOversizedWarning = false, className = '', shippingEnabled = true, items = [], config: shippingConfig }) {
+export function ShippingSelector({ selectedMethod, onMethodChange, decision, shippingEnabled = true, className = '', items = [], config: shippingConfig }) {
   const [shippingMethods, setShippingMethods] = useState([]);
   const [oversizedDetails, setOversizedDetails] = useState(null);
 
   useEffect(() => {
+    // Use decision prop if provided (SDL mode), otherwise fetch legacy way
+    if (decision) {
+      setShippingMethods(decision.allowedMethods.map(type => ({
+        type,
+        id: type,
+        label: SHIPPING_METHOD_LABELS[type],
+        cost: 0,
+      })));
+      setOversizedDetails(decision.details || null);
+      return;
+    }
+    
     if (!shippingConfig) {
       setShippingMethods([]);
       setOversizedDetails(null);
@@ -50,30 +62,31 @@ export function ShippingSelector({ selectedMethod, onMethodChange, showOversized
     };
     load();
     return () => { cancelled = true; };
-  }, [shippingConfig, items]);
+  }, [decision, shippingConfig, items]);
 
-  const localDeliveryMethod = shippingMethods.find((m) => m.type === 'local_delivery');
-  const standardShippingMethod = shippingMethods.find((m) => m.type === 'standard_shipping');
-  const reviewRequiredMethod = shippingMethods.find((m) => m.type === 'review_required');
+  // Determine oversized scenario from decision or methods
+  const isOversizedScenario = decision?.isOversized ?? (shippingMethods.find(m => m.type === 'review_required') && !shippingMethods.find(m => m.type === 'standard_shipping'));
+  const shouldShowWarning = isOversizedScenario;
 
-  const isOversizedScenario = reviewRequiredMethod && !standardShippingMethod;
-  const shouldShowWarning = showOversizedWarning || isOversizedScenario;
+  // Helper to get method from shippingMethods array
+  const getMethod = (type) => shippingMethods.find(m => m.type === type);
 
   return (
     <div className={`space-y-4 ${className}`}>
       {shouldShowWarning && (
         <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-          Oversized product detected. Standard shipping is unavailable. Our team will review shipping options and contact you.
+          <span className="font-semibold">Shipping Requires Manual Review</span>
           {oversizedDetails?.widthExceeded && (
             <div className="mt-1">
-              Selected Width: {oversizedDetails.widthExceeded.selectedWidth}" | Maximum Allowed Width: {oversizedDetails.widthExceeded.maxAllowedWidth}"
+              Width: {oversizedDetails.widthExceeded.selectedWidth}" exceeds {oversizedDetails.widthExceeded.maxAllowedWidth}" limit
             </div>
           )}
           {oversizedDetails?.weightExceeded && (
             <div className="mt-1">
-              Product Weight: {oversizedDetails.weightExceeded.productWeight} lbs | Maximum Allowed Weight: {oversizedDetails.weightExceeded.maxAllowedWeight} lbs
+              Weight: {oversizedDetails.weightExceeded.productWeight} lbs exceeds {oversizedDetails.weightExceeded.maxAllowedWeight} lbs limit
             </div>
           )}
+          <div className="mt-2">Our team will contact you with shipping options.</div>
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -86,10 +99,10 @@ export function ShippingSelector({ selectedMethod, onMethodChange, showOversized
               : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
           }`}
         >
-          <div className="font-semibold text-gray-900">Store Pickup FREE</div>
+          <div className="font-semibold text-gray-900">Store Pickup</div>
           <div className="text-sm text-gray-600">Pickup at our Fair Oaks store location.</div>
         </button>
-        {shippingEnabled !== false && localDeliveryMethod && (
+        {shippingEnabled !== false && getMethod('local_delivery') && (
           <button
             type="button"
             onClick={() => onMethodChange('local_delivery')}
@@ -101,12 +114,12 @@ export function ShippingSelector({ selectedMethod, onMethodChange, showOversized
           >
             <div className="font-semibold text-gray-900">Local Delivery</div>
             <div className="text-sm text-gray-600">
-              ${localDeliveryMethod.cost.toFixed(2)} delivery fee
-              {localDeliveryMethod.cost === 0 && ' (Free for 200+ items)'}
+              ${getMethod('local_delivery').cost.toFixed(2)} delivery fee
+              {getMethod('local_delivery').cost === 0 && ' (Free for 200+ items)'}
             </div>
           </button>
         )}
-        {shippingEnabled !== false && standardShippingMethod && (
+        {shippingEnabled !== false && getMethod('standard_shipping') && (
           <button
             type="button"
             onClick={() => onMethodChange('standard_shipping')}
@@ -118,12 +131,12 @@ export function ShippingSelector({ selectedMethod, onMethodChange, showOversized
           >
             <div className="font-semibold text-gray-900">Standard Shipping</div>
             <div className="text-sm text-gray-600">
-              ${standardShippingMethod.cost.toFixed(2)} shipping fee
-              {standardShippingMethod.cost === 0 && ' (Free for 200+ items)'}
+              ${getMethod('standard_shipping').cost.toFixed(2)} shipping fee
+              {getMethod('standard_shipping').cost === 0 && ' (Free for 200+ items)'}
             </div>
           </button>
         )}
-        {reviewRequiredMethod && (
+        {getMethod('review_required') && (
           <button
             type="button"
             onClick={() => onMethodChange('review_required')}
@@ -133,8 +146,8 @@ export function ShippingSelector({ selectedMethod, onMethodChange, showOversized
                 : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
             }`}
           >
-            <div className="font-semibold text-gray-900">Shipping Review Required</div>
-            <div className="text-sm text-gray-600">Oversized items require manual shipping review.</div>
+            <div className="font-semibold text-gray-900">Shipping Under Review</div>
+            <div className="text-sm text-gray-600">Oversized items require manual review. Cost pending.</div>
           </button>
         )}
       </div>

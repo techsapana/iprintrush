@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/app/lib/db';
 import { calculateUnifiedQuote } from '@/app/lib/quoteEngine';
 import { normalizeQuoteRequest } from '@/app/lib/quote/QuoteNormalizer';
+import { getShippingDecision, buildShippingConfig } from '@/app/lib/shippingEngine';
 import type {
   QuoteRequestPayload,
   QuoteConfigStore,
@@ -387,8 +388,39 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
       }
     : undefined;
 
+  // Build shipping items for SDL decision
+  const productWeight = productWithCat?.weight_lb != null ? Number(productWithCat.weight_lb) : null;
+  const productPackageWidth = productWithCat?.package_width_in != null ? Number(productWithCat.package_width_in) : null;
+  const selectedWidth = payload.selections?.width_in != null ? Number(payload.selections.width_in) : null;
+  const effectiveWidth = selectedWidth && productPackageWidth ? Math.max(selectedWidth, productPackageWidth) : (selectedWidth || productPackageWidth);
+
+  const shippingItems = [{
+    id: payload.productId,
+    quantity: totalQty,
+    product: {
+      id: payload.productId,
+      weight_lb: productWeight,
+      package_width_in: productPackageWidth,
+    },
+    quotePayload: {
+      mode: payload.mode,
+      selections: {
+        ...payload.selections,
+        ...(effectiveWidth && { width_in: effectiveWidth })
+      },
+    },
+  }];
+
+  // Get shipping config for SDL decision
+  const configRows = await query('SELECT * FROM shipping_config LIMIT 1');
+  const shippingConfig = buildShippingConfig(Array.isArray(configRows) ? configRows[0] : {});
+  const decision = getShippingDecision(shippingItems, shippingConfig);
+
   // Use the unified engine - shipping is calculated from DB config
   const summary = calculateUnifiedQuote(config, pools, unifiedRequest, dimensionPricing, payload.shippingState, payload.shippingZip);
+
+  // Add shipping review required flag to summary
+  summary.shippingReviewRequired = decision.shippingReviewRequired;
 
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
   assertTotalValueWithinProductBounds(summary.subtotal, valueBounds);

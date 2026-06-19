@@ -4,7 +4,7 @@ import {
   detectOversizedItems,
   getOversizedDetails,
   getAvailableShippingMethods,
-  ShippingConfig,
+  buildShippingConfig,
 } from "@/app/lib/shippingEngine";
 
 export async function POST(req: Request) {
@@ -20,20 +20,7 @@ export async function POST(req: Request) {
     }
 
     const configRows = (await query("SELECT * FROM shipping_config LIMIT 1")) as any[];
-    const row = configRows[0] || {};
-    const config: ShippingConfig = {
-      enabled: Boolean(row.enabled ?? true),
-      defaultFlatRate: parseFloat(row.default_flat_rate || 0),
-      oversizedWidthThresholdIn: parseFloat(row.oversized_width_threshold_in || 0),
-      oversizedWeightThresholdLb: parseFloat(row.oversized_weight_threshold_lb || 0),
-      under100Rate: parseFloat(row.under_100_rate || 0),
-      between100And199Rate: parseFloat(row.between_100_199_rate || 0),
-      over200Rate: parseFloat(row.over_200_rate || 0),
-      localUnder100Rate: parseFloat(row.local_under_100_rate || 0),
-      localBetween100And199Rate: parseFloat(row.local_between_100_199_rate || 0),
-      localOver200Rate: parseFloat(row.local_over_200_rate || 0),
-      rules: [],
-    };
+    const config = buildShippingConfig(configRows[0] || {});
 
     const oversized = detectOversizedItems(items, config);
     const oversizedDetails = getOversizedDetails(items, config);

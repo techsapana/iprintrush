@@ -164,6 +164,7 @@ export type QuoteSummary = {
   merchandiseSubtotal: number;
   shipping: number;
   grandTotal: number;
+  shippingReviewRequired?: boolean;
 };
 
 // ============ Dynamic Print Product Customization ============

@@ -489,10 +489,11 @@ export default function ProductDetailPage({ params }) {
                  maxQuantity={product.maxQuantity}
                  minOrderValue={product.minOrderValue}
                  maxOrderValue={product.maxOrderValue}
-                 prefillQuote={quotePrefill}
-                 onQuoteReady={setCurrentQuote}
-                 weightLb={product.weightLb}
-               />
+                  prefillQuote={quotePrefill}
+                  onQuoteReady={setCurrentQuote}
+                  weightLb={product.weightLb}
+                  packageWidthIn={product.packageWidthIn}
+                />
              )}
 
             {/* Notary pricing chart (separate from mailbox rental) */}

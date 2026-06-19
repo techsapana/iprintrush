@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Missing session_id' }, { status: 400 });
     }
 
-    const order = await queryOne(
-      `SELECT id, order_number, status, currency, amount_total, created_at
+const order = await queryOne(
+      `SELECT id, order_number, status, currency, amount_total, shipping_review_required, created_at
        FROM orders
        WHERE stripe_checkout_session_id = ?
        LIMIT 1`,
@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
         status: order.status,
         currency: order.currency,
         amountTotal: Number(order.amount_total || 0),
+        shippingReviewRequired: Boolean((order as any).shipping_review_required),
         createdAt: order.created_at,
       },
     });

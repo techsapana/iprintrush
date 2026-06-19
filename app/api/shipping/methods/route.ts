@@ -5,7 +5,8 @@ import {
   getOversizedDetails,
   getShippingTierSubtotalFromCartItems,
   getShippingCost,
-  ShippingConfig,
+  buildShippingConfig,
+  getShippingDecision,
 } from "@/app/lib/shippingEngine";
 
 export async function POST(req: Request) {
@@ -15,21 +16,7 @@ export async function POST(req: Request) {
 
     // Get shipping config from database
     const configRows = (await query(`SELECT * FROM shipping_config LIMIT 1`)) as any[];
-    const row = configRows[0] || {};
-
-    const config: ShippingConfig = {
-      enabled: Boolean(row.enabled ?? true),
-      defaultFlatRate: parseFloat(row.default_flat_rate || 0),
-      oversizedWidthThresholdIn: parseFloat(row.oversized_width_threshold_in || 0),
-      oversizedWeightThresholdLb: parseFloat(row.oversized_weight_threshold_lb || 0),
-      under100Rate: parseFloat(row.under_100_rate || 0),
-      between100And199Rate: parseFloat(row.between_100_199_rate || 0),
-      over200Rate: parseFloat(row.over_200_rate || 0),
-      localUnder100Rate: parseFloat(row.local_under_100_rate || 0),
-      localBetween100And199Rate: parseFloat(row.local_between_100_199_rate || 0),
-      localOver200Rate: parseFloat(row.local_over_200_rate || 0),
-      rules: [],
-    };
+    const config = buildShippingConfig(configRows[0] || {});
 
     const oversized = detectOversizedItems(items, config);
     const oversizedDetails = getOversizedDetails(items, config);
@@ -37,29 +24,38 @@ export async function POST(req: Request) {
       ? Math.max(0, Number(body.shippingTierSubtotal))
       : getShippingTierSubtotalFromCartItems(items);
 
+    // Use SDL to get unified decision
+    const decision = getShippingDecision(items, config);
+
     // Calculate shipping costs using unified function
     const standardCost = getShippingCost(shippingTierSubtotal, 'standard_shipping', config);
     const localCost = getShippingCost(shippingTierSubtotal, 'local_delivery', config);
 
-    const methods = oversized
-      ? [
-          { type: 'pickup', id: 'pickup', label: 'Store Pickup', cost: 0 },
-          { type: 'local_delivery', id: 'local_delivery', label: 'Local Delivery', cost: localCost },
-          { type: 'review_required', id: 'review_required', label: 'Shipping Review Required', cost: 0 },
-        ]
-      : [
-          { type: 'pickup', id: 'pickup', label: 'Store Pickup', cost: 0 },
-          { type: 'local_delivery', id: 'local_delivery', label: 'Local Delivery', cost: localCost },
-          { type: 'standard_shipping', id: 'standard_shipping', label: 'Standard Shipping', cost: standardCost },
-        ];
+    // Build methods array for backward compatibility
+    const methods = decision.allowedMethods.map((type) => {
+      if (type === 'pickup') {
+        return { type: 'pickup', id: 'pickup', label: 'Store Pickup', cost: 0 };
+      }
+      if (type === 'local_delivery') {
+        return { type: 'local_delivery', id: 'local_delivery', label: 'Local Delivery', cost: localCost };
+      }
+      if (type === 'standard_shipping') {
+        return { type: 'standard_shipping', id: 'standard_shipping', label: 'Standard Shipping', cost: standardCost };
+      }
+      if (type === 'review_required') {
+        return { type: 'review_required', id: 'review_required', label: 'Shipping Under Review', cost: 0 };
+      }
+      return { type, id: type, label: type, cost: 0 };
+    });
 
     return NextResponse.json({
       success: true,
       shippingTierSubtotal,
-      oversized,
-      oversizedDetected: oversized,
-      oversizedDetails,
-      methods,
+      oversized: decision.isOversized,
+      oversizedDetected: decision.isOversized,
+      oversizedDetails: decision.details,
+      methods, // kept for backward compatibility
+      decision, // NEW: SDL decision object
     });
   } catch (err) {
     return NextResponse.json(

@@ -33,9 +33,15 @@ export default function SuccessClient() {
             Thanks—your order is confirmed.
           </p>
 
-          {order && (
+{order && (
             <div className="bg-[rgba(41,182,246,0.1)] border border-[rgba(41,182,246,0.3)] rounded-lg p-6 mb-8 text-left">
               <h2 className="font-semibold text-[#155d7a] mb-4">Order Details</h2>
+              {order.shippingReviewRequired && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm">
+                  <span className="font-semibold">Shipping cost pending review</span>
+                  <p className="mt-1">Our team will contact you with shipping options and costs.</p>
+                </div>
+              )}
               <ul className="space-y-2 text-sm text-[#1a7ba3]">
                 <li>Order #: {order.orderNumber}</li>
                 <li>Status: {order.status}</li>
