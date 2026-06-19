@@ -119,13 +119,13 @@ export default function CheckoutClient() {
     setSessionReady(true);
   }, [isBuyNow]);
 
+  const checkoutItems = isBuyNow ? buyNowItems : cartItems;
+
   useEffect(() => {
     if (!useRuleBased) return;
     if (!canCalculateShipping()) return;
     fetchShippingMethods();
   }, [useRuleBased, checkoutItems, formData.shippingAddress, formData.shippingCity, formData.shippingState, formData.shippingZip]);
-
-  const checkoutItems = isBuyNow ? buyNowItems : cartItems;
 
   const buildShippingItems = useCallback(
     () =>
