@@ -131,7 +131,7 @@ export type QuoteRequestPayload = {
   printLocationIds: UUID[];
   turnaroundOptionId: UUID | null;
   designerHelpOptionId: UUID | null;
-  deliveryMethod: 'pickup' | 'local_delivery' | 'standard_shipping';
+  deliveryMethod: 'pickup' | 'local_delivery' | 'standard_shipping' | 'review_required';
   shippingState?: string;
   shippingZip?: string;
   shippingCity?: string;
@@ -164,6 +164,7 @@ export type QuoteSummary = {
   merchandiseSubtotal: number;
   shipping: number;
   grandTotal: number;
+  shippingTierSubtotal?: number;
   shippingReviewRequired?: boolean;
 };
 
@@ -208,7 +209,7 @@ export type DynamicQuoteRequestPayload = {
   productId: string;
   mode: 'print_product';
   selections: Record<string, string | string[] | number>; // poolKey -> optionId | optionIds[] | quantity
-  deliveryMethod: 'pickup' | 'local_delivery' | 'standard_shipping';
+  deliveryMethod: 'pickup' | 'local_delivery' | 'standard_shipping' | 'review_required';
   shippingState?: string;
   shippingZip?: string;
   shippingCity?: string;

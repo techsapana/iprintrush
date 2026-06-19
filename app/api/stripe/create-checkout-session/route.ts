@@ -8,6 +8,7 @@ import path from 'path';
 import { existsSync } from 'fs';
 import crypto from 'crypto';
 import { buildShippingConfig, getOversizedDetails } from '@/app/lib/shippingEngine';
+import { normalizeDeliveryMethod, type ValidDeliveryMethod } from '@/app/lib/quoteEngine';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,11 +20,8 @@ const CreateCheckoutSessionSchema = z.object({
         id: z.string().min(1),
         quantity: z.number().int().min(1).max(999),
         quotePayload: z.any().optional(),
-        quoteSummary: z.any().optional(),
         customizationsDisplay: z.record(z.string()).optional(),
         splitQuote: z.boolean().optional(),
-        customLineTotal: z.number().nonnegative().optional(),
-        customUnitPrice: z.number().nonnegative().optional(),
         artworkReady: z.boolean().optional(),
         tempArtworkFiles: z.array(z.string()).optional(),
         artworkFiles: z.array(z.string()).optional(),
@@ -42,7 +40,10 @@ const CreateCheckoutSessionSchema = z.object({
       state: z.string().optional().default(''),
       zip: z.string().optional().default(''),
       notes: z.string().optional().default(''),
-      deliveryMethod: z.enum(['pickup', 'local_delivery', 'standard_shipping']).optional().default('pickup'),
+      deliveryMethod: z.union([
+        z.enum(['pickup', 'local_delivery', 'standard_shipping', 'review_required']),
+        z.literal('shipping'),
+      ]).optional().default('pickup'),
       shippingAddress: z.string().optional().default(''),
       shippingApt: z.string().optional().default(''),
       shippingCity: z.string().optional().default(''),
@@ -74,6 +75,125 @@ function fromCents(amount: number) {
   return Math.round(amount) / 100;
 }
 
+function normalizeCheckoutDeliveryMethod(
+  deliveryMethod: unknown,
+  selectedMethod: string | undefined,
+  selectedShippingServiceType: string | undefined,
+): ValidDeliveryMethod {
+  if (selectedMethod && ['pickup', 'local_delivery', 'standard_shipping', 'review_required'].includes(selectedMethod)) {
+    return selectedMethod as ValidDeliveryMethod;
+  }
+  if (selectedShippingServiceType && ['pickup', 'local_delivery', 'standard_shipping', 'review_required'].includes(selectedShippingServiceType)) {
+    return selectedShippingServiceType as ValidDeliveryMethod;
+  }
+
+  const normalized = normalizeDeliveryMethod(deliveryMethod);
+  if (normalized === 'review_required') {
+    return 'review_required';
+  }
+  if (normalized === 'local_delivery') {
+    return 'local_delivery';
+  }
+  if (normalized === 'standard_shipping') {
+    return 'standard_shipping';
+  }
+  return 'pickup';
+}
+
+function assertShippingMethodSelected(
+  deliveryMethod: ValidDeliveryMethod,
+  checkoutCustomer: {
+    selectedShipping?: { serviceType?: string; cost?: number } | null;
+    selectedMethod?: string;
+    shippingMethodsData?: { type?: string; id?: string; serviceType?: string; cost?: number } | null;
+  },
+): void {
+  if (deliveryMethod === 'pickup' || deliveryMethod === 'review_required') return;
+
+  const hasSelectedShipping =
+    deliveryMethod === 'standard_shipping' ||
+    deliveryMethod === 'local_delivery' ||
+    checkoutCustomer.selectedShipping != null ||
+    checkoutCustomer.shippingMethodsData != null;
+
+  if (!hasSelectedShipping) {
+    throw new Error('A shipping method must be selected before checkout.');
+  }
+}
+
+function getSplitSizeLabel(item: any): string | null {
+  return (
+    item.splitSizeLabel ||
+    item.customizationsDisplay?.Size ||
+    item.customizationsDisplay?.size ||
+    item.customizationsDisplay?.['Print Size'] ||
+    item.customizationsDisplay?.Dimensions ||
+    null
+  );
+}
+
+function allocateCents(totalCents: number, qty: number, totalQty: number, index: number, count: number): number {
+  if (count <= 0) return 0;
+  if (index < count - 1) {
+    return Math.floor((totalCents * qty) / totalQty);
+  }
+  return totalCents - Math.floor((totalCents * (totalQty - qty)) / totalQty);
+}
+
+function prorateLineItemsCents(lineItems: { label: string; amount: number }[], qty: number, totalQty: number, index: number, count: number) {
+  return lineItems.map((item) => ({
+    label: item.label,
+    amount: fromCents(allocateCents(toCents(item.amount), qty, totalQty, index, count)),
+  }));
+}
+
+function buildSplitQuoteSummary(
+  summary: any,
+  item: any,
+  index: number,
+  count: number,
+): { summary: any; lineTotal: number } {
+  const sizeLabel = getSplitSizeLabel(item);
+  const sizeBreakdown = Array.isArray(summary.sizeBreakdown) ? summary.sizeBreakdown : [];
+  const matchIndex = sizeBreakdown.findIndex((s: any) => String(s?.sizeLabel || '') === String(sizeLabel || ''));
+  if (matchIndex < 0) {
+    throw new Error(`Unable to match split quote size: ${String(sizeLabel || '')}`);
+  }
+
+  const size = sizeBreakdown[matchIndex];
+  const qty = Math.max(1, Number(size?.quantity || item.quantity || 1));
+  const totalQty = Math.max(1, Number(summary.totalQuantity || 0));
+  if (Number.isFinite(Number(item.quantity)) && Number(item.quantity) > 0 && Number(item.quantity) !== qty) {
+    throw new Error('Split quote item quantity does not match server quote size breakdown');
+  }
+  if (qty <= 0 || totalQty <= 0) {
+    throw new Error('Invalid split quote quantity');
+  }
+
+  const grandTotalCents = toCents(summary.grandTotal || 0);
+  const subtotalCents = toCents(summary.subtotal || 0);
+  const shippingCents = toCents(summary.shipping || 0);
+  const lineTotalCents = allocateCents(grandTotalCents, qty, totalQty, index, count);
+  const splitSubtotalCents = allocateCents(subtotalCents, qty, totalQty, index, count);
+  const splitShippingCents = allocateCents(shippingCents, qty, totalQty, index, count);
+
+  return {
+    lineTotal: fromCents(lineTotalCents),
+    summary: {
+      ...summary,
+      totalQuantity: qty,
+      unitPrice: qty > 0 ? fromCents(lineTotalCents) / qty : 0,
+      lineItems: prorateLineItemsCents(summary.lineItems || [], qty, totalQty, index, count),
+      subtotal: fromCents(splitSubtotalCents),
+      shipping: fromCents(splitShippingCents),
+      grandTotal: fromCents(lineTotalCents),
+      shippingTierSubtotal: fromCents(allocateCents(toCents(summary.shippingTierSubtotal ?? summary.subtotal ?? 0), qty, totalQty, index, count)),
+      merchandiseSubtotal: fromCents(allocateCents(toCents(summary.merchandiseSubtotal ?? 0), qty, totalQty, index, count)),
+      sizeBreakdown: [{ sizeLabel: size.sizeLabel || getSplitSizeLabel(item) || 'Selected size', quantity: qty }],
+    },
+  };
+}
+
 function makeOrderNumber() {
   return `ORD-${Date.now()}-${Math.random().toString(16).slice(2, 8).toUpperCase()}`;
 }
@@ -103,6 +223,10 @@ async function ensureOrderShippingColumns() {
     {
       name: 'estimated_delivery_date',
       ddl: 'ALTER TABLE orders ADD COLUMN estimated_delivery_date VARCHAR(64) NULL AFTER shipping_service_name',
+    },
+    {
+      name: 'shipping_review_required',
+      ddl: 'ALTER TABLE orders ADD COLUMN shipping_review_required BOOLEAN NOT NULL DEFAULT 0 AFTER shipping_payload_json',
     },
   ];
 
@@ -140,7 +264,7 @@ export async function POST(req: NextRequest) {
     const stripe = getStripe();
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
     const checkoutCustomer = (payload.customer || {}) as {
-      deliveryMethod?: 'pickup' | 'local_delivery' | 'standard_shipping';
+      deliveryMethod?: 'pickup' | 'local_delivery' | 'standard_shipping' | 'review_required' | 'shipping';
       selectedShipping?: { serviceType: string; cost: number };
       shippingAddress?: string;
       shippingCity?: string;
@@ -151,6 +275,13 @@ export async function POST(req: NextRequest) {
       selectedMethod?: string;
       shippingMethodsData?: { type?: string; id?: string; serviceType?: string; label?: string; cost: number } | null;
     } & Record<string, unknown>;
+
+    const normalizedDeliveryMethod = normalizeCheckoutDeliveryMethod(
+      checkoutCustomer.deliveryMethod,
+      checkoutCustomer.selectedMethod,
+      checkoutCustomer.shippingMethodsData?.type || checkoutCustomer.shippingMethodsData?.id || checkoutCustomer.shippingMethodsData?.serviceType || checkoutCustomer.selectedShipping?.serviceType,
+    );
+    assertShippingMethodSelected(normalizedDeliveryMethod, checkoutCustomer);
 
     const configRows = (await query('SELECT * FROM shipping_config LIMIT 1')) as any[];
     const shippingConfig = buildShippingConfig(configRows[0] || {});
@@ -189,11 +320,7 @@ export async function POST(req: NextRequest) {
     const oversizedDetails = getOversizedDetails(oversizedItems, shippingConfig);
     const oversized = oversizedDetails.anyOversized;
     const selectedStandardShipping =
-      checkoutCustomer.selectedMethod === 'standard_shipping' ||
-      checkoutCustomer.deliveryMethod === 'standard_shipping' ||
-      checkoutCustomer.shippingMethodsData?.type === 'standard_shipping' ||
-      checkoutCustomer.shippingMethodsData?.id === 'standard_shipping' ||
-      checkoutCustomer.shippingMethodsData?.serviceType === 'standard_shipping';
+      normalizedDeliveryMethod === 'standard_shipping';
 
     if (oversized && selectedStandardShipping) {
       return NextResponse.json(
@@ -204,9 +331,7 @@ export async function POST(req: NextRequest) {
 
     const conn = await beginTransaction();
     try {
-      const useRuleBased = checkoutCustomer.useRuleBasedShipping === true;
-      const selectedMethodIsReviewRequired = useRuleBased && checkoutCustomer.selectedMethod === 'review_required';
-      const shippingReviewRequired = oversized || selectedMethodIsReviewRequired;
+      const shippingReviewRequired = oversized || normalizedDeliveryMethod === 'review_required';
 
       const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
       const orderItemRows: {
@@ -224,6 +349,7 @@ export async function POST(req: NextRequest) {
       let subtotalCents = 0;
       let shippingCents = 0;
       let shippingMeta: any = null;
+      let hasNonQuoteItem = false;
 
       for (const item of payload.items) {
         const p = productMap.get(item.id);
@@ -233,25 +359,17 @@ export async function POST(req: NextRequest) {
         let resolvedUnitPrice = 0;
         let customizationJson: string | null = null;
 
-        if (
-          item.splitQuote === true &&
-          Number.isFinite(Number(item.customLineTotal)) &&
-          Number.isFinite(Number(item.customUnitPrice))
-        ) {
-          itemTotal = Number(item.customLineTotal || 0);
-          resolvedUnitPrice = Number(item.customUnitPrice || 0);
-          customizationJson = JSON.stringify({
-            lineItems: item.quoteSummary?.lineItems || [],
-            customizationsDisplay: item.customizationsDisplay || {},
-            mode: 'split_quote',
-            quotePayload: null,
-            quoteSummary: item.quoteSummary || null,
-          });
-        } else if (item.quotePayload && item.quoteSummary) {
+        if (item.quotePayload) {
+          const quotePayloadForRecalc = {
+            ...item.quotePayload,
+            deliveryMethod: normalizedDeliveryMethod,
+            ...(checkoutCustomer.shippingState ? { shippingState: checkoutCustomer.shippingState } : {}),
+            ...(checkoutCustomer.shippingZip ? { shippingZip: checkoutCustomer.shippingZip } : {}),
+          };
           const calcRes = await fetch(`${baseUrl}/api/quote/calculate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(item.quotePayload),
+            body: JSON.stringify(quotePayloadForRecalc),
           });
           if (!calcRes.ok) {
             await rollback(conn);
@@ -263,19 +381,50 @@ export async function POST(req: NextRequest) {
             await rollback(conn);
             return NextResponse.json({ error: 'Quote product mismatch' }, { status: 400 });
           }
-          itemTotal = Number(serverSummary.grandTotal || 0);
-          customizationJson = JSON.stringify({
-            lineItems: serverSummary.lineItems || [],
-            customizationsDisplay: item.customizationsDisplay || {},
-            mode: item.quotePayload.mode || 'apparel',
-            quotePayload: item.quotePayload || null,
-            quoteSummary: serverSummary || null,
-          });
-          resolvedUnitPrice = item.quantity > 0 ? itemTotal / item.quantity : 0;
+
+          const splitQuoteIndex = payload.items.findIndex((candidate, candidateIndex) =>
+            candidateIndex <= payload.items.indexOf(item) &&
+            candidate.splitQuote === true &&
+            candidate.splitGroupId === item.splitGroupId
+          );
+          const splitQuoteCount = payload.items.filter((candidate) =>
+            candidate.splitQuote === true && candidate.splitGroupId === item.splitGroupId
+          ).length;
+
+          if (item.splitQuote === true) {
+            const split = buildSplitQuoteSummary(serverSummary, item, splitQuoteIndex, splitQuoteCount);
+            itemTotal = split.lineTotal;
+            const serverSummaryForSplit = split.summary;
+            customizationJson = JSON.stringify({
+              lineItems: serverSummaryForSplit.lineItems || [],
+              customizationsDisplay: item.customizationsDisplay || {},
+              mode: 'split_quote',
+              quotePayload: quotePayloadForRecalc,
+              quoteSummary: serverSummaryForSplit,
+            });
+            resolvedUnitPrice = item.quantity > 0 ? itemTotal / item.quantity : 0;
+          } else {
+            itemTotal = Number(serverSummary.grandTotal || 0);
+            customizationJson = JSON.stringify({
+              lineItems: serverSummary.lineItems || [],
+              customizationsDisplay: item.customizationsDisplay || {},
+              mode: item.quotePayload.mode || 'apparel',
+              quotePayload: quotePayloadForRecalc,
+              quoteSummary: serverSummary || null,
+            });
+            resolvedUnitPrice = item.quantity > 0 ? itemTotal / item.quantity : 0;
+          }
+
         } else {
+          hasNonQuoteItem = true;
           const unitPrice = Number(p.price || 0);
           itemTotal = unitPrice * item.quantity;
           resolvedUnitPrice = unitPrice;
+        }
+
+        if (itemTotal <= 0) {
+          await rollback(conn);
+          return NextResponse.json({ error: 'Quote total must be greater than zero' }, { status: 400 });
         }
 
         const amountCents = toCents(itemTotal);
@@ -333,6 +482,11 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      if (lineItems.length === 0) {
+        await rollback(conn);
+        return NextResponse.json({ error: 'No chargeable items in checkout' }, { status: 400 });
+      }
+
       const siteSettings: any = await query(
         'SELECT tax_rate_percent FROM site_settings ORDER BY id ASC LIMIT 1',
       );
@@ -376,55 +530,88 @@ export async function POST(req: NextRequest) {
         estimatedDeliveryLabel: string | null;
       } | null = null;
 
-      if (checkoutCustomer.deliveryMethod === 'pickup') {
-  // Pickup - no shipping cost
-} else {
-  // Shipping (local_delivery or standard_shipping)
-  const methodData = checkoutCustomer.shippingMethodsData;
-  if (methodData && typeof methodData.cost === 'number') {
-    shippingCents = toCents(methodData.cost);
-    selectedRateMeta = {
-      serviceType: methodData.type || methodData.id || 'rule_based',
-      serviceName: methodData.label || 'Rule-Based Shipping',
-      cost: methodData.cost,
-      estimatedDeliveryDate: null,
-      estimatedDeliveryLabel: null,
-    };
-shippingMeta = {
-       carrier: methodData.type === 'local_delivery' ? 'Local Delivery' : methodData.type === 'review_required' ? 'Shipping Review Required' : 'Standard Shipping',
-      serviceType: methodData.type || methodData.id || 'rule_based',
-      serviceName: methodData.label || 'Rule-Based Shipping',
-      estimatedDeliveryDate: null,
-      estimatedDeliveryLabel: null,
-      selectedByCustomer: true,
-      shippingReviewRequired,
-      ...(shippingReviewRequired && {
-        message: 'Oversized items require manual shipping review. Our team will contact you with options.',
-      }),
-      destination: {
-        addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
-        city: checkoutCustomer.shippingCity || 'City',
-        stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
-        postalCode: checkoutCustomer.shippingZip || '',
-        countryCode: 'US',
-      },
-    };
-  } else {
-    await rollback(conn);
-    return NextResponse.json(
-      { error: 'Please select a shipping method.' },
-      { status: 400 },
-    );
-  }
-}
+      if (normalizedDeliveryMethod === 'pickup' || normalizedDeliveryMethod === 'review_required') {
+        if (normalizedDeliveryMethod === 'review_required' && !checkoutCustomer.shippingAddress) {
+          await rollback(conn);
+          return NextResponse.json(
+            { error: 'Shipping address is required for shipping review.' },
+            { status: 400 },
+          );
+        }
+        // Pickup and review-required shipping have no immediate charge.
+      } else if (hasNonQuoteItem) {
+        const methodData = checkoutCustomer.shippingMethodsData;
+        if (methodData && typeof methodData.cost === 'number') {
+          shippingCents = toCents(methodData.cost);
+          selectedRateMeta = {
+            serviceType: methodData.type || methodData.id || normalizedDeliveryMethod,
+            serviceName: methodData.label || 'Shipping',
+            cost: methodData.cost,
+            estimatedDeliveryDate: null,
+            estimatedDeliveryLabel: null,
+          };
+          shippingMeta = {
+            carrier: normalizedDeliveryMethod === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
+            serviceType: methodData.type || methodData.id || normalizedDeliveryMethod,
+            serviceName: methodData.label || 'Shipping',
+            estimatedDeliveryDate: null,
+            estimatedDeliveryLabel: null,
+            selectedByCustomer: true,
+            shippingReviewRequired,
+            ...(shippingReviewRequired && {
+              message: 'Oversized items require manual shipping review. Our team will contact you with options.',
+            }),
+            destination: {
+              addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
+              city: checkoutCustomer.shippingCity || 'City',
+              stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
+              postalCode: checkoutCustomer.shippingZip || '',
+              countryCode: 'US',
+            },
+          };
+        } else if (checkoutCustomer.selectedShipping && typeof checkoutCustomer.selectedShipping.cost === 'number') {
+          shippingCents = toCents(checkoutCustomer.selectedShipping.cost);
+          selectedRateMeta = {
+            serviceType: checkoutCustomer.selectedShipping.serviceType || normalizedDeliveryMethod,
+            serviceName: checkoutCustomer.selectedShipping.serviceName || 'Shipping',
+            cost: checkoutCustomer.selectedShipping.cost,
+            estimatedDeliveryDate: null,
+            estimatedDeliveryLabel: null,
+          };
+          shippingMeta = {
+            carrier: normalizedDeliveryMethod === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
+            serviceType: checkoutCustomer.selectedShipping.serviceType || normalizedDeliveryMethod,
+            serviceName: checkoutCustomer.selectedShipping.serviceName || 'Shipping',
+            estimatedDeliveryDate: null,
+            estimatedDeliveryLabel: null,
+            selectedByCustomer: true,
+            shippingReviewRequired,
+            destination: {
+              addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
+              city: checkoutCustomer.shippingCity || 'City',
+              stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
+              postalCode: checkoutCustomer.shippingZip || '',
+              countryCode: 'US',
+            },
+          };
+        } else {
+          await rollback(conn);
+          return NextResponse.json(
+            { error: 'Please select a shipping method.' },
+            { status: 400 },
+          );
+        }
+      }
 
       const taxCents = Math.round((taxableBaseCents + shippingCents) * taxRate);
       const totalCents = taxableBaseCents + shippingCents + taxCents;
 
       const orderNumber = makeOrderNumber();
-      const isShippingMethod = checkoutCustomer.deliveryMethod === 'local_delivery' || checkoutCustomer.deliveryMethod === 'standard_shipping';
+      const isShippingMethod = normalizedDeliveryMethod === 'local_delivery' || normalizedDeliveryMethod === 'standard_shipping';
+      const requiresShippingAddress =
+        isShippingMethod || normalizedDeliveryMethod === 'review_required';
       if (
-        isShippingMethod &&
+        requiresShippingAddress &&
         (!checkoutCustomer.shippingAddress || !checkoutCustomer.shippingCity || !checkoutCustomer.shippingZip)
       ) {
         await rollback(conn);
@@ -440,7 +627,7 @@ shippingMeta = {
         state: checkoutCustomer.state || '',
         zip: checkoutCustomer.zip || '',
       };
-      const shippingAddr = isShippingMethod
+      const shippingAddr = requiresShippingAddress
         ? {
             address: checkoutCustomer.shippingAddress || '',
             apt: checkoutCustomer.shippingApt || '',
@@ -450,7 +637,7 @@ shippingMeta = {
           }
         : null;
 
-      if (isShippingMethod && shippingCents > 0) {
+      if (hasNonQuoteItem && isShippingMethod && shippingCents > 0) {
         const shipLabel = selectedRateMeta?.serviceName
           ? `Shipping (${selectedRateMeta.serviceName})`
           : 'Shipping';
@@ -503,7 +690,7 @@ shippingMeta = {
         JSON.stringify(billingAddress),
         shippingAddr ? JSON.stringify(shippingAddr) : null,
         checkoutCustomer.notes || null,
-        checkoutCustomer.deliveryMethod || 'pickup',
+        normalizedDeliveryMethod,
         shippingMeta?.carrier || null,
         shippingMeta?.serviceType || selectedRateMeta?.serviceType || null,
         shippingMeta ? JSON.stringify(shippingMeta) : null,

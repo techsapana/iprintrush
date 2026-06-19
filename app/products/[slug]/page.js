@@ -236,8 +236,6 @@ export default function ProductDetailPage({ params }) {
           customSizeNote: currentQuote.payload?.customSizeNote || '',
           splitQuote: true,
           splitSizeLabel: s.sizeLabel || 'Selected size',
-          customLineTotal: lineTotal,
-          customUnitPrice: qty > 0 ? lineTotal / qty : 0,
           splitGroupId,
         };
       });

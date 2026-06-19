@@ -736,21 +736,22 @@ const renderSizesStep = () => {
       String(size.id).toLowerCase().startsWith('youth-'),
     );
 
-    const renderSizeGrid = (sizes) => (
+const renderSizeGrid = (sizes) => (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {sizes.map((size) => {
           const qty = quantities[size.id] || 0;
 
           return (
             <div
-              key={size.id}
-              className="flex flex-col items-center rounded-xl border border-gray-200 bg-white px-3 py-3"
+          key={size.id}
+          className="flex flex-col items-center rounded-xl border border-gray-200 bg-white px-3 py-3"
             >
               <div className="text-base font-semibold text-gray-900">
                 {size.label}
               </div>
 
-              {typeof size.priceAddon === 'number' && size.priceAddon !== 0 && (
+              {/* Size surcharge is garment-dependent - only show when NOT using own fabric */}
+              {!useMyCloth && typeof size.priceAddon === 'number' && size.priceAddon !== 0 && (
                 <div className="text-xs text-gray-500">
                   +${size.priceAddon.toFixed(2)} each
                 </div>

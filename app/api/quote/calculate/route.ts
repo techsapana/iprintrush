@@ -1,7 +1,7 @@
 // Quote Calculation API - MySQL-backed with unified shipping
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/app/lib/db';
-import { calculateUnifiedQuote } from '@/app/lib/quoteEngine';
+import { calculateUnifiedQuote, normalizeDeliveryMethod } from '@/app/lib/quoteEngine';
 import { normalizeQuoteRequest } from '@/app/lib/quote/QuoteNormalizer';
 import { getShippingDecision, buildShippingConfig } from '@/app/lib/shippingEngine';
 import type {
@@ -326,7 +326,10 @@ async function handleApparelQuote(payload: QuoteRequestPayload) {
   const config = await getConfigWithCustomPrices(payload.productId);
 
   // Normalize the apparel payload
-  const unifiedRequest = normalizeQuoteRequest(payload, config.sizes);
+  const unifiedRequest = normalizeQuoteRequest({
+    ...payload,
+    deliveryMethod: normalizeDeliveryMethod(payload.deliveryMethod),
+  }, config.sizes);
 
   // Use the unified engine - shipping is calculated from DB config
   const summary = calculateUnifiedQuote(
@@ -364,11 +367,17 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
   const { getDynamicConfig } = await import('@/app/lib/dynamicQuoteConfig');
   const { pools } = await getDynamicConfig(payload.productId, schema);
 
+  // Normalize delivery method before shipping decisions and quote calculation.
+  const normalizedDeliveryMethod = normalizeDeliveryMethod(payload.deliveryMethod);
+
   // Get config for apparel-style options
   const config = await getConfigWithCustomPrices(payload.productId);
 
   // Normalize the print product payload
-  const unifiedRequest = normalizeQuoteRequest(payload, pools);
+  const unifiedRequest = normalizeQuoteRequest({
+    ...payload,
+    deliveryMethod: normalizedDeliveryMethod,
+  }, pools);
 
   // Validate quantity
   const totalQty = unifiedRequest.quantityBreakdown.reduce((sum, q) => sum + q.quantity, 0);
@@ -404,6 +413,7 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
     },
     quotePayload: {
       mode: payload.mode,
+      deliveryMethod: normalizedDeliveryMethod,
       selections: {
         ...payload.selections,
         ...(effectiveWidth && { width_in: effectiveWidth })

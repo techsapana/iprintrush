@@ -31,10 +31,10 @@ export type UnifiedQuoteRequest = {
   mode: 'apparel' | 'print_product';
 
   /**
-   * Normalized quantity breakdown.
-   * For apparel: [{ key: sizeId, label: 'S', quantity: 5 }, ...]
-   * For print products: [{ key: quantityPoolKey, label: 'Total', quantity: 100 }]
-   */
+    * Normalized quantity breakdown.
+    * For apparel: [{ key: sizeId, label: 'S', quantity: 5 }, ...]
+    * For print products: [{ key: quantityPoolKey, label: 'Total', quantity: 100 }]
+    */
   quantityBreakdown: {
     key: string;
     label: string;
@@ -42,18 +42,23 @@ export type UnifiedQuoteRequest = {
   }[];
 
   /**
-   * All selections in a unified format.
-   * - Single select: 'value'
-   * - Multi select: ['value1', 'value2']
-   * - Quantity: number
-   */
+    * All selections in a unified format.
+    * - Single select: 'value'
+    * - Multi select: ['value1', 'value2']
+    * - Quantity: number
+    */
   selections: Record<string, string | string[] | number>;
 
-  deliveryMethod: 'pickup' | 'local_delivery' | 'standard_shipping';
+  deliveryMethod: 'pickup' | 'local_delivery' | 'standard_shipping' | 'review_required';
   artworkReady?: boolean;
   tempArtworkFiles?: string[];
   artworkFiles?: string[];
   customSizeNote?: string;
+  /**
+    * When true, customer is supplying their own garments ("use my cloth").
+    * Garment cost and size surcharges should be zero.
+    */
+  useMyCloth?: boolean;
 };
 
 /**
@@ -97,6 +102,7 @@ export function normalizeApparelPayload(
     tempArtworkFiles: payload.tempArtworkFiles,
     artworkFiles: payload.artworkFiles,
     customSizeNote: payload.customSizeNote,
+    useMyCloth: payload.useMyCloth,
   };
 }
 

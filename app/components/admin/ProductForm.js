@@ -1227,13 +1227,15 @@ const productData = {
                     />
                     <p className="mt-1 text-xs text-gray-500">
                       Monthly rental price for mailbox services. This will be used to calculate
-                      multi-month discounts.
+multi-month discounts.
                     </p>
                   </>
                 ) : (
                   <>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Base Price
+                      {isCustomApparels 
+                        ? 'Garment Base Price (cost of blank garment)' 
+                        : 'Base Price'}
                     </label>
                     <input
                       type="number"
@@ -1244,6 +1246,11 @@ const productData = {
                       step="0.01"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
                     />
+                    {isCustomApparels && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        This is the blank garment cost. It will be removed when customer selects "I have my own fabric".
+                      </p>
+                    )}
                   </>
                 )}
               </div>

@@ -394,9 +394,9 @@ export default function CheckoutClient() {
       formData.deliveryMethod === 'shipping' &&
       useRuleBased &&
       selectedMethod === 'review_required' &&
-      !formData.shippingAddress.trim()
+      (!formData.shippingAddress.trim() || !formData.shippingCity.trim() || !formData.shippingZip.trim())
     ) {
-      setPayError('Please enter a shipping address for oversized items.');
+      setPayError('Please enter a complete shipping address for shipping review.');
       return;
     }
     setIsPaying(true);
@@ -409,11 +409,8 @@ export default function CheckoutClient() {
             id: i.id,
             quantity: i.quantity,
             quotePayload: i.options?.quotePayload,
-            quoteSummary: i.options?.quoteSummary,
             customizationsDisplay: i.options?.customizationsDisplay,
             splitQuote: i.options?.splitQuote === true,
-            customLineTotal: i.options?.customLineTotal,
-            customUnitPrice: i.options?.customUnitPrice,
             artworkReady: i.options?.artworkReady === true,
             tempArtworkFiles: i.options?.tempArtworkFiles || [],
             artworkFiles: i.options?.artworkFiles || [],
