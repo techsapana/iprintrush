@@ -528,9 +528,9 @@ const invalidateQuote = () => {
       return;
     }
 
+    const requestId = ++latestCalcRequestIdRef.current;
     try {
       setCalculating(true);
-      const requestId = ++latestCalcRequestIdRef.current;
 
       // Add dimension data if available
       const payload = {

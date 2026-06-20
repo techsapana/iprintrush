@@ -525,9 +525,9 @@ const isShippingReviewRequired = () => {
       }
     }
 
-try {
-      setCalculating(true);
       const requestId = ++latestCalcRequestIdRef.current;
+      try {
+        setCalculating(true);
     const dimensionSelections =
       shouldUseCustomDimensions
           ? {
@@ -602,7 +602,7 @@ customizationsDisplay.Delivery =
         });
       }
     } catch (err) {
-      if (++latestCalcRequestIdRef.current === requestId) {
+      if (requestId === latestCalcRequestIdRef.current) {
         setError(err.message || 'Failed to calculate quote');
       }
     } finally {
@@ -1527,3 +1527,4 @@ const renderDeliveryStep = () => {
     </section>
   );
 }
+
