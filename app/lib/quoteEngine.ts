@@ -149,6 +149,9 @@ function buildStandardProductPrice(params: {
 
   const lineItems: QuoteLineItem[] = [...merchandiseLineItems];
   const addonsTotal = addonsPerUnit * totalQuantity;
+  const itemPrice = merchandisePerUnit + addonsPerUnit;
+  const quantitySubtotal = merchandiseSubtotal + addonsTotal;
+  const discountedSubtotal = quantitySubtotal;
 
   for (const addon of addonBreakdown) {
     if (addon.perUnit === 0) continue;
@@ -162,17 +165,6 @@ function buildStandardProductPrice(params: {
     lineItems.push({
       label: `Add-ons ($${addonsPerUnit.toFixed(2)} / pc)`,
       amount: addonsTotal,
-    });
-  }
-
-  const itemPrice = merchandisePerUnit + addonsPerUnit;
-  const quantitySubtotal = merchandiseSubtotal + addonsTotal;
-  const discountedSubtotal = quantitySubtotal;
-
-  if (addonsTotal !== 0 || merchandiseSubtotal !== 0) {
-    lineItems.push({
-      label: `Subtotal (${totalQuantity} pcs, merchandise + add-ons)`,
-      amount: quantitySubtotal,
     });
   }
 
@@ -518,14 +510,6 @@ export function calculateQuote(
     ...sizeSurchargeLineItems,
     ...flatFees.map(f => ({ label: f.label, amount: f.amount })),
   ];
-
-  // Add subtotal breakdown if we have multiple line items
-  if (lineItems.length > 1) {
-    lineItems.push({
-      label: `Subtotal (${totalQuantity} pcs, garment + printing + size surcharge + turnaround)`,
-      amount: subtotalBeforeDiscount,
-    });
-  }
 
   // Add garment indicator when useMyCloth is true
   const finalLineItems = [...lineItems];
@@ -939,14 +923,6 @@ export function calculateUnifiedQuote(
     ...sizeSurchargeLineItems,
     ...flatFees.map(f => ({ label: f.label, amount: f.amount })),
   ];
-
-  // Add subtotal breakdown if we have multiple line items
-  if (lineItems.length > 1) {
-    lineItems.push({
-      label: `Subtotal (${totalQuantity} pcs, garment + printing + size surcharge + turnaround)`,
-      amount: subtotalBeforeDiscount,
-    });
-  }
 
   // Apply discount on FULL subtotal (after all charges)
   const discountType = tier?.discountType || 'NONE';

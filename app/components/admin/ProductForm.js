@@ -592,6 +592,15 @@ setCustomizationMode('print_product');
     return !!cat || formData.category === 'Mailbox & Notary';
   })();
 
+  const isCustomApparels = (() => {
+    const cat = categories.find(
+      (c) =>
+        c.slug === 'custom-apparels' &&
+        (c.name === formData.category || c.id === formData.category || c.slug === formData.category)
+    );
+    return !!cat || formData.category === 'Custom Apparels';
+  })();
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name === 'category') {

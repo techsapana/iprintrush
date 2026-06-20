@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceHTML, buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
-import { ShippingSelector } from '../shared/ShippingSelector';
+import { ShippingSelector, getShippingDisplayLabel } from '../shared/ShippingSelector';
 
 const SHIPPING_METHOD_LABELS = {
   pickup: 'Store Pickup',
@@ -590,8 +590,7 @@ const isShippingReviewRequired = () => {
           }
         }
 
-customizationsDisplay.Delivery =
-           deliveryMethod === 'pickup' ? 'Store Pickup FREE' : getShippingMethodLabel('standard_shipping');
+        customizationsDisplay.Delivery = getShippingDisplayLabel(deliveryMethod);
         customizationsDisplay.Artwork =
           artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later';
         onQuoteReady({
@@ -947,6 +946,8 @@ const renderDimensionStep = (group, pool, value) => {
         </div>
       );
     }
+
+    const shippingLabel = getShippingDisplayLabel(deliveryMethod);
     
     const selectionLines = [];
     for (const g of activeGroups) {
@@ -1156,7 +1157,9 @@ const renderDimensionStep = (group, pool, value) => {
               </div>
             )}
             <div className="flex justify-between text-sm">
-              <span>Shipping</span>
+              <span>
+                Shipping {shippingLabel ? `(${shippingLabel})` : ''}
+              </span>
               <span>{quoteSummary.shipping === 0 ? 'FREE' : `$${quoteSummary.shipping.toFixed(2)}`}</span>
             </div>
             <div className="flex justify-between text-base font-semibold">

@@ -961,6 +961,8 @@ const renderDeliveryStep = () => {
   const renderSummaryStep = () => {
     if (!quoteSummary) return null;
 
+    const shippingLabel = getShippingDisplayLabel(deliveryMethod);
+
     const discountAmount = quoteSummary.lineItems
       .filter((it) => it.amount < 0)
       .reduce((sum, it) => sum + Math.abs(it.amount), 0);
@@ -1243,7 +1245,9 @@ const renderDeliveryStep = () => {
               </div>
             )}
             <div className="flex justify-between text-sm text-gray-900">
-              <span>Shipping</span>
+              <span>
+                Shipping {shippingLabel ? `(${shippingLabel})` : ''}
+              </span>
               <span>{(typeof quoteSummary.shipping === 'number' ? quoteSummary.shipping : 0) === 0 ? 'FREE' : `$${(typeof quoteSummary.shipping === 'number' ? quoteSummary.shipping : 0).toFixed(2)}`}</span>
             </div>
             <div className="flex justify-between text-base font-semibold text-gray-900">

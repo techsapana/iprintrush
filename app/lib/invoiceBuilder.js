@@ -20,7 +20,10 @@ const formatAmount = (amount) => {
 const getLineItemType = (item) => {
   const label = (item.label || '').toLowerCase();
   if (item.amount < 0) return 'discount';
-  if (label.includes('rush') || label.includes('2 hour') || label.includes('turnaround')) {
+  const isTurnaround =
+    item.type === 'turnaround' ||
+    item.isTurnaround === true;
+  if (isTurnaround || label.includes('rush') || label.includes('2 hour')) {
     return 'rush';
   }
   return 'normal';
