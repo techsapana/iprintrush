@@ -147,27 +147,34 @@ function parseWidthInches(selections: Record<string, unknown> | undefined): numb
   return toPositiveNumber(selections.width_in);
 }
 
-function getPackageWidthInches(item: CartItem): number | null {
-  return toPositiveNumber(item.product?.package_width_in);
-}
-
-export function getEffectiveItemWidth(item: CartItem): number | null {
+export function getEffectiveItemWidth(item: CartItem): number {
   const selectedWidth = parseWidthInches(item.quotePayload?.selections);
-  const packageWidth = getPackageWidthInches(item);
+  const rawPackageWidth = item.product?.package_width_in;
+  const packageWidth = typeof rawPackageWidth === 'number' 
+    ? rawPackageWidth 
+    : typeof rawPackageWidth === 'string' 
+      ? Number.parseFloat(rawPackageWidth) 
+      : 0;
+  const safePackageWidth = Number.isFinite(packageWidth) ? packageWidth : 0;
 
-  if (selectedWidth == null) return packageWidth;
-  if (packageWidth == null) return selectedWidth;
-  return Math.max(selectedWidth, packageWidth);
+  if (selectedWidth == null || !Number.isFinite(selectedWidth)) return safePackageWidth;
+  return Math.max(selectedWidth, safePackageWidth);
 }
 
 /**
  * Get weight for an item (base weight * quantity)
+ * Returns 0 if weight is not available - ensures safe oversized detection
  */
-function getItemWeight(item: CartItem): number | null {
-  const baseWeight = toPositiveNumber(item.product?.weight_lb);
-  if (baseWeight == null) return null;
+function getItemWeight(item: CartItem): number {
+  const rawWeight = item.product?.weight_lb;
+  const baseWeight = typeof rawWeight === 'number' 
+    ? rawWeight 
+    : typeof rawWeight === 'string' 
+      ? Number.parseFloat(rawWeight) 
+      : 0;
+  const safeWeight = Number.isFinite(baseWeight) ? baseWeight : 0;
   const qty = Math.max(1, item.quantity || 1);
-  return baseWeight * qty;
+  return safeWeight * qty;
 }
 
 /**
@@ -340,13 +347,13 @@ export function getOversizedDetails(cartItems: CartItem[], config: ShippingConfi
     const width = getEffectiveItemWidth(item);
     
     // Check width threshold
-    if (Number.isFinite(widthThreshold) && width !== null && width > widthThreshold) {
+    if (Number.isFinite(widthThreshold) && width > widthThreshold) {
       widthExceeded = { selectedWidth: width, maxAllowedWidth: widthThreshold };
     }
     
     // Check weight threshold
     const weight = getItemWeight(item);
-    if (Number.isFinite(weightThreshold) && weightThreshold > 0 && weight !== null && weight > weightThreshold) {
+    if (Number.isFinite(weightThreshold) && weightThreshold > 0 && weight > weightThreshold) {
       weightExceeded = { productWeight: weight, maxAllowedWeight: weightThreshold };
     }
 

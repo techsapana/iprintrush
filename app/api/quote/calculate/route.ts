@@ -4,6 +4,7 @@ import { query, queryOne } from '@/app/lib/db';
 import { calculateUnifiedQuote, normalizeDeliveryMethod } from '@/app/lib/quoteEngine';
 import { normalizeQuoteRequest } from '@/app/lib/quote/QuoteNormalizer';
 import { getShippingDecision, buildShippingConfig } from '@/app/lib/shippingEngine';
+import { lookupZoneByZip } from '@/app/lib/shipping/zipZoneService';
 import type {
   QuoteRequestPayload,
   QuoteConfigStore,
@@ -314,6 +315,65 @@ async function handleMailboxQuote(payload: any) {
   });
 }
 
+/**
+ * Build shipping config with zone overrides injected.
+ * ZEROES OUT all global local tier rates when a zone is active.
+ */
+function buildShippingConfigWithZone(
+  base: QuoteConfigStore['shipping'],
+  zone: { delivery_fee: number; free_delivery_minimum: number } | null,
+): QuoteConfigStore['shipping'] {
+  if (!zone) {
+    return base;
+  }
+
+  return {
+    ...base,
+    localUnder100Rate: 0,
+    localBetween100And199Rate: 0,
+    localOver200Rate: 0,
+  };
+}
+
+/**
+ * Resolve local delivery availability and zone parameters.
+ * AND-gates: ZIP match → zone enabled → product eligible.
+ */
+async function resolveLocalDeliveryZone(
+  shippingZip: string | null | undefined,
+  productLocalDeliveryEligible: boolean | null | undefined,
+): Promise<{
+  available: boolean;
+  fee: number;
+  freeMinimum: number;
+  deliveryWindow: string | null;
+}> {
+  const zip = String(shippingZip || '').trim();
+  if (!/^\d{5}$/.test(zip)) {
+    return { available: false, fee: 0, freeMinimum: 0, deliveryWindow: null };
+  }
+
+  const zone = await lookupZoneByZip(zip);
+  if (!zone) {
+    return { available: false, fee: 0, freeMinimum: 0, deliveryWindow: null };
+  }
+
+  if (!zone.enabled) {
+    return { available: false, fee: 0, freeMinimum: 0, deliveryWindow: null };
+  }
+
+  if (productLocalDeliveryEligible === false) {
+    return { available: false, fee: 0, freeMinimum: 0, deliveryWindow: null };
+  }
+
+  return {
+    available: true,
+    fee: zone.delivery_fee,
+    freeMinimum: zone.free_delivery_minimum,
+    deliveryWindow: zone.delivery_window,
+  };
+}
+
 async function handleApparelQuote(payload: QuoteRequestPayload) {
   const apparelTotal = (payload.quantities || []).reduce((s, q: any) => {
     const n = Number(q?.quantity ?? 0);
@@ -323,7 +383,17 @@ async function handleApparelQuote(payload: QuoteRequestPayload) {
   const qtyBounds = await getProductQuantityBounds(String(payload.productId));
   assertTotalQuantityWithinProductBounds(apparelTotal, qtyBounds);
 
-  const config = await getConfigWithCustomPrices(payload.productId);
+  const config = await getConfigWithCustomPrices(String(payload.productId));
+
+  const productEligibility = await queryOne(
+    'SELECT local_delivery_eligible FROM products WHERE id = ? LIMIT 1',
+    [payload.productId],
+  );
+
+  const zoneResult = await resolveLocalDeliveryZone(
+    payload.shippingZip,
+    productEligibility?.local_delivery_eligible ?? null,
+  );
 
   // Normalize the apparel payload
   const unifiedRequest = normalizeQuoteRequest({
@@ -340,6 +410,18 @@ async function handleApparelQuote(payload: QuoteRequestPayload) {
     payload.shippingState,
     payload.shippingZip,
   );
+
+  if (zoneResult.available && normalizeDeliveryMethod(payload.deliveryMethod) === 'local_delivery') {
+    const shippingAmount = summary.subtotal >= zoneResult.freeMinimum ? 0 : zoneResult.fee;
+    summary.shipping = shippingAmount;
+    summary.grandTotal = summary.subtotal + shippingAmount;
+    summary.localDeliveryZone = {
+      available: true,
+      fee: zoneResult.fee,
+      freeMinimum: zoneResult.freeMinimum,
+      deliveryWindow: zoneResult.deliveryWindow,
+    };
+  }
 
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
   assertTotalValueWithinProductBounds(summary.subtotal, valueBounds);
@@ -372,6 +454,16 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
 
   // Get config for apparel-style options
   const config = await getConfigWithCustomPrices(payload.productId);
+
+  const productEligibility = await queryOne(
+    'SELECT local_delivery_eligible FROM products WHERE id = ? LIMIT 1',
+    [payload.productId],
+  );
+
+  const zoneResult = await resolveLocalDeliveryZone(
+    payload.shippingZip,
+    productEligibility?.local_delivery_eligible ?? null,
+  );
 
   // Normalize the print product payload
   const unifiedRequest = normalizeQuoteRequest({
@@ -431,6 +523,18 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
 
   // Add shipping review required flag to summary
   summary.shippingReviewRequired = decision.shippingReviewRequired;
+
+  if (zoneResult.available && normalizedDeliveryMethod === 'local_delivery') {
+    const shippingAmount = summary.subtotal >= zoneResult.freeMinimum ? 0 : zoneResult.fee;
+    summary.shipping = shippingAmount;
+    summary.grandTotal = summary.subtotal + shippingAmount;
+    summary.localDeliveryZone = {
+      available: true,
+      fee: zoneResult.fee,
+      freeMinimum: zoneResult.freeMinimum,
+      deliveryWindow: zoneResult.deliveryWindow,
+    };
+  }
 
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
   assertTotalValueWithinProductBounds(summary.subtotal, valueBounds);

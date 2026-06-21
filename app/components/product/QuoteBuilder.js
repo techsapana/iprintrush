@@ -61,7 +61,12 @@ const [printLocationIds, setPrintLocationIds] = useState([]);
 const [turnaroundId, setTurnaroundId] = useState(null);
 const [designerHelpId, setDesignerHelpId] = useState(null);
 const [deliveryMethod, setDeliveryMethod] = useState('pickup');
-  // Shipping address is collected at checkout (not in quote builder)
+   const [availableMethods, setAvailableMethods] = useState([]);
+   const [oversizedDetails, setOversizedDetails] = useState(null);
+   const [zipCheckStatus, setZipCheckStatus] = useState('idle');
+   const [zipCheckResult, setZipCheckResult] = useState(null);
+   const [shippingZip, setShippingZip] = useState('');
+   // Shipping address is collected at checkout (not in quote builder)
   const [useMyCloth, setUseMyCloth] = useState(false);
   const [fabricChoice, setFabricChoice] = useState('');
   const isCustomApparels = /custom\s*apparel/i.test(String(productCategory || ''));
@@ -116,12 +121,14 @@ const [deliveryMethod, setDeliveryMethod] = useState('pickup');
             'Step 7: Need Designer Help?',
             'Step 8: Delivery Option',
             'Step 9: Quote Summary',
-          ],
+],
     [isCustomApparels],
   );
 
-  useEffect(() => {
-    let cancelled = false;
+  const deliveryStepIndex = isCustomApparels ? 8 : 7;
+
+   useEffect(() => {
+     let cancelled = false;
     const load = async () => {
       try {
         setLoading(true);
@@ -392,6 +399,10 @@ const invalidateQuote = () => {
     if (!hasCalculated) return;
     setQuoteSummary(null);
     setHasCalculated(false);
+    setZipCheckStatus('idle');
+    setZipCheckResult(null);
+    setAvailableMethods([]);
+    setOversizedDetails(null);
   };
 
    const scheduleRecalculation = debounce(() => {
@@ -462,13 +473,87 @@ const invalidateQuote = () => {
     scheduleRecalculation();
   };
 
-  const handleDeliveryMethodChange = (method) => {
-    invalidateQuote();
-    setDeliveryMethod(method);
-    scheduleRecalculation();
-  };
+  const buildShippingItems = useCallback(
+    () => ({
+      id: productId,
+      quantity: totalQuantity > 0 ? totalQuantity : 1,
+      product: {
+        weight_lb: Number(weightLb) || 0,
+        package_width_in: Number(packageWidthIn) || 0,
+        localDeliveryEligible: true,
+      },
+    }),
+    [productId, totalQuantity, weightLb, packageWidthIn],
+  );
 
-  const handleArtworkReadyChange = (value) => {
+   const fetchShippingMethods = async (items, zip = '') => {
+     try {
+       const res = await fetch('/api/shipping/methods', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+           items,
+           shippingAddress: zip ? { zip } : {},
+         }),
+       });
+       const data = await res.json().catch(() => ({}));
+       if (data?.success && Array.isArray(data.methods)) {
+         setAvailableMethods(data.methods);
+         if (data.oversizedDetails) {
+           setOversizedDetails(data.oversizedDetails);
+         }
+         return data;
+       }
+       setAvailableMethods([]);
+       return null;
+     } catch {
+       setAvailableMethods([]);
+       return null;
+     }
+   };
+
+   const handleZipCheck = async (zip) => {
+     if (!zip || zip.length !== 5) return;
+     setZipCheckStatus('checking');
+     setZipCheckResult(null);
+     try {
+       const items = buildShippingItems();
+       const data = await fetchShippingMethods(items, zip);
+       if (data) {
+         setZipCheckStatus('success');
+         setZipCheckResult({
+           available: true,
+           cost: data.methods.find(m => m.type === 'local_delivery')?.cost || 0,
+           deliveryWindow: data.methods.find(m => m.type === 'local_delivery')?.deliveryWindow || null,
+         });
+       } else {
+         setZipCheckStatus('unavailable');
+         setZipCheckResult({ available: false, cost: 0, deliveryWindow: null });
+       }
+     } catch {
+       setZipCheckStatus('error');
+       setZipCheckResult(null);
+     }
+   };
+
+const handleDeliveryMethodChange = (method) => {
+        invalidateQuote();
+        setDeliveryMethod(method);
+        if (method !== 'local_delivery') {
+          setShippingZip('');
+          setZipCheckStatus('idle');
+          setZipCheckResult(null);
+        }
+      };
+
+   useEffect(() => {
+     if (step === deliveryStepIndex && availableMethods.length === 0) {
+       const items = buildShippingItems();
+       fetchShippingMethods(items);
+     }
+   }, [step, deliveryStepIndex, availableMethods.length, buildShippingItems]);
+
+    const handleArtworkReadyChange = (value) => {
     invalidateQuote();
     setArtworkReadyChoice(value);
     setArtworkConfirmed(false);
@@ -927,14 +1012,27 @@ const renderSizeGrid = (sizes) => (
   };
 
 const renderDeliveryStep = () => {
+    const shippingDecision = oversizedDetails ? {
+      isOversized: oversizedDetails.anyOversized || false,
+      details: oversizedDetails,
+    } : null;
+
+    const deliveryStepIndex = isCustomApparels ? 8 : 7;
+
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Step 9 – Delivery Option</h3>
+        <h3 className="text-lg font-semibold text-gray-900">{isCustomApparels ? 'Step 9 – Delivery Option' : 'Step 8 – Delivery Option'}</h3>
         <ShippingSelector
           selectedMethod={deliveryMethod}
           onMethodChange={handleDeliveryMethodChange}
           shippingEnabled={config?.shipping?.enabled !== false}
           config={config?.shipping}
+          zipCheckStatus={zipCheckStatus}
+          zipCheckResult={zipCheckResult}
+          onZipCheck={handleZipCheck}
+          deliveryMethod={deliveryMethod}
+          methods={availableMethods}
+          decision={shippingDecision}
         />
       </div>
     );
@@ -1491,14 +1589,18 @@ const renderDeliveryStep = () => {
            );
         case 7:
           return Boolean(designerHelpId);
-        case 8:
-          return Boolean(deliveryMethod);
-        default:
-          return true;
-      }
-    }
+case 8:
+           if (deliveryMethod === 'local_delivery') {
+             return Boolean(deliveryMethod) && zipCheckStatus === 'success' && zipCheckResult?.available === true;
+           }
+           const methodExists = availableMethods.some(m => m.type === deliveryMethod) || !availableMethods.length;
+           return Boolean(deliveryMethod) && methodExists;
+         default:
+           return true;
+       }
+     }
 
-    // Default Apparel order:
+     // Default Apparel order:
     // 0 Decoration, 1 Color, 2 Sizes/Qty, 3 Print Locations, 4 Turnaround,
     // 5 Artwork, 6 Designer Help, 7 Delivery
     switch (step) {
@@ -1519,9 +1621,13 @@ const renderDeliveryStep = () => {
          );
       case 6:
         return Boolean(designerHelpId);
-      case 7:
-        return Boolean(deliveryMethod);
-      default:
+case 7:
+         if (deliveryMethod === 'local_delivery') {
+           return Boolean(deliveryMethod) && zipCheckStatus === 'success' && zipCheckResult?.available === true;
+         }
+         const methodExists = availableMethods.some(m => m.type === deliveryMethod) || !availableMethods.length;
+         return Boolean(deliveryMethod) && methodExists;
+       default:
         return true;
     }
   };

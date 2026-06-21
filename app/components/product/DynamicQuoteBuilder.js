@@ -59,9 +59,10 @@ export function DynamicQuoteBuilder({
   const [quoteSummary, setQuoteSummary] = useState(null);
   const [calculating, setCalculating] = useState(false);
   const [selections, setSelections] = useState({});
-  const [widthIn, setWidthIn] = useState('');
-  const [heightIn, setHeightIn] = useState('');
+const [widthIn, setWidthIn] = useState('');
+const [heightIn, setHeightIn] = useState('');
 const [deliveryMethod, setDeliveryMethod] = useState('pickup');
+const [shippingZip, setShippingZip] = useState('');
   const [hasCalculated, setHasCalculated] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [emailTo, setEmailTo] = useState('');
@@ -80,12 +81,17 @@ const artworkFileRef = useRef(null);
   const [artworkError, setArtworkError] = useState('');
   const [artworkConfirmed, setArtworkConfirmed] = useState(false);
 
-  const latestCalcRequestIdRef = useRef(0);
+const latestCalcRequestIdRef = useRef(0);
   const hasEverCalculatedRef = useRef(false);
 
-  useEffect(() => {
-    if (hasCalculated) hasEverCalculatedRef.current = true;
-  }, [hasCalculated]);
+const [zipCheckStatus, setZipCheckStatus] = useState('idle');
+   const [zipCheckResult, setZipCheckResult] = useState(null);
+   const [availableMethods, setAvailableMethods] = useState([]);
+   const [oversizedDetails, setOversizedDetails] = useState(null);
+
+   useEffect(() => {
+     if (hasCalculated) hasEverCalculatedRef.current = true;
+   }, [hasCalculated]);
 
   const poolKeySet = useMemo(
     () => new Set((pools || []).map((p) => String(p.key))),
@@ -281,27 +287,79 @@ const artworkFileRef = useRef(null);
     scheduleRecalculation();
   };
 
+const fetchShippingMethods = async (items, zip = '') => {
+    try {
+      const res = await fetch('/api/shipping/methods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items,
+          shippingAddress: zip ? { zip } : {},
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data?.success && Array.isArray(data.methods)) {
+        setAvailableMethods(data.methods);
+        if (data.oversizedDetails) {
+          setOversizedDetails(data.oversizedDetails);
+        }
+        return data;
+      }
+      setAvailableMethods([]);
+      return null;
+    } catch {
+      setAvailableMethods([]);
+      return null;
+    }
+  };
+
+const handleZipCheck = async (zip) => {
+      if (!zip || zip.length !== 5) return;
+      setZipCheckStatus('checking');
+      setZipCheckResult(null);
+      try {
+        const items = [{
+         id: productId,
+         quantity: totalQuantity > 0 ? totalQuantity : 1,
+         quotePayload: {
+           mode: 'print_product',
+           selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn) } : {}) },
+         },
+         product: {
+           weight_lb: Number(weightLb) || 0,
+           package_width_in: Number(packageWidthIn) || 0,
+           localDeliveryEligible: true,
+         },
+        }];
+        const data = await fetchShippingMethods(items, zip);
+       if (data) {
+         setZipCheckStatus('success');
+         setZipCheckResult({
+           available: true,
+           cost: data.methods.find(m => m.type === 'local_delivery')?.cost || 0,
+           deliveryWindow: data.methods.find(m => m.type === 'local_delivery')?.deliveryWindow || null,
+         });
+       } else {
+         setZipCheckStatus('unavailable');
+         setZipCheckResult({ available: false, cost: 0, deliveryWindow: null });
+       }
+     } catch {
+       setZipCheckStatus('error');
+       setZipCheckResult(null);
+     }
+   };
+
   const invalidateQuote = () => {
     if (!hasCalculated) return;
     setQuoteSummary(null);
     setHasCalculated(false);
-  };
+    setZipCheckStatus('idle');
+    setZipCheckResult(null);
+    setAvailableMethods([]);
+    setOversizedDetails(null);
+};
 
-const isShippingReviewRequired = () => {
-    const w = parseFloat(widthIn);
-    const threshold = Number(shipping?.oversizedWidthThresholdIn);
-    const weightThreshold = Number(shipping?.oversizedWeightThresholdLb);
-    // Width check
-    const widthExceeded = Number.isFinite(w) && Number.isFinite(threshold) && w > threshold;
-    // Weight check - base weight multiplied by quantity
-    const qty = Math.max(1, totalQuantity || 1);
-    const baseWeight = Number(weightLb || 0);
-    const totalWeight = baseWeight * qty;
-    const weightExceeded = Number.isFinite(weightThreshold) && weightThreshold > 0 && Number.isFinite(totalWeight) && totalWeight > weightThreshold;
-    return widthExceeded || weightExceeded;
-  };
-
-  const hasCalculatedRef = useRef(hasCalculated);
+   const hasCalculatedRef = useRef(hasCalculated);
   useEffect(() => {
     hasCalculatedRef.current = hasCalculated;
   }, [hasCalculated]);
@@ -319,13 +377,17 @@ const isShippingReviewRequired = () => {
     scheduleRecalculation();
   };
 
-  const handleDeliveryMethodChange = (method) => {
+const handleDeliveryMethodChange = (method) => {
     invalidateQuote();
     setDeliveryMethod(method);
-    scheduleRecalculation();
+    if (method !== 'local_delivery') {
+      setShippingZip('');
+      setZipCheckStatus('idle');
+      setZipCheckResult(null);
+    }
   };
 
-  const handleTempArtworkFilesChange = (newFiles) => {
+   const handleTempArtworkFilesChange = (newFiles) => {
     invalidateQuote();
     setTempArtworkFiles(newFiles);
     setArtworkConfirmed(false);
@@ -542,6 +604,9 @@ const isShippingReviewRequired = () => {
         selections: { ...selections, ...dimensionSelections },
         size: finalSize,
         deliveryMethod,
+        shippingZip: shippingZip.trim(),
+        shippingState: '',
+        shippingCity: '',
         artworkReady: artworkReadyChoice === 'ready',
         tempArtworkFiles,
         artworkFiles,
@@ -1351,27 +1416,61 @@ const renderDeliveryStep = () => {
         mode: 'print_product',
         selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn) } : {}) },
       },
-      product: { weight_lb: weightLb, package_width_in: packageWidthIn },
+      product: {
+        weight_lb: Number(weightLb) || 0,
+        package_width_in: Number(packageWidthIn) || 0,
+        localDeliveryEligible: true,
+      },
     }];
 
-    return (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Delivery Option</h3>
-        <ShippingSelector
-          selectedMethod={deliveryMethod}
-          onMethodChange={handleDeliveryMethodChange}
-          shippingEnabled={shipping?.enabled !== false}
-          config={shipping}
-          items={items}
-        />
-      </div>
-    );
-  };
+    const shippingDecision = oversizedDetails ? {
+      isOversized: oversizedDetails.anyOversized || false,
+      details: oversizedDetails,
+    } : null;
 
-  const artworkStepIndex = activeGroups.length;
-  const deliveryStepIndex = activeGroups.length + 1;
+return (
+       <div className="space-y-4">
+         <h3 className="text-lg font-semibold text-gray-900">Delivery Option</h3>
+         <ShippingSelector
+           selectedMethod={deliveryMethod}
+           onMethodChange={handleDeliveryMethodChange}
+           shippingEnabled={shipping?.enabled !== false}
+           config={shipping}
+           items={items}
+           zipCheckStatus={zipCheckStatus}
+           zipCheckResult={zipCheckResult}
+           onZipCheck={handleZipCheck}
+           deliveryMethod={deliveryMethod}
+           methods={availableMethods}
+           decision={shippingDecision}
+         />
+       </div>
+     );
+   };
 
-  const renderStepContent = () => {
+   const artworkStepIndex = activeGroups.length;
+   const deliveryStepIndex = activeGroups.length + 1;
+
+useEffect(() => {
+      if (step === deliveryStepIndex && availableMethods.length === 0) {
+        const items = [{
+          id: productId,
+          quantity: totalQuantity > 0 ? totalQuantity : 1,
+          quotePayload: {
+            mode: 'print_product',
+            selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn) } : {}) },
+          },
+          product: {
+            weight_lb: Number(weightLb) || 0,
+            package_width_in: Number(packageWidthIn) || 0,
+            localDeliveryEligible: true,
+          },
+        }];
+        fetchShippingMethods(items);
+      }
+    }, [step, deliveryStepIndex, availableMethods.length, productId, totalQuantity, selections, widthIn, weightLb, packageWidthIn]);
+
+   const renderStepContent = () => {
     if (step < activeGroups.length) {
       return renderGroupStep(activeGroups[step], step);
     }
@@ -1431,7 +1530,11 @@ const renderDeliveryStep = () => {
     }
 
     if (step === deliveryStepIndex) {
-      return Boolean(deliveryMethod);
+      if (deliveryMethod === 'local_delivery') {
+        return Boolean(deliveryMethod) && zipCheckStatus === 'success' && zipCheckResult?.available === true;
+      }
+      const methodExists = availableMethods.some(m => m.type === deliveryMethod) || !availableMethods.length;
+      return Boolean(deliveryMethod) && methodExists;
     }
 
     return true;

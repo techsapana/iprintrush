@@ -62,81 +62,19 @@ export default function CheckoutClient() {
     unavailable: false,
     message: '',
   });
-  const [oversizedDetails, setOversizedDetails] = useState(null);
-  const [selectedShipping, setSelectedShipping] = useState(null);
-  const [shippingMethods, setShippingMethods] = useState([]);
-  const [selectedMethod, setSelectedMethod] = useState(null);
-  const [useRuleBased, setUseRuleBased] = useState(
-    process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true'
-  );
-  const [shippingAddressKey, setShippingAddressKey] = useState('');
-  const [fileUploadMode, setFileUploadMode] = useState('later');
-  const [uploadedFile, setUploadedFile] = useState(null);
-  const [uploadedPreview, setUploadedPreview] = useState(null);
-  const [isFinalConfirmed, setIsFinalConfirmed] = useState(false);
-
-  async function fetchShippingMethods() {
-    if (!useRuleBased) return;
-    try {
-      const res = await fetch('/api/shipping/methods', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: checkoutItems.map((i) => ({
-            id: i.id,
-            quantity: i.quantity,
-            quotePayload: i.options?.quotePayload || null,
-            product: { weight_lb: i.weightLb ?? null, package_width_in: i.packageWidthIn ?? null },
-          })),
-          shippingAddress: {
-            address: formData.shippingAddress.trim(),
-            city: formData.shippingCity.trim(),
-            state: formData.shippingState.trim(),
-            zip: formData.shippingZip.trim(),
-          },
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data?.success && Array.isArray(data.methods)) {
-        setShippingMethods(data.methods);
-        if (data.oversizedDetails) {
-          setOversizedDetails(data.oversizedDetails);
-        }
-      } else {
-        setShippingMethods([]);
-      }
-    } catch {
-      setShippingMethods([]);
-    }
-  }
-
-  useEffect(() => {
-    if (isBuyNow) {
-      setBuyNowItems(readBuyNowItems());
-    } else {
-      clearBuyNowItems();
-    }
-    setSessionReady(true);
-  }, [isBuyNow]);
-
-  const checkoutItems = isBuyNow ? buyNowItems : cartItems;
-
-  useEffect(() => {
-    if (!useRuleBased) return;
-    if (!canCalculateShipping()) return;
-    fetchShippingMethods();
-  }, [useRuleBased, checkoutItems, formData.shippingAddress, formData.shippingCity, formData.shippingState, formData.shippingZip]);
-
-  const buildShippingItems = useCallback(
-    () =>
-      checkoutItems.map((i) => ({
-        id: i.id,
-        quantity: i.quantity,
-        quotePayload: i.options?.quotePayload || null,
-        product: { weight_lb: i.weightLb ?? null, package_width_in: i.packageWidthIn ?? null },
-      })),
-    [checkoutItems],
-  );
+const [oversizedDetails, setOversizedDetails] = useState(null);
+   const [selectedShipping, setSelectedShipping] = useState(null);
+   const [shippingMethods, setShippingMethods] = useState([]);
+   const [selectedMethod, setSelectedMethod] = useState(null);
+   const [useRuleBased, setUseRuleBased] = useState(
+     process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true'
+   );
+   const [shippingAddressKey, setShippingAddressKey] = useState('');
+   const [fileUploadMode, setFileUploadMode] = useState('later');
+   const [uploadedFile, setUploadedFile] = useState(null);
+   const [uploadedPreview, setUploadedPreview] = useState(null);
+   const [isFinalConfirmed, setIsFinalConfirmed] = useState(false);
+   const [isZipValidated, setIsZipValidated] = useState(false);
 
   const canCalculateShipping = useCallback(() => {
     const zipRegex = /^\d{5}$/;
@@ -275,7 +213,7 @@ export default function CheckoutClient() {
     };
   }, [uploadedPreview]);
 
-  useEffect(() => {
+useEffect(() => {
     const loadCoupons = async () => {
       try {
         const productIds = Array.from(new Set(checkoutItems.map((i) => i.id).filter(Boolean)));
@@ -301,8 +239,24 @@ export default function CheckoutClient() {
         setCouponLookup({});
       }
     };
-    loadCoupons();
-  }, [checkoutItems]);
+
+const buildShippingItems = useCallback(
+      () =>
+        checkoutItems.map((i) => ({
+          id: i.id,
+          quantity: i.quantity,
+          quotePayload: i.options?.quotePayload || null,
+          product: {
+            weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
+            package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),
+            localDeliveryEligible: i.product?.localDeliveryEligible ?? true,
+          },
+        })),
+      [checkoutItems],
+    );
+
+   loadCoupons();
+    }, [checkoutItems]);
 
   useEffect(() => {
     if (formData.deliveryMethod !== 'shipping') {
@@ -311,6 +265,7 @@ export default function CheckoutClient() {
       setShippingMethods([]);
       setSelectedMethod(null);
       setShippingAddressKey('');
+      setIsZipValidated(false);
       return;
     }
     const currentKey = `${formData.shippingAddress}|${formData.shippingCity}|${formData.shippingState}|${formData.shippingZip}`;
@@ -320,6 +275,7 @@ export default function CheckoutClient() {
       setShippingMethods([]);
       setSelectedMethod(null);
       setShippingAddressKey('');
+      setIsZipValidated(false);
     }
   }, [
     formData.deliveryMethod,
@@ -330,6 +286,54 @@ export default function CheckoutClient() {
     shippingAddressKey,
     useRuleBased,
   ]);
+
+  const handleZipCheck = async () => {
+    const zip = String(formData.shippingZip || '').trim();
+    if (!/^\d{5}$/.test(zip)) {
+      setPayError('Please enter a valid 5-digit ZIP code.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/shipping/methods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: checkoutItems.map((i) => ({
+            id: i.id,
+            quantity: i.quantity,
+            quotePayload: i.options?.quotePayload || null,
+            product: {
+              weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
+              package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),
+              localDeliveryEligible: i.product?.localDeliveryEligible ?? true,
+            },
+          })),
+          shippingAddress: { zip },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data?.success && Array.isArray(data.methods)) {
+        setShippingMethods(data.methods);
+        const hasLocal = data.methods.some((m) => m.type === 'local_delivery');
+        if (useRuleBased && selectedMethod === 'local_delivery') {
+          setIsZipValidated(hasLocal);
+          if (!hasLocal) setPayError('Local delivery not available in this ZIP code.');
+        }
+      } else {
+        setShippingMethods([]);
+        if (useRuleBased && selectedMethod === 'local_delivery') {
+          setIsZipValidated(false);
+          setPayError('Unable to verify ZIP code. Please try again.');
+        }
+      }
+    } catch {
+      setShippingMethods([]);
+      if (useRuleBased && selectedMethod === 'local_delivery') {
+        setIsZipValidated(false);
+        setPayError('Unable to verify ZIP code. Please try again.');
+      }
+    }
+  };
 
   const handleApplyCoupon = (e) => {
     e.preventDefault();
@@ -397,6 +401,15 @@ export default function CheckoutClient() {
       (!formData.shippingAddress.trim() || !formData.shippingCity.trim() || !formData.shippingZip.trim())
     ) {
       setPayError('Please enter a complete shipping address for shipping review.');
+      return;
+    }
+    if (
+      formData.deliveryMethod === 'shipping' &&
+      useRuleBased &&
+      selectedMethod === 'local_delivery' &&
+      !isZipValidated
+    ) {
+      setPayError('Please verify your ZIP code is eligible for local delivery.');
       return;
     }
     setIsPaying(true);
@@ -666,40 +679,63 @@ export default function CheckoutClient() {
                        <div>Our team will review shipping options and contact you.</div>
                      </div>
                    )}
-                {shippingMethods.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    Enter street, city, state, and ZIP in Shipping Address to load shipping methods.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {shippingMethods.map((method) => {
-                      const checked = selectedMethod === method.type;
-                      return (
-                        <label
-                          key={method.type}
-                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
-                            checked
-                              ? 'border-[#29b6f6] bg-sky-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="ruleBasedShippingOption"
-                            checked={checked}
-                            onChange={() => setSelectedMethod(method.type)}
-                            className="mt-1"
-                          />
-                          <span className="text-sm text-gray-900">
-                            {method.label} — ${Number(method.cost || 0).toFixed(2)}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+{shippingMethods.length === 0 ? (
+                   <p className="text-sm text-gray-500">
+                     Enter street, city, state, and ZIP in Shipping Address to load shipping methods.
+                   </p>
+                 ) : (
+                   <div className="space-y-3">
+                     {shippingMethods.map((method) => {
+                       const checked = selectedMethod === method.type;
+                       const isLocalDelivery = method.type === 'local_delivery';
+                       const canSelectLocal = !isLocalDelivery || (isLocalDelivery && isZipValidated);
+                       return (
+                         <label
+                           key={method.type}
+                           className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
+                             checked
+                               ? 'border-[#29b6f6] bg-sky-50'
+                               : 'border-gray-200 hover:border-gray-300'
+                           } ${canSelectLocal ? '' : 'opacity-60'}`}
+                         >
+                           <input
+                             type="radio"
+                             name="ruleBasedShippingOption"
+                             checked={checked}
+                             onChange={() => {
+                               setSelectedMethod(method.type);
+                               if (method.type !== 'local_delivery') {
+                                 setIsZipValidated(false);
+                               }
+                             }}
+                             disabled={!canSelectLocal}
+                             className="mt-1"
+                           />
+                           <span className="text-sm text-gray-900">
+                             {method.label} — ${Number(method.cost || 0).toFixed(2)}
+                           </span>
+                         </label>
+                       );
+                     })}
+                     {selectedMethod === 'local_delivery' && !isZipValidated && (
+                       <div className="mt-3 p-3 border-t border-gray-200">
+                         <Button
+                           type="button"
+                           variant="outline"
+                           onClick={handleZipCheck}
+                           className="text-sm"
+                         >
+                           Check ZIP Availability
+                         </Button>
+                         <p className="text-xs text-gray-500 mt-2">
+                           Verify your ZIP code is eligible for local delivery.
+                         </p>
+                       </div>
+                     )}
+                   </div>
+                 )}
+               </div>
+             )}
 
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Upload Your Design (Optional but recommended)</h2>
