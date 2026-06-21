@@ -713,7 +713,7 @@ useEffect(() => {
                 href="/admin/testimonials"
                 className="block w-full bg-rose-600 text-white text-center py-2 rounded-lg hover:bg-rose-700 transition font-medium"
               >
-                Manage Testimonials
+                Manage Testimonial
               </Link>
             </div>
           </div>

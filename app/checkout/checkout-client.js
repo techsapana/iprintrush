@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -75,6 +75,11 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
    const [uploadedPreview, setUploadedPreview] = useState(null);
    const [isFinalConfirmed, setIsFinalConfirmed] = useState(false);
    const [isZipValidated, setIsZipValidated] = useState(false);
+
+  const checkoutItems = useMemo(() => {
+    const source = isBuyNow ? buyNowItems : cartItems;
+    return Array.isArray(source) ? source : [];
+  }, [isBuyNow, buyNowItems, cartItems]);
 
   const canCalculateShipping = useCallback(() => {
     const zipRegex = /^\d{5}$/;
@@ -213,7 +218,14 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     };
   }, [uploadedPreview]);
 
-useEffect(() => {
+  useEffect(() => {
+    if (isBuyNow) {
+      setBuyNowItems(readBuyNowItems());
+    }
+    setSessionReady(true);
+  }, [isBuyNow]);
+
+  useEffect(() => {
     const loadCoupons = async () => {
       try {
         const productIds = Array.from(new Set(checkoutItems.map((i) => i.id).filter(Boolean)));
