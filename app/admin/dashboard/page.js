@@ -718,6 +718,31 @@ useEffect(() => {
             </div>
           </div>
 
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-teal-600 text-white p-6">
+              <h2 className="text-xl font-bold">Shipping Zones</h2>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                Manage local delivery zones, ZIP codes, delivery fees, free delivery thresholds, and delivery windows.
+              </p>
+              <div className="space-y-3">
+                <Link
+                  href="/admin/shipping/zones"
+                  className="block w-full bg-teal-600 text-white text-center py-2 rounded-lg hover:bg-teal-700 transition font-medium"
+                >
+                  Manage Shipping Zones
+                </Link>
+                <Link
+                  href="/admin/shipping/zones"
+                  className="block w-full bg-green-600 text-white text-center py-2 rounded-lg hover:bg-green-700 transition font-medium"
+                >
+                  Create New Zone
+                </Link>
+              </div>
+            </div>
+          </div>
+
           <div className="mt-8 bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-gray-800 text-white p-6">
               <h2 className="text-xl font-bold">Recent Products</h2>
