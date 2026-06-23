@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdmin } from '../../../hooks/useAdmin';
 
@@ -13,9 +13,18 @@ function ShippingZonesAdminPageInner() {
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({});
   const [zipsState, setZipsState] = useState({});
-  const [bulkZips, setBulkZips] = useState('');
-  const [zipAdded, setZipAdded] = useState(null);
-  const [zipError, setZipError] = useState('');
+  const [expandedZoneId, setExpandedZoneId] = useState(null);
+
+  const getZoneState = (zoneId) => {
+    return zipsState[zoneId] || { zips: [], newZip: '', bulkZips: '', zipAdded: null, zipError: '' };
+  };
+
+  const updateZoneState = (zoneId, updates) => {
+    setZipsState(prev => {
+      const current = prev[zoneId] || { zips: [], newZip: '', bulkZips: '', zipAdded: null, zipError: '' };
+      return { ...prev, [zoneId]: { ...current, ...updates } };
+    });
+  };
 
   useEffect(() => {
     if (!adminLoading && !adminUser) {
@@ -93,12 +102,14 @@ function ShippingZonesAdminPageInner() {
       }
 
       await loadZones();
+      setExpandedZoneId(null);
     } catch (err) {
       setError(err.message || 'Failed to delete');
     }
   };
 
   const startEdit = (zone) => {
+    setExpandedZoneId(null);
     setEditing(zone.id);
     setFormData({
       zone_name: zone.zone_name || '',
@@ -130,8 +141,7 @@ function ShippingZonesAdminPageInner() {
     setEditing(null);
     setFormData({});
     setZipsState({});
-    setZipAdded(null);
-    setZipError('');
+    setExpandedZoneId(null);
   };
 
   const loadZips = async (zoneId) => {
@@ -139,21 +149,21 @@ function ShippingZonesAdminPageInner() {
       const res = await fetch(`/api/admin/shipping/zones/${zoneId}/zips`);
       if (!res.ok) throw new Error('Failed to load ZIP codes');
       const json = await res.json();
-      setZipsState(prev => ({ ...prev, [zoneId]: json.zips || [] }));
+      updateZoneState(zoneId, { zips: json.zips || [] });
     } catch (err) {
-      setZipError(err.message || 'Failed to load ZIP codes');
+      updateZoneState(zoneId, { zipError: err.message || 'Failed to load ZIP codes' });
     }
   };
 
   const handleAddZip = async (zoneId) => {
-    const zipCode = (zipsState.newZip || '').replace(/\D/g, '').slice(0, 5);
+    const zipCode = (getZoneState(zoneId).newZip || '').replace(/\D/g, '').slice(0, 5);
     if (!/^\d{5}$/.test(zipCode)) {
-      setZipError('Please enter a valid 5-digit ZIP code');
+      updateZoneState(zoneId, { zipError: 'Please enter a valid 5-digit ZIP code' });
       return;
     }
 
     try {
-      setZipError('');
+      updateZoneState(zoneId, { zipError: '' });
       const res = await fetch(`/api/admin/shipping/zones/${zoneId}/zips`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,25 +173,25 @@ function ShippingZonesAdminPageInner() {
       if (!res.ok) {
         const err = await res.json();
         if (err.duplicate) {
-          setZipAdded({ added: 0, duplicates: 1 });
+          updateZoneState(zoneId, { zipAdded: { added: 0, duplicates: 1 } });
         } else {
           throw new Error(err.error || 'Failed to add ZIP');
         }
       } else {
         const json = await res.json();
-        setZipAdded(json);
+        updateZoneState(zoneId, { zipAdded: json });
       }
 
-      setZipsState(prev => ({ ...prev, newZip: '' }));
+      updateZoneState(zoneId, { newZip: '' });
       await loadZips(zoneId);
     } catch (err) {
-      setZipError(err.message || 'Failed to add ZIP');
+      updateZoneState(zoneId, { zipError: err.message || 'Failed to add ZIP' });
     }
   };
 
   const handleRemoveZip = async (zoneId, zipCode) => {
     try {
-      setZipError('');
+      updateZoneState(zoneId, { zipError: '' });
       const res = await fetch(`/api/admin/shipping/zones/zips/${zipCode}`, {
         method: 'DELETE',
       });
@@ -193,22 +203,23 @@ function ShippingZonesAdminPageInner() {
 
       await loadZips(zoneId);
     } catch (err) {
-      setZipError(err.message || 'Failed to remove ZIP');
+      updateZoneState(zoneId, { zipError: err.message || 'Failed to remove ZIP' });
     }
   };
 
   const handleBulkZips = async (zoneId) => {
+    const bulkZips = getZoneState(zoneId).bulkZips || '';
     const zipCodes = bulkZips.split('\n')
       .map(z => z.replace(/\D/g, '').slice(0, 5))
       .filter(z => /^\d{5}$/.test(z));
 
     if (zipCodes.length === 0) {
-      setZipError('No valid 5-digit ZIP codes found');
+      updateZoneState(zoneId, { zipError: 'No valid 5-digit ZIP codes found' });
       return;
     }
 
     try {
-      setZipError('');
+      updateZoneState(zoneId, { zipError: '' });
       const res = await fetch(`/api/admin/shipping/zones/${zoneId}/bulk-zips`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -221,20 +232,20 @@ function ShippingZonesAdminPageInner() {
       }
 
       const json = await res.json();
-      setZipAdded(json);
-      setBulkZips('');
+      updateZoneState(zoneId, { zipAdded: json, bulkZips: '' });
       await loadZips(zoneId);
     } catch (err) {
-      setZipError(err.message || 'Failed to add ZIP codes');
+      updateZoneState(zoneId, { zipError: err.message || 'Failed to add ZIP codes' });
     }
   };
 
   const getZoneZips = (zoneId) => {
-    if (zipsState[zoneId] === undefined) {
+    const state = zipsState[zoneId];
+    if (!state) {
       loadZips(zoneId);
       return [];
     }
-    return zipsState[zoneId] || [];
+    return state.zips || [];
   };
 
   if (adminLoading || !adminUser) {
@@ -420,123 +431,111 @@ function ShippingZonesAdminPageInner() {
                   </tr>
                 ) : (
                   zones.map((zone) => (
-                    <tr key={zone.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium text-gray-900">{zone.zone_name}</td>
-                      <td className="px-6 py-4 text-gray-600">${Number(zone.delivery_fee || 0).toFixed(2)}</td>
-                      <td className="px-6 py-4 text-gray-600">${Number(zone.free_delivery_minimum || 0).toFixed(2)}</td>
-                      <td className="px-6 py-4 text-gray-600">{zone.delivery_window || '—'}</td>
-                      <td className="px-6 py-4 text-gray-600">{zone.zipCount || 0}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded text-xs ${zone.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                          {zone.enabled ? 'Yes' : 'No'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm space-x-3">
-                        <button
-                          onClick={() => startEdit(zone)}
-                          className="text-[#29b6f6] hover:text-[#1a7ba3] font-medium"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(zone.id)}
-                          className="text-red-600 hover:text-red-800 font-medium"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
+                    <React.Fragment key={zone.id}>
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-6 py-4 font-medium text-gray-900">{zone.zone_name}</td>
+                        <td className="px-6 py-4 text-gray-600">${Number(zone.delivery_fee || 0).toFixed(2)}</td>
+                        <td className="px-6 py-4 text-gray-600">${Number(zone.free_delivery_minimum || 0).toFixed(2)}</td>
+                        <td className="px-6 py-4 text-gray-600">{zone.delivery_window || '—'}</td>
+                        <td className="px-6 py-4 text-gray-600">{zone.zipCount || 0}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs ${zone.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                            {zone.enabled ? 'Yes' : 'No'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm space-x-3">
+                          <button
+                            onClick={() => setExpandedZoneId(expandedZoneId === zone.id ? null : zone.id)}
+                            className="text-[#29b6f6] hover:text-[#1a7ba3] font-medium"
+                          >
+                            {expandedZoneId === zone.id ? 'Hide Details' : 'View Details'}
+                          </button>
+                          <button
+                            onClick={() => startEdit(zone)}
+                            className="text-[#29b6f6] hover:text-[#1a7ba3] font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(zone.id)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedZoneId === zone.id && (
+                        <tr key={`detail-${zone.id}`}>
+                          <td colSpan={7} className="p-6 bg-gray-50">
+                            <div className="mb-4">
+                              <div className="flex flex-wrap gap-2 mb-3">
+                                {getZoneZips(zone.id).length > 0 ? (
+                                  getZoneZips(zone.id).map((zip) => (
+                                    <span key={zip} className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 rounded text-sm">
+                                      {zip}
+                                      <button
+                                        onClick={() => handleRemoveZip(zone.id, zip)}
+                                        className="text-red-500 hover:text-red-700"
+                                        title="Remove"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-gray-500 text-sm">No ZIP codes added</span>
+                                )}
+                              </div>
+                              <div className="flex gap-2 mb-3">
+                                <input
+                                  type="text"
+                                  value={getZoneState(zone.id).newZip || ''}
+                                  onChange={(e) => updateZoneState(zone.id, { newZip: e.target.value.replace(/\D/g, '').slice(0, 5) })}
+                                  placeholder="Enter 5-digit ZIP code"
+                                  maxLength={5}
+                                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                />
+                                <button
+                                  onClick={() => handleAddZip(zone.id)}
+                                  className="bg-[#29b6f6] text-white px-4 py-2 rounded-lg hover:bg-[#1e8fc4] transition text-sm"
+                                >
+                                  Add ZIP
+                                </button>
+                              </div>
+                              <div className="space-y-2">
+                                <textarea
+                                  value={getZoneState(zone.id).bulkZips || ''}
+                                  onChange={(e) => updateZoneState(zone.id, { bulkZips: e.target.value })}
+                                  placeholder="Bulk add ZIP codes (one per line)"
+                                  rows={3}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                />
+<button
+                                   onClick={() => handleBulkZips(zone.id)}
+                                   className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition text-sm"
+                                 >
+                                   Add All ZIPs
+                                 </button>
+                               </div>
+                               {getZoneState(zone.id).zipAdded && (
+                                 <div className="mt-2 text-sm text-green-700">
+                                   Added {getZoneState(zone.id).zipAdded.added} ZIP codes{getZoneState(zone.id).zipAdded.duplicates > 0 ? `, skipped ${getZoneState(zone.id).zipAdded.duplicates} duplicates` : ''}
+                                 </div>
+                               )}
+                               {getZoneState(zone.id).zipError && (
+                                 <div className="mt-2 text-sm text-red-700">{getZoneState(zone.id).zipError}</div>
+                               )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))
                 )}
               </tbody>
             </table>
           </div>
         </div>
-
-        {/* ZIP Management section */}
-        {zones.length > 0 && (
-          <div className="mt-8 bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">ZIP Code Management</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Add ZIP codes to zones. Each ZIP can only belong to one zone.
-              </p>
-            </div>
-
-            {zones.map((zone) => (
-              <div key={`zips-${zone.id}`} className="border-b border-gray-100 last:border-0">
-                <div className="px-6 py-3 bg-gray-50">
-                  <h3 className="font-semibold text-gray-900">{zone.zone_name}</h3>
-                </div>
-                <div className="p-6">
-                  <div className="mb-4">
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {getZoneZips(zone.id).length > 0 ? (
-                        getZoneZips(zone.id).map((zip) => (
-                          <span key={zip} className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 rounded text-sm">
-                            {zip}
-                            <button
-                              onClick={() => handleRemoveZip(zone.id, zip)}
-                              className="text-red-500 hover:text-red-700"
-                              title="Remove"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-gray-500 text-sm">No ZIP codes added</span>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2 mb-3">
-                      <input
-                        type="text"
-                        value={zipsState.newZip || ''}
-                        onChange={(e) => setZipsState({ ...zipsState, newZip: e.target.value.replace(/\D/g, '').slice(0, 5) })}
-                        placeholder="Enter 5-digit ZIP code"
-                        maxLength={5}
-                        className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      />
-                      <button
-                        onClick={() => handleAddZip(zone.id)}
-                        className="bg-[#29b6f6] text-white px-4 py-2 rounded-lg hover:bg-[#1e8fc4] transition text-sm"
-                      >
-                        Add ZIP
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <textarea
-                        value={bulkZips}
-                        onChange={(e) => setBulkZips(e.target.value)}
-                        placeholder="Bulk add ZIP codes (one per line)"
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      />
-                      <button
-                        onClick={() => handleBulkZips(zone.id)}
-                        className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition text-sm"
-                      >
-                        Add All ZIPs
-                      </button>
-                    </div>
-
-                    {zipAdded && (
-                      <div className="mt-2 text-sm text-green-700">
-                        Added {zipAdded.added} ZIP codes{zipAdded.duplicates > 0 ? `, skipped ${zipAdded.duplicates} duplicates` : ''}
-                      </div>
-                    )}
-
-                    {zipError && (
-                      <div className="mt-2 text-sm text-red-700">{zipError}</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
