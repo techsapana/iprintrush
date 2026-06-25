@@ -1239,6 +1239,18 @@ const renderDimensionStep = (group, pool, value) => {
                 <span>-${discountAmount.toFixed(2)}</span>
               </div>
             )}
+            {(() => {
+              const turnaroundItem = quoteSummary.lineItems.find(
+                (it) => it.label.toLowerCase().includes('turnaround') || it.label.toLowerCase().includes('rush') || it.label.toLowerCase().includes('production time')
+              );
+              if (!turnaroundItem || turnaroundItem.amount <= 0) return null;
+              return (
+                <div className="flex justify-between text-sm text-gray-900">
+                  <span>Turnaround / Rush Fee</span>
+                  <span>${turnaroundItem.amount.toFixed(2)}</span>
+                </div>
+              );
+            })()}
             <div className="flex justify-between text-sm">
               <span>
                 Shipping {shippingLabel ? `(${shippingLabel})` : ''}

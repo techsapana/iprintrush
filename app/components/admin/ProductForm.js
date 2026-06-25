@@ -2528,7 +2528,7 @@ multi-month discounts.
                             className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
                           />
                           <p className="mt-1 text-xs text-gray-500">
-                            Applied on merchandise subtotal + addons + designer help
+                            Applied on discounted subtotal (after quantity discount)
                           </p>
                         </div>
                       )}

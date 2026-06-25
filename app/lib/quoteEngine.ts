@@ -883,18 +883,6 @@ export function calculateUnifiedQuote(
     });
   }
 
-  // Calculate production time / turnaround
-  const designerHelpTotal = flatFees.reduce((sum, f) => sum + f.amount, 0);
-  const { productionTimeTotal, productionTimeLabel } = resolveProductionTimeForMode(
-    config,
-    pools,
-    selections,
-    totalQuantity,
-    addonsPerUnit, // Printing costs for percentage-based turnaround
-    garmentSubtotal + basePrintingSubtotal,
-    designerHelpTotal
-  );
-
   // Calculate size surcharge line item (garment dependent)
   const sizeSurchargeTotal = sizeAddonPerUnit * totalQuantity;
   const sizeSurchargeLineItems: QuoteLineItem[] = [];
@@ -906,9 +894,9 @@ export function calculateUnifiedQuote(
   }
 
   // Build final pricing
-  // Subtotal = garment/base printing + printing addons + size surcharge + turnaround
+  // Subtotal = garment/base printing + printing addons + size surcharge + designer help
   const printingSubtotal = basePrintingSubtotal + addonsPerUnit * totalQuantity;
-  const subtotalBeforeDiscount = garmentSubtotal + printingSubtotal + sizeSurchargeTotal + productionTimeTotal + designerHelpTotal;
+  const subtotalBeforeDiscount = garmentSubtotal + printingSubtotal + sizeSurchargeTotal + designerHelpTotal;
   if (subtotalBeforeDiscount < 0) {
     throw new Error('Quote subtotal cannot be negative');
   }
@@ -924,7 +912,7 @@ export function calculateUnifiedQuote(
     ...flatFees.map(f => ({ label: f.label, amount: f.amount })),
   ];
 
-  // Apply discount on FULL subtotal (after all charges)
+  // Apply discount on subtotal before turnaround
   const discountType = tier?.discountType || 'NONE';
   const discountValue = tier?.discountValue ?? 0;
   let discountApplied = 0;
@@ -944,6 +932,21 @@ export function calculateUnifiedQuote(
       amount: -discountApplied,
     });
     subtotal -= discountApplied;
+  }
+
+  // Calculate turnaround/rush fee AFTER discount using discounted subtotal as base
+  const { productionTimeTotal, productionTimeLabel } = resolveProductionTimeForMode(
+    config,
+    pools,
+    selections,
+    subtotal
+  );
+  if (productionTimeTotal !== 0) {
+    finalLineItems.push({
+      label: productionTimeLabel,
+      amount: productionTimeTotal,
+    });
+    subtotal += productionTimeTotal;
   }
 
   const shippingTierSubtotal = subtotal;
@@ -1156,10 +1159,7 @@ function resolveProductionTimeForMode(
   config: QuoteConfigStore,
   pools: CustomizationPool[],
   selections: Record<string, any>,
-  totalQuantity: number,
-  addonsPerUnit: number,
-  merchandiseSubtotal: number,
-  designerHelpTotal: number
+  discountedSubtotal: number
 ): { productionTimeTotal: number; productionTimeLabel: string } {
   const poolMap = new Map(pools.map(p => [p.key, p]));
 
@@ -1178,18 +1178,16 @@ function resolveProductionTimeForMode(
     if (opt) {
         const pricingType = opt.pricingType || 'flat';
         if (pricingType === 'percentage' && opt.percentageValue != null) {
-          const addonsTotal = addonsPerUnit * totalQuantity;
-          const baseForPct = merchandiseSubtotal + addonsTotal + designerHelpTotal;
           return {
-            productionTimeTotal: baseForPct * (opt.percentageValue / 100),
+            productionTimeTotal: discountedSubtotal * (opt.percentageValue / 100),
             productionTimeLabel: `${productionPool.name} (${opt.label})`,
           };
-      } else if (opt.priceModifier !== 0) {
-        return {
-          productionTimeTotal: opt.priceModifier,
-          productionTimeLabel: `${productionPool.name} (${opt.label})`,
-        };
-      }
+        } else if (opt.priceModifier !== 0) {
+          return {
+            productionTimeTotal: opt.priceModifier,
+            productionTimeLabel: `${productionPool.name} (${opt.label})`,
+          };
+        }
     }
   }
 
@@ -1198,10 +1196,8 @@ function resolveProductionTimeForMode(
   if (selectedTurnaround) {
     const pricingType = selectedTurnaround.pricingType || 'flat';
     if (pricingType === 'percentage' && selectedTurnaround.percentageValue != null) {
-      const addonsTotal = addonsPerUnit * totalQuantity;
-      const baseForPct = merchandiseSubtotal + addonsTotal + designerHelpTotal;
       return {
-        productionTimeTotal: baseForPct * (selectedTurnaround.percentageValue / 100),
+        productionTimeTotal: discountedSubtotal * (selectedTurnaround.percentageValue / 100),
         productionTimeLabel: `Turnaround (${selectedTurnaround.name})`,
       };
     } else if (selectedTurnaround.priceModifier !== 0) {
