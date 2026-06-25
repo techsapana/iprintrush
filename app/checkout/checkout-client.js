@@ -63,9 +63,10 @@ export default function CheckoutClient() {
     message: '',
   });
 const [oversizedDetails, setOversizedDetails] = useState(null);
-   const [selectedShipping, setSelectedShipping] = useState(null);
-   const [shippingMethods, setShippingMethods] = useState([]);
-   const [selectedMethod, setSelectedMethod] = useState(null);
+    const [selectedShipping, setSelectedShipping] = useState(null);
+    const [shippingMethods, setShippingMethods] = useState([]);
+    const [shippingMethodsLoading, setShippingMethodsLoading] = useState(false);
+    const [selectedMethod, setSelectedMethod] = useState(null);
    const [useRuleBased, setUseRuleBased] = useState(
      process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true'
    );
@@ -278,6 +279,7 @@ const buildShippingItems = useCallback(
       setSelectedMethod(null);
       setShippingAddressKey('');
       setIsZipValidated(false);
+      setOversizedDetails(null);
       return;
     }
     const currentKey = `${formData.shippingAddress}|${formData.shippingCity}|${formData.shippingState}|${formData.shippingZip}`;
@@ -288,6 +290,7 @@ const buildShippingItems = useCallback(
       setSelectedMethod(null);
       setShippingAddressKey('');
       setIsZipValidated(false);
+      setOversizedDetails(null);
     }
   }, [
     formData.deliveryMethod,
@@ -305,6 +308,7 @@ const buildShippingItems = useCallback(
       setPayError('Please enter a valid 5-digit ZIP code.');
       return;
     }
+    setShippingMethodsLoading(true);
     try {
       const res = await fetch('/api/shipping/methods', {
         method: 'POST',
@@ -326,13 +330,20 @@ const buildShippingItems = useCallback(
       const data = await res.json().catch(() => ({}));
       if (data?.success && Array.isArray(data.methods)) {
         setShippingMethods(data.methods);
+        if (data.oversizedDetails) {
+          setOversizedDetails(data.oversizedDetails);
+        } else {
+          setOversizedDetails(null);
+        }
         const hasLocal = data.methods.some((m) => m.type === 'local_delivery');
         if (useRuleBased && selectedMethod === 'local_delivery') {
           setIsZipValidated(hasLocal);
           if (!hasLocal) setPayError('Local delivery not available in this ZIP code.');
         }
+        setShippingMethodsLoading(false);
       } else {
         setShippingMethods([]);
+        setShippingMethodsLoading(false);
         if (useRuleBased && selectedMethod === 'local_delivery') {
           setIsZipValidated(false);
           setPayError('Unable to verify ZIP code. Please try again.');
@@ -340,14 +351,36 @@ const buildShippingItems = useCallback(
       }
     } catch {
       setShippingMethods([]);
+      setShippingMethodsLoading(false);
       if (useRuleBased && selectedMethod === 'local_delivery') {
         setIsZipValidated(false);
         setPayError('Unable to verify ZIP code. Please try again.');
-      }
     }
   };
+  };
 
-  const handleApplyCoupon = (e) => {
+  useEffect(() => {
+    if (
+      shippingMethods.length > 0 &&
+      selectedMethod !== null &&
+      !shippingMethods.some((m) => m.type === selectedMethod) &&
+      shippingMethods.some((m) => m.type === 'pickup')
+    ) {
+      setSelectedMethod('pickup');
+    }
+  }, [shippingMethods, selectedMethod]);
+
+  useEffect(() => {
+    if (
+      shippingMethods.length > 0 &&
+      selectedMethod === null &&
+      shippingMethods.some((m) => m.type === 'pickup')
+    ) {
+      setSelectedMethod('pickup');
+    }
+  }, [shippingMethods, selectedMethod]);
+
+const handleApplyCoupon = (e) => {
     e.preventDefault();
     const code = (couponCode || '').trim().toUpperCase();
     if (!code) {

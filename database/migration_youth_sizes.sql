@@ -11,4 +11,3 @@ VALUES
   ('youth-xl', 'Youth XL', 0.00, 13),
   ('youth-2xl', 'Youth 2XL', 3.00, 14)
 ON DUPLICATE KEY UPDATE label = VALUES(label);
-

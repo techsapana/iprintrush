@@ -61,8 +61,9 @@ const [printLocationIds, setPrintLocationIds] = useState([]);
 const [turnaroundId, setTurnaroundId] = useState(null);
 const [designerHelpId, setDesignerHelpId] = useState(null);
 const [deliveryMethod, setDeliveryMethod] = useState('pickup');
-   const [availableMethods, setAvailableMethods] = useState([]);
-   const [oversizedDetails, setOversizedDetails] = useState(null);
+const [availableMethods, setAvailableMethods] = useState([]);
+    const [shippingMethodsLoading, setShippingMethodsLoading] = useState(false);
+    const [oversizedDetails, setOversizedDetails] = useState(null);
    const [zipCheckStatus, setZipCheckStatus] = useState('idle');
    const [zipCheckResult, setZipCheckResult] = useState(null);
    const [shippingZip, setShippingZip] = useState('');
@@ -486,31 +487,35 @@ const invalidateQuote = () => {
     [productId, totalQuantity, weightLb, packageWidthIn],
   );
 
-   const fetchShippingMethods = async (items, zip = '') => {
-     try {
-       const res = await fetch('/api/shipping/methods', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({
-           items,
-           shippingAddress: zip ? { zip } : {},
-         }),
-       });
-       const data = await res.json().catch(() => ({}));
-       if (data?.success && Array.isArray(data.methods)) {
-         setAvailableMethods(data.methods);
-         if (data.oversizedDetails) {
-           setOversizedDetails(data.oversizedDetails);
-         }
-         return data;
-       }
-       setAvailableMethods([]);
-       return null;
-     } catch {
-       setAvailableMethods([]);
-       return null;
-     }
-   };
+const fetchShippingMethods = async (items, zip = '') => {
+      setShippingMethodsLoading(true);
+      try {
+        const res = await fetch('/api/shipping/methods', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items,
+            shippingAddress: zip ? { zip } : {},
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data?.success && Array.isArray(data.methods)) {
+          setAvailableMethods(data.methods);
+          if (data.oversizedDetails) {
+            setOversizedDetails(data.oversizedDetails);
+          }
+          setShippingMethodsLoading(false);
+          return data;
+        }
+        setAvailableMethods([]);
+        setShippingMethodsLoading(false);
+        return null;
+      } catch {
+        setAvailableMethods([]);
+        setShippingMethodsLoading(false);
+        return null;
+      }
+    };
 
    const handleZipCheck = async (zip) => {
      if (!zip || zip.length !== 5) return;
@@ -579,6 +584,19 @@ const handleDeliveryMethodChange = (method) => {
     setCustomSizeNote(note);
     scheduleRecalculation();
   };
+
+  useEffect(() => {
+    if (
+      availableMethods.length > 0 &&
+      !availableMethods.some((m) => m.type === deliveryMethod) &&
+      availableMethods.some((m) => m.type === 'pickup')
+    ) {
+      setDeliveryMethod('pickup');
+      setShippingZip('');
+      setZipCheckStatus('idle');
+      setZipCheckResult(null);
+    }
+  }, [availableMethods, deliveryMethod]);
 
   const handleFabricChoiceChange = (choice) => {
     invalidateQuote();

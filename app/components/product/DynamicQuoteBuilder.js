@@ -85,9 +85,10 @@ const latestCalcRequestIdRef = useRef(0);
   const hasEverCalculatedRef = useRef(false);
 
 const [zipCheckStatus, setZipCheckStatus] = useState('idle');
-   const [zipCheckResult, setZipCheckResult] = useState(null);
-   const [availableMethods, setAvailableMethods] = useState([]);
-   const [oversizedDetails, setOversizedDetails] = useState(null);
+    const [zipCheckResult, setZipCheckResult] = useState(null);
+    const [availableMethods, setAvailableMethods] = useState([]);
+    const [shippingMethodsLoading, setShippingMethodsLoading] = useState(false);
+    const [oversizedDetails, setOversizedDetails] = useState(null);
 
    useEffect(() => {
      if (hasCalculated) hasEverCalculatedRef.current = true;
@@ -288,6 +289,7 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
   };
 
 const fetchShippingMethods = async (items, zip = '') => {
+    setShippingMethodsLoading(true);
     try {
       const res = await fetch('/api/shipping/methods', {
         method: 'POST',
@@ -303,15 +305,31 @@ const fetchShippingMethods = async (items, zip = '') => {
         if (data.oversizedDetails) {
           setOversizedDetails(data.oversizedDetails);
         }
+        setShippingMethodsLoading(false);
         return data;
       }
       setAvailableMethods([]);
+      setShippingMethodsLoading(false);
       return null;
     } catch {
       setAvailableMethods([]);
+      setShippingMethodsLoading(false);
       return null;
     }
   };
+
+  useEffect(() => {
+    if (
+      availableMethods.length > 0 &&
+      !availableMethods.some((m) => m.type === deliveryMethod) &&
+      availableMethods.some((m) => m.type === 'pickup')
+    ) {
+      setDeliveryMethod('pickup');
+      setShippingZip('');
+      setZipCheckStatus('idle');
+      setZipCheckResult(null);
+    }
+  }, [availableMethods, deliveryMethod]);
 
 const handleZipCheck = async (zip) => {
       if (!zip || zip.length !== 5) return;

@@ -10,10 +10,6 @@ import { CartContext } from '../context/CartContext.js';
 export function useCart() {
   const context = useContext(CartContext);
 
-  if (context) {
-    return context;
-  }
-
   // Fallback to local state if no provider
   const [items, setItems] = useState([]);
 
@@ -77,6 +73,10 @@ export function useCart() {
   const getItemCount = useCallback(() => {
     return items.reduce((count, item) => count + item.quantity, 0);
   }, [items]);
+
+  if (context) {
+    return context;
+  }
 
   return {
     items,

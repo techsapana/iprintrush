@@ -10,10 +10,6 @@ import { AuthContext } from '../context/AuthContext.js';
 export function useAuth() {
   const context = useContext(AuthContext);
 
-  if (context) {
-    return context;
-  }
-
   // Fallback to local state if no provider
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -71,6 +67,10 @@ export function useAuth() {
   }, []);
 
   const isAuthenticated = user !== null;
+
+  if (context) {
+    return context;
+  }
 
   return {
     user,
