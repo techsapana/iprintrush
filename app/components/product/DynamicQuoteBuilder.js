@@ -379,11 +379,33 @@ const handleZipCheck = async (zip) => {
 };
 
    const hasCalculatedRef = useRef(hasCalculated);
-  useEffect(() => {
-    hasCalculatedRef.current = hasCalculated;
-  }, [hasCalculated]);
+   useEffect(() => {
+     hasCalculatedRef.current = hasCalculated;
+   }, [hasCalculated]);
 
-  const scheduleRecalculation = debounce(() => {
+    const artworkStepIndex = activeGroups.length;
+    const deliveryStepIndex = activeGroups.length + 1;
+
+  useEffect(() => {
+       if (step === deliveryStepIndex && availableMethods.length === 0) {
+         const items = [{
+           id: productId,
+           quantity: totalQuantity > 0 ? totalQuantity : 1,
+           quotePayload: {
+             mode: 'print_product',
+             selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn) } : {}) },
+           },
+           product: {
+             weight_lb: Number(weightLb) || 0,
+             package_width_in: Number(packageWidthIn) || 0,
+             localDeliveryEligible: localDeliveryEligible,
+           },
+         }];
+         fetchShippingMethods(items);
+       }
+     }, [step, deliveryStepIndex, availableMethods.length, productId, totalQuantity, selections, widthIn, weightLb, packageWidthIn]);
+
+   const scheduleRecalculation = debounce(() => {
     // Read fresh value from ref to avoid stale closure
     if (!hasCalculatedRef.current && !hasEverCalculatedRef.current) return;
     handleCalculateRef.current();
@@ -1479,29 +1501,7 @@ return (
      );
    };
 
-   const artworkStepIndex = activeGroups.length;
-   const deliveryStepIndex = activeGroups.length + 1;
-
-useEffect(() => {
-      if (step === deliveryStepIndex && availableMethods.length === 0) {
-        const items = [{
-          id: productId,
-          quantity: totalQuantity > 0 ? totalQuantity : 1,
-          quotePayload: {
-            mode: 'print_product',
-            selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn) } : {}) },
-          },
-          product: {
-            weight_lb: Number(weightLb) || 0,
-            package_width_in: Number(packageWidthIn) || 0,
-            localDeliveryEligible: localDeliveryEligible,
-          },
-        }];
-        fetchShippingMethods(items);
-      }
-    }, [step, deliveryStepIndex, availableMethods.length, productId, totalQuantity, selections, widthIn, weightLb, packageWidthIn]);
-
-   const renderStepContent = () => {
+    const renderStepContent = () => {
     if (step < activeGroups.length) {
       return renderGroupStep(activeGroups[step], step);
     }

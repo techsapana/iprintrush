@@ -13,7 +13,12 @@ import { lookupZoneByZip } from "@/app/lib/shipping/zipZoneService";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { items = [], shippingAddress = {} } = body;
+    const items = Array.isArray(body.items)
+      ? body.items
+      : body.items
+        ? [body.items]
+        : [];
+    const { shippingAddress = {} } = body;
 
     const configRows = (await query(`SELECT * FROM shipping_config LIMIT 1`)) as any[];
     const config = buildShippingConfig(configRows[0] || {});

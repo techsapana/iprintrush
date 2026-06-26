@@ -476,7 +476,7 @@ const invalidateQuote = () => {
   };
 
   const buildShippingItems = useCallback(
-    () => ({
+    () => [{
       id: productId,
       quantity: totalQuantity > 0 ? totalQuantity : 1,
       product: {
@@ -484,7 +484,7 @@ const invalidateQuote = () => {
         package_width_in: Number(packageWidthIn) || 0,
         localDeliveryEligible: true,
       },
-    }),
+    }],
     [productId, totalQuantity, weightLb, packageWidthIn],
   );
 
