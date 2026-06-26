@@ -491,6 +491,7 @@ export default function ProductDetailPage({ params }) {
                   onQuoteReady={setCurrentQuote}
                   weightLb={product.weightLb}
                   packageWidthIn={product.packageWidthIn}
+                  localDeliveryEligible={product.localDeliveryEligible}
                 />
              )}
 

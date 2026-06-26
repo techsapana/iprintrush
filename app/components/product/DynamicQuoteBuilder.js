@@ -45,6 +45,7 @@ export function DynamicQuoteBuilder({
   onQuoteReady,
   weightLb = null,
   packageWidthIn = null,
+  localDeliveryEligible = null,
 }) {
    const [loading, setLoading] = useState(true);
    const [schema, setSchema] = useState(null);
@@ -346,17 +347,17 @@ const handleZipCheck = async (zip) => {
          product: {
            weight_lb: Number(weightLb) || 0,
            package_width_in: Number(packageWidthIn) || 0,
-           localDeliveryEligible: true,
+           localDeliveryEligible: localDeliveryEligible,
          },
         }];
         const data = await fetchShippingMethods(items, zip);
-       if (data) {
-         setZipCheckStatus('success');
-         setZipCheckResult({
-           available: true,
-           cost: data.methods.find(m => m.type === 'local_delivery')?.cost || 0,
-           deliveryWindow: data.methods.find(m => m.type === 'local_delivery')?.deliveryWindow || null,
-         });
+        if (data) {
+          setZipCheckStatus('success');
+          setZipCheckResult({
+            available: data.methods.some(m => m.type === 'local_delivery' && m.available !== false) || false,
+            cost: data.methods.find(m => m.type === 'local_delivery')?.cost || 0,
+            deliveryWindow: data.methods.find(m => m.type === 'local_delivery')?.deliveryWindow || null,
+          });
        } else {
          setZipCheckStatus('unavailable');
          setZipCheckResult({ available: false, cost: 0, deliveryWindow: null });
@@ -1449,7 +1450,7 @@ const renderDeliveryStep = () => {
       product: {
         weight_lb: Number(weightLb) || 0,
         package_width_in: Number(packageWidthIn) || 0,
-        localDeliveryEligible: true,
+        localDeliveryEligible: localDeliveryEligible,
       },
     }];
 
@@ -1493,7 +1494,7 @@ useEffect(() => {
           product: {
             weight_lb: Number(weightLb) || 0,
             package_width_in: Number(packageWidthIn) || 0,
-            localDeliveryEligible: true,
+            localDeliveryEligible: localDeliveryEligible,
           },
         }];
         fetchShippingMethods(items);

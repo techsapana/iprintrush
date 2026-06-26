@@ -27,6 +27,7 @@ export function QuoteBuilder({
   onQuoteReady,
   weightLb = null,
   packageWidthIn = null,
+  localDeliveryEligible = null,
 }) {
   const [loading, setLoading] = useState(true);
   const [configMode, setConfigMode] = useState(null);
@@ -524,13 +525,13 @@ const fetchShippingMethods = async (items, zip = '') => {
      try {
        const items = buildShippingItems();
        const data = await fetchShippingMethods(items, zip);
-       if (data) {
-         setZipCheckStatus('success');
-         setZipCheckResult({
-           available: true,
-           cost: data.methods.find(m => m.type === 'local_delivery')?.cost || 0,
-           deliveryWindow: data.methods.find(m => m.type === 'local_delivery')?.deliveryWindow || null,
-         });
+        if (data) {
+          setZipCheckStatus('success');
+          setZipCheckResult({
+            available: data.methods.some(m => m.type === 'local_delivery' && m.available !== false) || false,
+            cost: data.methods.find(m => m.type === 'local_delivery')?.cost || 0,
+            deliveryWindow: data.methods.find(m => m.type === 'local_delivery')?.deliveryWindow || null,
+          });
        } else {
          setZipCheckStatus('unavailable');
          setZipCheckResult({ available: false, cost: 0, deliveryWindow: null });
@@ -729,6 +730,7 @@ const handleDeliveryMethodChange = (method) => {
         onQuoteReady={onQuoteReady}
         weightLb={weightLb}
         packageWidthIn={packageWidthIn}
+        localDeliveryEligible={localDeliveryEligible}
       />
     );
   }
