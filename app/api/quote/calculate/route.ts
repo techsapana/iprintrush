@@ -421,6 +421,10 @@ async function handleApparelQuote(payload: QuoteRequestPayload) {
       freeMinimum: zoneResult.freeMinimum,
       deliveryWindow: zoneResult.deliveryWindow,
     };
+  } else if (normalizeDeliveryMethod(payload.deliveryMethod) === 'local_delivery') {
+    summary.shipping = 0;
+    summary.grandTotal = summary.subtotal;
+    summary.localDeliveryZone = { available: false };
   }
 
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
@@ -534,6 +538,10 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
       freeMinimum: zoneResult.freeMinimum,
       deliveryWindow: zoneResult.deliveryWindow,
     };
+  } else if (normalizedDeliveryMethod === 'local_delivery') {
+    summary.shipping = 0;
+    summary.grandTotal = summary.subtotal;
+    summary.localDeliveryZone = { available: false };
   }
 
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
