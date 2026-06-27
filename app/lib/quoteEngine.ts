@@ -896,6 +896,7 @@ export function calculateUnifiedQuote(
   // Build final pricing
   // Subtotal = garment/base printing + printing addons + size surcharge + designer help
   const printingSubtotal = basePrintingSubtotal + addonsPerUnit * totalQuantity;
+  const designerHelpTotal = flatFees.reduce((sum, f) => sum + f.amount, 0);
   const subtotalBeforeDiscount = garmentSubtotal + printingSubtotal + sizeSurchargeTotal + designerHelpTotal;
   if (subtotalBeforeDiscount < 0) {
     throw new Error('Quote subtotal cannot be negative');
