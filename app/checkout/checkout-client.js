@@ -176,6 +176,21 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     return null;
   }, []);
 
+  const buildShippingItems = useCallback(
+    () =>
+      checkoutItems.map((i) => ({
+        id: i.id,
+        quantity: i.quantity,
+        quotePayload: i.options?.quotePayload || null,
+        product: {
+          weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
+          package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),
+          localDeliveryEligible: i.product?.localDeliveryEligible ?? true,
+        },
+      })),
+    [checkoutItems],
+  );
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -196,6 +211,7 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     setUploadedPreview(null);
     setIsFinalConfirmed(false);
   };
+ 
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -252,21 +268,6 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
         setCouponLookup({});
       }
     };
-
-const buildShippingItems = useCallback(
-      () =>
-        checkoutItems.map((i) => ({
-          id: i.id,
-          quantity: i.quantity,
-          quotePayload: i.options?.quotePayload || null,
-          product: {
-            weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
-            package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),
-            localDeliveryEligible: i.product?.localDeliveryEligible ?? true,
-          },
-        })),
-      [checkoutItems],
-    );
 
    loadCoupons();
     }, [checkoutItems]);
