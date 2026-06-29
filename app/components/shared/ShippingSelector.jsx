@@ -57,13 +57,13 @@ export function ShippingSelector({
     const methodWindow = method.deliveryWindow;
     const methodZipRequired = method.zipRequired === true;
 
-    const disabled = methodZipRequired || (methodType === 'local_delivery' && localDeliveryDisabled && !isZipAvailable);
+    const disabled = methodType === 'local_delivery' && localDeliveryDisabled && !isZipAvailable;
 
     return (
       <button
         key={methodType || idx}
         type="button"
-        onClick={() => !methodZipRequired && onMethodChange(methodType)}
+        onClick={() => onMethodChange(methodType)}
         disabled={disabled}
         className={`rounded-xl border px-4 py-3 text-left transition relative ${
           selectedMethod === methodType
