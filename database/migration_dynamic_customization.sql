@@ -20,9 +20,11 @@ CREATE TABLE IF NOT EXISTS customization_option_pools (
     selection_type ENUM('single', 'multi', 'quantity', 'dimension') DEFAULT 'single',
     price_type ENUM('per_unit', 'per_order', 'tier_based') DEFAULT 'per_unit',
     display_order INT DEFAULT 0,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_key (`key`),
+    INDEX idx_enabled (enabled),
     INDEX idx_display_order (display_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

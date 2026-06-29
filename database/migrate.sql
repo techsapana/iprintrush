@@ -28,5 +28,12 @@ CREATE INDEX IF NOT EXISTS idx_customer_users_updated_at ON customer_users(updat
 CREATE INDEX IF NOT EXISTS idx_customer_users_enabled ON customer_users(enabled);
 CREATE INDEX IF NOT EXISTS idx_customer_users_email ON customer_users(email);
 
+-- Migration 002: Add enabled column to customization_option_pools (fixes schema sync)
+-- This column was missing from the original dynamic customization migration
+ALTER TABLE customization_option_pools
+  ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_enabled ON customization_option_pools(enabled);
+
 -- Show migration completion
 SELECT 'Migration completed successfully!' as status;
