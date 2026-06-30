@@ -8,8 +8,52 @@ import {
   DynamicQuoteRequestPayload,
   CustomizationPool,
 } from './quoteConfigTypes';
-import { getShippingCost, detectOversizedItems } from './shippingEngine';
+import { getShippingCost, detectOversizedItems, getShippingDecision, type ShippingDecision, type CartItem } from './shippingEngine';
 import { UnifiedQuoteRequest } from './quote/QuoteNormalizer';
+
+/**
+ * Adapter: translate quote-domain parameters into shipping-engine CartItem shape,
+ * then delegate to getShippingDecision(). Owns zero shipping business rules.
+ */
+export function resolveShippingDecisionForQuote(params: {
+  productId: string;
+  totalQuantity: number;
+  productWeightLb?: number | null;
+  productPackageWidthIn?: number | null;
+  selections?: Record<string, unknown> | undefined;
+  deliveryMethod: string;
+  shippingConfig: ShippingConfig;
+  mode: string;
+}): ShippingDecision {
+  const {
+    productId,
+    totalQuantity,
+    productWeightLb,
+    productPackageWidthIn,
+    selections,
+    deliveryMethod,
+    shippingConfig,
+    mode,
+  } = params;
+
+  const items: CartItem[] = [
+    {
+      id: productId,
+      quantity: totalQuantity,
+      product: {
+        id: productId,
+        weight_lb: productWeightLb ?? undefined,
+        package_width_in: productPackageWidthIn ?? undefined,
+      },
+      quotePayload: {
+        mode,
+        selections,
+      },
+    },
+  ];
+
+  return getShippingDecision(items, shippingConfig);
+}
 
 /**
  * Unified pricing configuration that works for both apparel and print products.
@@ -831,7 +875,7 @@ export function calculateUnifiedQuote(
 
   // Find applicable tier
   const tier = findApplicableTier(tiers, totalQuantity);
-  if (!tier && config.quantityTiers.length > 0 && !dimensionPricing?.pricePerSqInch) {
+  if (!tier && config.quantityTiers.length > 0 && mode !== 'simple') {
     throw new Error('No quantity pricing tier configured for this quantity');
   }
 
@@ -860,30 +904,41 @@ export function calculateUnifiedQuote(
     useMyCloth || false
   );
 
-  // Calculate garment cost only for apparel. Print products must never use apparel garment logic.
+  // Calculate garment/base cost based on mode
   const garmentLineItems: QuoteLineItem[] = [];
   let garmentSubtotal = 0;
-  const garmentBaseUnitPrice = mode === 'apparel' ? (config.baseUnitPrice || null) : null;
-  if (mode === 'apparel' && !useMyCloth && garmentBaseUnitPrice != null && garmentBaseUnitPrice > 0) {
-    garmentSubtotal = garmentBaseUnitPrice * totalQuantity;
-    garmentLineItems.push({
-      label: `Garment (${totalQuantity} pcs × $${garmentBaseUnitPrice.toFixed(2)} / pc)`,
-      amount: garmentSubtotal,
-    });
+  
+  if (mode === 'apparel') {
+    // Apparel: garment cost is the blank garment price
+    const garmentBaseUnitPrice = config.baseUnitPrice || null;
+    if (!useMyCloth && garmentBaseUnitPrice != null && garmentBaseUnitPrice > 0) {
+      garmentSubtotal = garmentBaseUnitPrice * totalQuantity;
+      garmentLineItems.push({
+        label: `Garment (${totalQuantity} pcs × $${garmentBaseUnitPrice.toFixed(2)} / pc)`,
+        amount: garmentSubtotal,
+      });
+    }
+  } else if (mode === 'print_product') {
+    // Print product: base printing cost
+    if (config.baseUnitPrice != null && config.baseUnitPrice > 0) {
+      garmentSubtotal = config.baseUnitPrice * totalQuantity;
+      garmentLineItems.push({
+        label: `Base printing (${totalQuantity} pcs × $${Number(config.baseUnitPrice).toFixed(2)} / pc)`,
+        amount: garmentSubtotal,
+      });
+    }
+  } else if (mode === 'simple') {
+    // Simple product: base cost from product price
+    if (config.baseUnitPrice != null && config.baseUnitPrice > 0) {
+      garmentSubtotal = config.baseUnitPrice * totalQuantity;
+      garmentLineItems.push({
+        label: `Product (${totalQuantity} pcs × $${Number(config.baseUnitPrice).toFixed(2)} / pc)`,
+        amount: garmentSubtotal,
+      });
+    }
   }
 
-  const basePrintingSubtotal = mode === 'print_product' && config.baseUnitPrice != null && config.baseUnitPrice > 0
-    ? config.baseUnitPrice * totalQuantity
-    : 0;
-  const basePrintingLineItems: QuoteLineItem[] = [];
-  if (basePrintingSubtotal > 0) {
-    basePrintingLineItems.push({
-      label: `Base printing (${totalQuantity} pcs × $${Number(config.baseUnitPrice).toFixed(2)} / pc)`,
-      amount: basePrintingSubtotal,
-    });
-  }
-
-  // Calculate size surcharge line item (garment dependent)
+  // Calculate size surcharge line item (garment dependent - only for apparel)
   const sizeSurchargeTotal = sizeAddonPerUnit * totalQuantity;
   const sizeSurchargeLineItems: QuoteLineItem[] = [];
   if (sizeSurchargeTotal !== 0) {
@@ -894,8 +949,8 @@ export function calculateUnifiedQuote(
   }
 
   // Build final pricing
-  // Subtotal = garment/base printing + printing addons + size surcharge + designer help
-  const printingSubtotal = basePrintingSubtotal + addonsPerUnit * totalQuantity;
+  // Subtotal = base cost + printing addons + size surcharge + designer help
+  const printingSubtotal = addonsPerUnit * totalQuantity;
   const designerHelpTotal = flatFees.reduce((sum, f) => sum + f.amount, 0);
   const subtotalBeforeDiscount = garmentSubtotal + printingSubtotal + sizeSurchargeTotal + designerHelpTotal;
   if (subtotalBeforeDiscount < 0) {
@@ -904,7 +959,6 @@ export function calculateUnifiedQuote(
   
   const lineItems: QuoteLineItem[] = [
     ...garmentLineItems,
-    ...basePrintingLineItems,
     ...addonBreakdown.map(a => ({
       label: `${a.label} (${totalQuantity} pcs × $${a.perUnit.toFixed(2)} / pc)`,
       amount: a.perUnit * totalQuantity,
@@ -971,7 +1025,7 @@ export function calculateUnifiedQuote(
     sizeBreakdown,
     lineItems: finalLineItems,
     subtotal,
-    merchandiseSubtotal: garmentSubtotal + printingSubtotal,
+    merchandiseSubtotal: garmentSubtotal,
     shipping,
     grandTotal,
     shippingTierSubtotal: subtotal,
@@ -984,7 +1038,7 @@ export function calculateUnifiedQuote(
 function resolveAddonsForMode(
   config: QuoteConfigStore,
   pools: CustomizationPool[],
-  mode: 'apparel' | 'print_product',
+  mode: 'apparel' | 'print_product' | 'simple',
   selections: Record<string, any>,
   dimensionPricing?: {
     minWidthIn?: number | null;
@@ -996,6 +1050,11 @@ function resolveAddonsForMode(
 ): { addonBreakdown: { label: string; perUnit: number }[]; addonsPerUnit: number } {
   const addonBreakdown: { label: string; perUnit: number }[] = [];
   const poolMap = new Map(pools.map(p => [p.key, p]));
+
+  if (mode === 'simple') {
+    // Simple products have no addons - just the base price
+    return { addonBreakdown, addonsPerUnit: 0 };
+  }
 
   if (mode === 'apparel') {
     // Apparel: decoration and print locations come from config
@@ -1076,11 +1135,16 @@ function resolveAddonsForMode(
 function resolveFlatFeesForMode(
   config: QuoteConfigStore,
   pools: CustomizationPool[],
-  mode: 'apparel' | 'print_product',
+  mode: 'apparel' | 'print_product' | 'simple',
   selections: Record<string, any>
 ): { flatFees: { label: string; amount: number }[] } {
   const flatFees: { label: string; amount: number }[] = [];
   const poolMap = new Map(pools.map(p => [p.key, p]));
+
+  if (mode === 'simple') {
+    // Simple products have no flat fees
+    return { flatFees };
+  }
 
   if (mode === 'apparel') {
     const help = requireEnabledId(selections.designerHelpOptionId, config.designerHelp, 'designer help');
@@ -1099,20 +1163,19 @@ function resolveFlatFeesForMode(
         throw new Error('Invalid designer help pool selected');
       }
       const id = Array.isArray(designerSel) ? designerSel[0] : designerSel;
-      if (typeof id !== 'string') {
-        throw new Error('Invalid designer help option ID');
-      }
-      const opt = requireEnabledId(id, pool.options, 'designer help');
-      if (opt && opt.priceModifier !== 0) {
-        flatFees.push({
-          label: `${pool.name} (${opt.label})`,
-          amount: opt.priceModifier,
-        });
+      if (typeof id === 'string') {
+        const opt = requireEnabledId(id, pool.options, 'designer help');
+        if (opt && opt.priceModifier !== 0) {
+          flatFees.push({
+            label: `${pool.name} (${opt.label})`,
+            amount: opt.priceModifier,
+          });
+        }
       }
     }
   }
 
-  return { flatFees };
+return { flatFees };
 }
 
 /**
@@ -1120,7 +1183,7 @@ function resolveFlatFeesForMode(
  * Size surcharges are GARMENT DEPENDENT - they should be zero when customer supplies their own fabric.
  */
 function resolveSizeAddonPerUnit(
-  mode: 'apparel' | 'print_product',
+  mode: 'apparel' | 'print_product' | 'simple',
   sizes: SizeOption[],
   quantityBreakdown: { key: string; label: string; quantity: number }[],
   useMyCloth: boolean

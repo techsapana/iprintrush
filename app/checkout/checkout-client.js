@@ -40,6 +40,7 @@ export default function CheckoutClient() {
     email: '',
     phone: '',
     address: '',
+    apartmentOrSuite: '',
     city: '',
     state: '',
     zip: '',
@@ -56,108 +57,20 @@ export default function CheckoutClient() {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState('');
   const [couponMessage, setCouponMessage] = useState('');
-  const [fedexRates, setFedexRates] = useState({
-    options: [],
-    loading: false,
-    unavailable: false,
-    message: '',
-  });
-const [oversizedDetails, setOversizedDetails] = useState(null);
-    const [selectedShipping, setSelectedShipping] = useState(null);
-    const [shippingMethods, setShippingMethods] = useState([]);
-    const [shippingMethodsLoading, setShippingMethodsLoading] = useState(false);
-    const [selectedMethod, setSelectedMethod] = useState(null);
-   const [useRuleBased, setUseRuleBased] = useState(
-     process.env.NEXT_PUBLIC_USE_RULE_BASED_SHIPPING === 'true'
-   );
-   const [shippingAddressKey, setShippingAddressKey] = useState('');
-   const [fileUploadMode, setFileUploadMode] = useState('later');
-   const [uploadedFile, setUploadedFile] = useState(null);
-   const [uploadedPreview, setUploadedPreview] = useState(null);
-   const [isFinalConfirmed, setIsFinalConfirmed] = useState(false);
-   const [isZipValidated, setIsZipValidated] = useState(false);
+  const [oversizedDetails, setOversizedDetails] = useState(null);
+  const [shippingMethods, setShippingMethods] = useState([]);
+  const [shippingMethodsLoading, setShippingMethodsLoading] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState(null);
+  const [fileUploadMode, setFileUploadMode] = useState('later');
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploadedPreview, setUploadedPreview] = useState(null);
+  const [isFinalConfirmed, setIsFinalConfirmed] = useState(false);
+  const [isZipValidated, setIsZipValidated] = useState(false);
 
   const checkoutItems = useMemo(() => {
     const source = isBuyNow ? buyNowItems : cartItems;
     return Array.isArray(source) ? source : [];
   }, [isBuyNow, buyNowItems, cartItems]);
-
-  const canCalculateShipping = useCallback(() => {
-    const zipRegex = /^\d{5}$/;
-    return (
-      formData.shippingAddress?.trim() &&
-      formData.shippingCity?.trim() &&
-      formData.shippingState?.trim() &&
-      zipRegex.test(String(formData.shippingZip || '').trim())
-    );
-  }, [
-    formData.shippingAddress,
-    formData.shippingCity,
-    formData.shippingState,
-    formData.shippingZip,
-  ]);
-
-  const handleCalculateShipping = async () => {
-    if (!canCalculateShipping()) {
-      setPayError('Enter street, city, state, and a 5-digit ZIP in Shipping Address first.');
-      return;
-    }
-    // Skip rate calculation when rule-based shipping is active
-    if (useRuleBased) {
-      return;
-    }
-    setPayError('');
-    setFedexRates({ options: [], loading: true, unavailable: false, message: '' });
-    setSelectedShipping(null);
-    try {
-      const res = await fetch('/api/fedex/rates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: buildShippingItems(),
-          shippingAddress: {
-            address: formData.shippingAddress.trim(),
-            city: formData.shippingCity.trim(),
-            state: formData.shippingState.trim(),
-            zip: formData.shippingZip.trim(),
-          },
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!data.success || !Array.isArray(data.rates) || data.rates.length === 0) {
-        setSelectedShipping(null);
-        setFedexRates({
-          options: [],
-          loading: false,
-          unavailable: true,
-          message:
-            data.message || data.error || 'Unable to retrieve shipping rates. Check your address and try again.',
-        });
-        return;
-      }
-      setFedexRates({
-        options: data.rates,
-        loading: false,
-        unavailable: false,
-        message: '',
-      });
-      const cheapest = [...data.rates].sort(
-        (a, b) => Number(a.cost || 0) - Number(b.cost || 0),
-      )[0];
-      setSelectedShipping(cheapest || null);
-      setShippingAddressKey(
-        `${formData.shippingAddress}|${formData.shippingCity}|${formData.shippingState}|${formData.shippingZip}`,
-      );
-    } catch {
-      setSelectedShipping(null);
-      setFedexRates({
-        options: [],
-        loading: false,
-        unavailable: true,
-        message: 'Unable to retrieve shipping rates. Please try again.',
-      });
-    }
-  };
 
   const getItemSizeLabel = useCallback((item) => {
     const customizations = item?.options?.customizationsDisplay || {};
@@ -175,21 +88,6 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     }
     return null;
   }, []);
-
-  const buildShippingItems = useCallback(
-    () =>
-      checkoutItems.map((i) => ({
-        id: i.id,
-        quantity: i.quantity,
-        quotePayload: i.options?.quotePayload || null,
-        product: {
-          weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
-          package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),
-          localDeliveryEligible: i.product?.localDeliveryEligible ?? true,
-        },
-      })),
-    [checkoutItems],
-  );
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -211,7 +109,7 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     setUploadedPreview(null);
     setIsFinalConfirmed(false);
   };
- 
+
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -274,33 +172,14 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
 
   useEffect(() => {
     if (formData.deliveryMethod !== 'shipping') {
-      setFedexRates({ options: [], loading: false, unavailable: false, message: '' });
-      setSelectedShipping(null);
       setShippingMethods([]);
       setSelectedMethod(null);
-      setShippingAddressKey('');
       setIsZipValidated(false);
       setOversizedDetails(null);
       return;
     }
-    const currentKey = `${formData.shippingAddress}|${formData.shippingCity}|${formData.shippingState}|${formData.shippingZip}`;
-    if (shippingAddressKey && currentKey !== shippingAddressKey) {
-      setFedexRates({ options: [], loading: false, unavailable: false, message: '' });
-      setSelectedShipping(null);
-      setShippingMethods([]);
-      setSelectedMethod(null);
-      setShippingAddressKey('');
-      setIsZipValidated(false);
-      setOversizedDetails(null);
-    }
   }, [
     formData.deliveryMethod,
-    formData.shippingAddress,
-    formData.shippingCity,
-    formData.shippingState,
-    formData.shippingZip,
-    shippingAddressKey,
-    useRuleBased,
   ]);
 
   const handleZipCheck = async () => {
@@ -337,7 +216,7 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
           setOversizedDetails(null);
         }
         const hasLocal = data.methods.some((m) => m.type === 'local_delivery');
-        if (useRuleBased && selectedMethod === 'local_delivery') {
+        if (selectedMethod === 'local_delivery') {
           setIsZipValidated(hasLocal);
           if (!hasLocal) setPayError('Local delivery not available in this ZIP code.');
         }
@@ -345,7 +224,7 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
       } else {
         setShippingMethods([]);
         setShippingMethodsLoading(false);
-        if (useRuleBased && selectedMethod === 'local_delivery') {
+        if (selectedMethod === 'local_delivery') {
           setIsZipValidated(false);
           setPayError('Unable to verify ZIP code. Please try again.');
         }
@@ -353,11 +232,10 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     } catch {
       setShippingMethods([]);
       setShippingMethodsLoading(false);
-      if (useRuleBased && selectedMethod === 'local_delivery') {
+      if (selectedMethod === 'local_delivery') {
         setIsZipValidated(false);
         setPayError('Unable to verify ZIP code. Please try again.');
     }
-  };
   };
 
   useEffect(() => {
@@ -426,15 +304,6 @@ const handleApplyCoupon = (e) => {
     }
     if (
       formData.deliveryMethod === 'shipping' &&
-      !useRuleBased &&
-      !selectedShipping
-    ) {
-      setPayError('Calculate shipping and select a shipping option before checkout.');
-      return;
-    }
-    if (
-      formData.deliveryMethod === 'shipping' &&
-      useRuleBased &&
       !selectedMethod
     ) {
       setPayError('Please select a shipping method.');
@@ -442,7 +311,6 @@ const handleApplyCoupon = (e) => {
     }
     if (
       formData.deliveryMethod === 'shipping' &&
-      useRuleBased &&
       selectedMethod === 'review_required' &&
       (!formData.shippingAddress.trim() || !formData.shippingCity.trim() || !formData.shippingZip.trim())
     ) {
@@ -451,7 +319,6 @@ const handleApplyCoupon = (e) => {
     }
     if (
       formData.deliveryMethod === 'shipping' &&
-      useRuleBased &&
       selectedMethod === 'local_delivery' &&
       !isZipValidated
     ) {
@@ -477,20 +344,14 @@ const handleApplyCoupon = (e) => {
           })),
           customer: {
             ...formData,
-            selectedShipping:
-              formData.deliveryMethod === 'shipping' && !useRuleBased && selectedShipping
-                ? selectedShipping
-                : undefined,
             selectedMethod:
-              formData.deliveryMethod === 'shipping' && useRuleBased
+              formData.deliveryMethod === 'shipping'
                 ? selectedMethod
                 : undefined,
             shippingMethodsData:
-              formData.deliveryMethod === 'shipping' && useRuleBased
+              formData.deliveryMethod === 'shipping'
                 ? shippingMethods.find((m) => m.type === selectedMethod) || null
                 : undefined,
-            useRuleBasedShipping: useRuleBased,
-            shippingRatesUnavailable: false,
           },
           couponCode: appliedCoupon || undefined,
         }),
@@ -513,9 +374,7 @@ const handleApplyCoupon = (e) => {
   const taxableBase = Math.max(0, (subtotal || 0) - discount);
   const shippingAmount =
     formData.deliveryMethod === 'shipping'
-      ? useRuleBased
-        ? Number(shippingMethods.find((m) => m.type === selectedMethod)?.cost || 0)
-        : Number(selectedShipping?.cost || 0)
+      ? Number(shippingMethods.find((m) => m.type === selectedMethod)?.cost || 0)
       : 0;
   const taxAmount = (taxableBase + shippingAmount) * ((Number(taxRatePercent) || 0) / 100);
   const finalTotal = taxableBase + shippingAmount + taxAmount;
@@ -582,7 +441,7 @@ const handleApplyCoupon = (e) => {
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Contact &amp; Billing</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping &amp; Delivery</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">First name</label>
@@ -604,6 +463,10 @@ const handleApplyCoupon = (e) => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Street address</label>
                   <input name="address" value={formData.address} onChange={handleInputChange} required className={inputClass} />
                 </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Apartment / Suite Number (Optional)</label>
+                  <input name="apartmentOrSuite" value={formData.apartmentOrSuite} onChange={handleInputChange} maxLength={100} className={inputClass} />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                   <input name="city" value={formData.city} onChange={handleInputChange} required className={inputClass} />
@@ -619,7 +482,7 @@ const handleApplyCoupon = (e) => {
               </div>
             </div>
 
-{formData.deliveryMethod === 'shipping' && (
+            {formData.deliveryMethod === 'shipping' && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Address</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -647,141 +510,83 @@ const handleApplyCoupon = (e) => {
               </div>
             )}
 
-            {formData.deliveryMethod === 'shipping' && !useRuleBased && (
+            {formData.deliveryMethod === 'shipping' && (
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Shipping Options</h2>
-                <p className="text-sm text-gray-600 mb-4">
-                  Fill in the shipping address above, then calculate shipping rates for your order.
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCalculateShipping}
-                  disabled={!canCalculateShipping() || fedexRates.loading}
-                  className="mb-4"
-                >
-                  {fedexRates.loading ? 'Calculating shipping…' : 'Calculate shipping'}
-                </Button>
-                {!canCalculateShipping() && (
-                  <p className="text-sm text-gray-500 mb-4">
-                    Enter street, city, state, and ZIP in Shipping Address to calculate rates.
-                  </p>
-                )}
-{!fedexRates.loading && fedexRates.unavailable && (
-                  <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
-                    {fedexRates.message || 'Unable to retrieve shipping rates. Check your address and try again.'}
-                  </p>
-                )}
-                {!fedexRates.loading && !fedexRates.unavailable && fedexRates.options.length > 0 && (
-                  <div className="space-y-3">
-                    {fedexRates.options.map((rate) => {
-                      const deliveryLabel =
-                        rate.estimatedDeliveryLabel || rate.transitTime || 'Delivery date pending';
-                      const label = `${rate.serviceName} — Delivery ${deliveryLabel} — $${Number(rate.cost).toFixed(2)}`;
-                      const checked = selectedShipping?.serviceType === rate.serviceType;
-                      return (
-                        <label
-                          key={rate.serviceType}
-                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
-                            checked
-                              ? 'border-[#29b6f6] bg-sky-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="fedexShippingOption"
-                            checked={checked}
-                            onChange={() => setSelectedShipping(rate)}
-                            className="mt-1"
-                          />
-                          <span className="text-sm text-gray-900">{label}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Methods</h2>
+                {shippingMethods.some((m) => m.type === 'review_required') &&
+                  !shippingMethods.some((m) => m.type === 'standard_shipping') && oversizedDetails && (
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm mb-4">
+                      <div className="font-semibold mb-2">Shipping Review Required</div>
+                      {oversizedDetails.widthExceeded && (
+                        <div className="mb-1">
+                          Maximum allowed width: {oversizedDetails.widthExceeded.maxAllowedWidth} in. Selected: {oversizedDetails.widthExceeded.selectedWidth} in.
+                        </div>
+                      )}
+                      {oversizedDetails.weightExceeded && (
+                        <div className="mb-1">
+                          Maximum allowed weight: {oversizedDetails.weightExceeded.maxAllowedWeight} lb. Product weight: {oversizedDetails.weightExceeded.productWeight} lb.
+                        </div>
+                      )}
+                      <div>Our team will review shipping options and contact you.</div>
+                    </div>
+                  )}
+                {shippingMethods.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                      Enter street, city, state, and ZIP in Shipping Address to load shipping methods.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {shippingMethods.map((method) => {
+                        const checked = selectedMethod === method.type;
+                        const isLocalDelivery = method.type === 'local_delivery';
+                        const canSelectLocal = !isLocalDelivery || (isLocalDelivery && isZipValidated);
+                        return (
+                          <label
+                            key={method.type}
+                            className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
+                              checked
+                                ? 'border-[#29b6f6] bg-sky-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            } ${canSelectLocal ? '' : 'opacity-60'}`}
+                          >
+                            <input
+                              type="radio"
+                              name="ruleBasedShippingOption"
+                              checked={checked}
+                              onChange={() => {
+                                setSelectedMethod(method.type);
+                                if (method.type !== 'local_delivery') {
+                                  setIsZipValidated(false);
+                                }
+                              }}
+                              disabled={!canSelectLocal}
+                              className="mt-1"
+                            />
+                            <span className="text-sm text-gray-900">
+                              {method.label} — ${Number(method.cost || 0).toFixed(2)}
+                            </span>
+                          </label>
+                        );
+                      })}
+                      {selectedMethod === 'local_delivery' && !isZipValidated && (
+                        <div className="mt-3 p-3 border-t border-gray-200">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleZipCheck}
+                            className="text-sm"
+                          >
+                            Check ZIP Availability
+                          </Button>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Verify your ZIP code is eligible for local delivery.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
             )}
-
-{formData.deliveryMethod === 'shipping' && useRuleBased && (
-               <div className="bg-white rounded-lg shadow-sm p-6">
-                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Methods</h2>
-                 {/* Check if review_required method exists without standard_shipping */}
-                 {shippingMethods.some((m) => m.type === 'review_required') &&
-                   !shippingMethods.some((m) => m.type === 'standard_shipping') && oversizedDetails && (
-                     <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm mb-4">
-                       <div className="font-semibold mb-2">Shipping Review Required</div>
-                       {oversizedDetails.widthExceeded && (
-                         <div className="mb-1">
-                           Maximum allowed width: {oversizedDetails.widthExceeded.maxAllowedWidth} in. Selected: {oversizedDetails.widthExceeded.selectedWidth} in.
-                         </div>
-                       )}
-                       {oversizedDetails.weightExceeded && (
-                         <div className="mb-1">
-                           Maximum allowed weight: {oversizedDetails.weightExceeded.maxAllowedWeight} lb. Product weight: {oversizedDetails.weightExceeded.productWeight} lb.
-                         </div>
-                       )}
-                       <div>Our team will review shipping options and contact you.</div>
-                     </div>
-                   )}
-{shippingMethods.length === 0 ? (
-                   <p className="text-sm text-gray-500">
-                     Enter street, city, state, and ZIP in Shipping Address to load shipping methods.
-                   </p>
-                 ) : (
-                   <div className="space-y-3">
-                     {shippingMethods.map((method) => {
-                       const checked = selectedMethod === method.type;
-                       const isLocalDelivery = method.type === 'local_delivery';
-                       const canSelectLocal = !isLocalDelivery || (isLocalDelivery && isZipValidated);
-                       return (
-                         <label
-                           key={method.type}
-                           className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
-                             checked
-                               ? 'border-[#29b6f6] bg-sky-50'
-                               : 'border-gray-200 hover:border-gray-300'
-                           } ${canSelectLocal ? '' : 'opacity-60'}`}
-                         >
-                           <input
-                             type="radio"
-                             name="ruleBasedShippingOption"
-                             checked={checked}
-                             onChange={() => {
-                               setSelectedMethod(method.type);
-                               if (method.type !== 'local_delivery') {
-                                 setIsZipValidated(false);
-                               }
-                             }}
-                             disabled={!canSelectLocal}
-                             className="mt-1"
-                           />
-                           <span className="text-sm text-gray-900">
-                             {method.label} — ${Number(method.cost || 0).toFixed(2)}
-                           </span>
-                         </label>
-                       );
-                     })}
-                     {selectedMethod === 'local_delivery' && !isZipValidated && (
-                       <div className="mt-3 p-3 border-t border-gray-200">
-                         <Button
-                           type="button"
-                           variant="outline"
-                           onClick={handleZipCheck}
-                           className="text-sm"
-                         >
-                           Check ZIP Availability
-                         </Button>
-                         <p className="text-xs text-gray-500 mt-2">
-                           Verify your ZIP code is eligible for local delivery.
-                         </p>
-                       </div>
-                     )}
-                   </div>
-                 )}
-               </div>
-             )}
 
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Upload Your Design (Optional but recommended)</h2>
@@ -929,39 +734,22 @@ const handleApplyCoupon = (e) => {
                     <span>- ${(discount || 0).toFixed(2)}</span>
                   </div>
                 )}
-{formData.deliveryMethod === 'shipping' && (
-                <div className="flex justify-between items-center text-sm text-gray-700 gap-2">
-                  <span className="min-w-0">
-                    {useRuleBased && shippingMethods.find((m) => m.type === selectedMethod)
-                      ? `Shipping (${shippingMethods.find((m) => m.type === selectedMethod)?.label}):`
-                      : !useRuleBased && selectedShipping
-                      ? `Shipping (${selectedShipping.serviceName}):`
-                      : 'Shipping:'}
-                  </span>
-                  {useRuleBased && shippingMethods.find((m) => m.type === selectedMethod) ? (
-                    <span className="shrink-0 font-medium">
-                      {selectedMethod === 'review_required' ? 'Under review' : shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}
+                {formData.deliveryMethod === 'shipping' && (
+                  <div className="flex justify-between items-center text-sm text-gray-700 gap-2">
+                    <span className="min-w-0">
+                      {shippingMethods.find((m) => m.type === selectedMethod)
+                        ? `Shipping (${shippingMethods.find((m) => m.type === selectedMethod)?.label}):`
+                        : 'Shipping:'}
                     </span>
-                  ) : selectedShipping ? (
-                    <span className="shrink-0 font-medium">
-                      {selectedMethod === 'review_required' ? 'Under review' : shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}
-                    </span>
-                  ) : useRuleBased ? (
-                    <span className="shrink-0 font-medium text-amber-600">Shipping methods pending</span>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0 text-xs h-8"
-                      onClick={handleCalculateShipping}
-                      disabled={!canCalculateShipping() || fedexRates.loading}
-                    >
-                      {fedexRates.loading ? 'Calculating…' : 'Calculate shipping'}
-                    </Button>
-                  )}
-                </div>
-              )}
+                    {shippingMethods.find((m) => m.type === selectedMethod) ? (
+                      <span className="shrink-0 font-medium">
+                        {selectedMethod === 'review_required' ? 'Under review' : shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 font-medium text-amber-600">Shipping methods pending</span>
+                    )}
+                  </div>
+                )}
                 <div className="flex justify-between text-sm text-gray-700">
                   <span>Tax:</span>
                   <span>${(taxAmount || 0).toFixed(2)}</span>

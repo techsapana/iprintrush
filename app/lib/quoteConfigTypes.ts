@@ -166,6 +166,13 @@ export type QuoteSummary = {
   grandTotal: number;
   shippingTierSubtotal?: number;
   shippingReviewRequired?: boolean;
+  shippingDecision?: import('./shippingEngine').ShippingDecision;
+  localDeliveryZone?: {
+    available: boolean;
+    fee: number;
+    freeMinimum: number;
+    deliveryWindow: string | null;
+  };
 };
 
 // ============ Dynamic Print Product Customization ============
@@ -214,12 +221,22 @@ export type DynamicQuoteRequestPayload = {
   shippingZip?: string;
   shippingCity?: string;
   /**
-   * Full street address (first line) for shipping destination.
-   */
+    * Full street address (first line) for shipping destination.
+    */
   shippingStreet?: string;
   /** Customer artwork (temp upload ids), same contract as apparel quotes. */
   artworkReady?: boolean;
   tempArtworkFiles?: string[];
+};
+
+export type SimpleQuoteRequestPayload = {
+  productId: string;
+  mode: 'simple';
+  quantity: number;
+  deliveryMethod: 'pickup' | 'local_delivery' | 'standard_shipping' | 'review_required';
+  shippingState?: string;
+  shippingZip?: string;
+  shippingCity?: string;
 };
 
 export type DynamicQuoteSummary = QuoteSummary;

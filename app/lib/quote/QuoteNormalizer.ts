@@ -1,6 +1,7 @@
 import {
   QuoteRequestPayload,
   DynamicQuoteRequestPayload,
+  SimpleQuoteRequestPayload,
   CustomizationPool,
 } from '../quoteConfigTypes';
 
@@ -23,12 +24,17 @@ type FrontendPrintProductPayload = DynamicQuoteRequestPayload & {
 };
 
 /**
+ * Simple quote payload with quantity only.
+ */
+type FrontendSimplePayload = SimpleQuoteRequestPayload;
+
+/**
  * Unified quote request format that both apparel and print product flows use.
  * All pricing logic operates on this normalized structure only.
  */
 export type UnifiedQuoteRequest = {
   productId: string;
-  mode: 'apparel' | 'print_product';
+  mode: 'apparel' | 'print_product' | 'simple';
 
   /**
     * Normalized quantity breakdown.
@@ -173,14 +179,48 @@ function findQuantityPoolKey(pools: CustomizationPool[]): string | null {
 }
 
 /**
+ * Normalize simple product payload to unified format.
+ * Simple products have just productId, quantity, and deliveryMethod.
+ */
+export function normalizeSimplePayload(
+  payload: FrontendSimplePayload,
+): UnifiedQuoteRequest {
+  const quantity = Number(payload.quantity) || 0;
+
+  const quantityBreakdown: UnifiedQuoteRequest['quantityBreakdown'] = [];
+  if (quantity > 0) {
+    quantityBreakdown.push({
+      key: 'quantity',
+      label: 'Total',
+      quantity,
+    });
+  }
+
+  return {
+    productId: payload.productId,
+    mode: 'simple',
+    quantityBreakdown,
+    selections: {
+      quantity,
+    },
+    deliveryMethod: payload.deliveryMethod,
+  };
+}
+
+/**
  * Main normalization function that handles both modes.
  */
 export function normalizeQuoteRequest(
-  payload: QuoteRequestPayload | DynamicQuoteRequestPayload,
+  payload: QuoteRequestPayload | DynamicQuoteRequestPayload | SimpleQuoteRequestPayload,
   poolsOrSizes?: CustomizationPool[] | Array<{ id: string; label: string }>
 ): UnifiedQuoteRequest {
   // Detect mode - DynamicQuoteRequestPayload has mode='print_product'
   const isPrintProduct = (payload as DynamicQuoteRequestPayload).mode === 'print_product';
+  const isSimple = (payload as SimpleQuoteRequestPayload).mode === 'simple';
+
+  if (isSimple) {
+    return normalizeSimplePayload(payload as FrontendSimplePayload);
+  }
 
   if (isPrintProduct && poolsOrSizes && Array.isArray(poolsOrSizes) && poolsOrSizes.length > 0 && 'selectionType' in poolsOrSizes[0]) {
     return normalizePrintProductPayload(payload as FrontendPrintProductPayload, poolsOrSizes as CustomizationPool[]);

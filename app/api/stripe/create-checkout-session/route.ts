@@ -39,6 +39,7 @@ const CreateCheckoutSessionSchema = z.object({
       city: z.string().optional().default(''),
       state: z.string().optional().default(''),
       zip: z.string().optional().default(''),
+      apartmentOrSuite: z.string().optional().default(''),
       notes: z.string().optional().default(''),
       deliveryMethod: z.union([
         z.enum(['pickup', 'local_delivery', 'standard_shipping', 'review_required']),
@@ -623,6 +624,7 @@ export async function POST(req: NextRequest) {
       const customerName = [checkoutCustomer.firstName, checkoutCustomer.lastName].filter(Boolean).join(' ').trim();
       const billingAddress = {
         address: checkoutCustomer.address || '',
+        apartmentOrSuite: checkoutCustomer.apartmentOrSuite || '',
         city: checkoutCustomer.city || '',
         state: checkoutCustomer.state || '',
         zip: checkoutCustomer.zip || '',

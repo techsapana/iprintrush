@@ -12,12 +12,12 @@ import { isSameDayPrintingProduct } from '../../lib/siteConstants';
 import { SameDayNotice } from '../../components/shared/SameDayNotice';
 import { ProductCard } from '../../components/shared/ProductCard';
 import { QuoteBuilder } from '../../components/product/QuoteBuilder';
+import { SimpleQuoteBuilder } from '../../components/product/SimpleQuoteBuilder';
 import { MailboxQuoteBuilder } from '../../components/product/MailboxQuoteBuilder';
 import { NotaryPricingChart } from '../../components/product/NotaryPricingChart';
 import { MailboxPricingChart } from '../../components/product/MailboxPricingChart';
 import { OurProcess } from '../../components/sections/OurProcess';
 import { useAuth } from '../../hooks/useAuth';
-import { useMemo } from 'react';
 import {
   saveBuyNowItems,
   clearBuyNowItems,
@@ -134,15 +134,6 @@ export default function ProductDetailPage({ params }) {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const currentMedia = media[currentMediaIndex] || { type: 'image', url: product?.image || '/placeholder.jpg' };
   const inWishlist = product ? isInWishlist(product.id) : false;
-
-  const [simpleQty, setSimpleQty] = useState(1);
-  const simpleTotal = useMemo(() => {
-    const unit = Number(product?.price || 0);
-    const qty = Number(simpleQty || 0);
-    if (!Number.isFinite(unit) || unit <= 0) return 0;
-    if (!Number.isFinite(qty) || qty <= 0) return 0;
-    return unit * qty;
-  }, [product?.price, simpleQty]);
 
   if (!product) {
     return (
@@ -262,23 +253,11 @@ export default function ProductDetailPage({ params }) {
     setTimeout(() => setAddedToCart(false), 2000);
   };
 
-  const canProceedToPayment = Boolean(
+const canProceedToPayment = Boolean(
     currentQuote?.summary?.grandTotal != null && currentQuote?.payload,
   );
 
-  const handleSimpleCheckout = () => {
-    if (outOfStock) return;
-    const qty = Math.max(1, Number(simpleQty || 1));
-    clearBuyNowItems();
-    saveBuyNowItems([{ ...product, quantity: qty, options: { quantity: qty } }]);
-    if (!isAuthenticated) {
-      requireLoginForCheckout(router, '/checkout?mode=buyNow');
-      return;
-    }
-    router.push('/checkout?mode=buyNow');
-  };
-
-   const handleProceedToPayment = () => {
+  const handleProceedToPayment = () => {
      if (!canProceedToPayment) return;
      clearBuyNowItems();
      const entries = buildQuoteCartEntries();
@@ -438,62 +417,43 @@ export default function ProductDetailPage({ params }) {
             </div>
 
             {/* Customizer */}
-            {isMailboxNotaryCategory ? (
-              <MailboxQuoteBuilder
-                productId={product.id}
-                productName={product.name}
-                pricePerMonth={product.mailboxPricePerMonth ?? product.price}
-                onQuoteReady={setCurrentQuote}
-              />
-            ) : !quoteEnabled ? (
-              <div className="border rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="text-sm text-gray-700">
-                    Quantity
-                    <div className="mt-1">
-                      <input
-                        type="number"
-                        min={1}
-                        value={simpleQty}
-                        onChange={(e) => setSimpleQty(Number(e.target.value || 1))}
-                        className="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs text-gray-500">Total</div>
-                    <div className="text-xl font-bold text-[#29b6f6]">
-                      ${Number(simpleTotal || 0).toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <Button
-                    type="button"
-                    onClick={handleSimpleCheckout}
-                    disabled={!hasPrice || outOfStock}
-                    className="w-full bg-[#0f172a] hover:bg-[#020617] text-white font-semibold py-4 text-lg rounded-lg transition disabled:opacity-60"
-                  >
-                    Checkout
-                  </Button>
-                </div>
-              </div>
-) : (
-               <QuoteBuilder
+{isMailboxNotaryCategory ? (
+               <MailboxQuoteBuilder
                  productId={product.id}
                  productName={product.name}
-                 productCategory={product.category || product.categorySlug || ''}
+                 pricePerMonth={product.mailboxPricePerMonth ?? product.price}
+                 onQuoteReady={setCurrentQuote}
+               />
+             ) : !quoteEnabled ? (
+               <SimpleQuoteBuilder
+                 productId={product.id}
+                 productName={product.name}
                  minQuantity={product.minQuantity}
                  maxQuantity={product.maxQuantity}
                  minOrderValue={product.minOrderValue}
                  maxOrderValue={product.maxOrderValue}
-                  prefillQuote={quotePrefill}
-                  onQuoteReady={setCurrentQuote}
-                  weightLb={product.weightLb}
-                  packageWidthIn={product.packageWidthIn}
-                  localDeliveryEligible={product.localDeliveryEligible}
-                />
-             )}
+                 prefillQuote={quotePrefill}
+                 onQuoteReady={setCurrentQuote}
+                 weightLb={product.weightLb}
+                 packageWidthIn={product.packageWidthIn}
+                 localDeliveryEligible={product.localDeliveryEligible}
+               />
+             ) : (
+                <QuoteBuilder
+                  productId={product.id}
+                  productName={product.name}
+                  productCategory={product.category || product.categorySlug || ''}
+                  minQuantity={product.minQuantity}
+                  maxQuantity={product.maxQuantity}
+                  minOrderValue={product.minOrderValue}
+                  maxOrderValue={product.maxOrderValue}
+                   prefillQuote={quotePrefill}
+                   onQuoteReady={setCurrentQuote}
+                   weightLb={product.weightLb}
+                   packageWidthIn={product.packageWidthIn}
+                   localDeliveryEligible={product.localDeliveryEligible}
+                 />
+              )}
 
             {/* Notary pricing chart (separate from mailbox rental) */}
             {isMailboxNotaryCategory && (

@@ -1,14 +1,15 @@
 // Quote Calculation API - MySQL-backed with unified shipping
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/app/lib/db';
-import { calculateUnifiedQuote, normalizeDeliveryMethod } from '@/app/lib/quoteEngine';
+import { calculateUnifiedQuote, normalizeDeliveryMethod, resolveShippingDecisionForQuote } from '@/app/lib/quoteEngine';
 import { normalizeQuoteRequest } from '@/app/lib/quote/QuoteNormalizer';
-import { getShippingDecision, buildShippingConfig } from '@/app/lib/shippingEngine';
+import { buildShippingConfig } from '@/app/lib/shippingEngine';
 import { lookupZoneByZip } from '@/app/lib/shipping/zipZoneService';
 import type {
   QuoteRequestPayload,
   QuoteConfigStore,
   DynamicQuoteRequestPayload,
+  SimpleQuoteRequestPayload,
 } from '@/app/lib/quoteConfigTypes';
 
 async function getProductQuantityBounds(productId: string): Promise<{ min: number | null; max: number | null }> {
@@ -224,6 +225,11 @@ export async function POST(req: NextRequest) {
       return handleMailboxQuote(payload);
     }
 
+    // Simple product mode
+    if (payload.mode === 'simple') {
+      return handleSimpleQuote(payload);
+    }
+
     // Apparel mode
     if (!payload.mode || payload.mode === 'apparel') {
       return handleApparelQuote(payload);
@@ -303,6 +309,20 @@ async function handleMailboxQuote(payload: any) {
     });
   }
 
+  const shippingConfigRows = await query('SELECT * FROM shipping_config LIMIT 1');
+  const shippingConfig = buildShippingConfig(Array.isArray(shippingConfigRows) ? shippingConfigRows[0] : {});
+
+  const shippingDecision = resolveShippingDecisionForQuote({
+    productId,
+    totalQuantity: months,
+    productWeightLb: null,
+    productPackageWidthIn: null,
+    selections: undefined,
+    deliveryMethod: 'pickup',
+    shippingConfig,
+    mode: 'mailbox',
+  });
+
   return NextResponse.json({
     productId,
     totalQuantity: months,
@@ -312,7 +332,80 @@ async function handleMailboxQuote(payload: any) {
     subtotal,
     shipping: 0,
     grandTotal: subtotal,
+    shippingDecision,
   });
+}
+
+async function handleSimpleQuote(payload: SimpleQuoteRequestPayload) {
+  const productId = String(payload.productId || '');
+  const quantity = Number(payload.quantity) || 1;
+
+  if (!productId) throw new Error('Product ID is required for simple quote.');
+  if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('Quantity must be a positive number.');
+
+  const qtyBounds = await getProductQuantityBounds(productId);
+  assertTotalQuantityWithinProductBounds(quantity, qtyBounds);
+
+  const config = await getConfigWithCustomPrices(productId);
+
+  const productEligibility = await queryOne(
+    'SELECT local_delivery_eligible, weight_lb, package_width_in FROM products WHERE id = ? LIMIT 1',
+    [productId],
+  );
+
+  const zoneResult = await resolveLocalDeliveryZone(
+    payload.shippingZip,
+    productEligibility?.local_delivery_eligible ?? null,
+  );
+
+  // Normalize the simple payload
+  const unifiedRequest = normalizeQuoteRequest({
+    ...payload,
+    deliveryMethod: normalizeDeliveryMethod(payload.deliveryMethod),
+  });
+
+  // Use the unified engine
+  const summary = calculateUnifiedQuote(
+    config,
+    [],
+    unifiedRequest,
+    undefined,
+    payload.shippingState,
+    payload.shippingZip,
+  );
+
+  // Apply zone-based local delivery if applicable
+  if (zoneResult.available && normalizeDeliveryMethod(payload.deliveryMethod) === 'local_delivery') {
+    const shippingAmount = summary.subtotal >= zoneResult.freeMinimum ? 0 : zoneResult.fee;
+    summary.shipping = shippingAmount;
+    summary.grandTotal = summary.subtotal + shippingAmount;
+    summary.localDeliveryZone = {
+      available: true,
+      fee: zoneResult.fee,
+      freeMinimum: zoneResult.freeMinimum,
+      deliveryWindow: zoneResult.deliveryWindow,
+    };
+  } else if (normalizeDeliveryMethod(payload.deliveryMethod) === 'local_delivery') {
+    summary.shipping = 0;
+    summary.grandTotal = summary.subtotal;
+    summary.localDeliveryZone = { available: false };
+  }
+
+  const valueBounds = await getProductOrderValueBounds(productId);
+  assertTotalValueWithinProductBounds(summary.subtotal, valueBounds);
+
+  const shippingDecision = resolveShippingDecisionForQuote({
+    productId,
+    totalQuantity: quantity,
+    productWeightLb: productEligibility?.weight_lb ?? null,
+    productPackageWidthIn: productEligibility?.package_width_in ?? null,
+    selections: undefined,
+    deliveryMethod: payload.deliveryMethod,
+    shippingConfig: config.shipping,
+    mode: 'simple',
+  });
+
+  return NextResponse.json({ ...summary, shippingDecision });
 }
 
 /**
@@ -386,7 +479,7 @@ async function handleApparelQuote(payload: QuoteRequestPayload) {
   const config = await getConfigWithCustomPrices(String(payload.productId));
 
   const productEligibility = await queryOne(
-    'SELECT local_delivery_eligible FROM products WHERE id = ? LIMIT 1',
+    'SELECT local_delivery_eligible, weight_lb, package_width_in FROM products WHERE id = ? LIMIT 1',
     [payload.productId],
   );
 
@@ -430,7 +523,18 @@ async function handleApparelQuote(payload: QuoteRequestPayload) {
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
   assertTotalValueWithinProductBounds(summary.subtotal, valueBounds);
 
-  return NextResponse.json(summary);
+  const shippingDecision = resolveShippingDecisionForQuote({
+    productId: payload.productId,
+    totalQuantity: apparelTotal,
+    productWeightLb: productEligibility?.weight_lb ?? null,
+    productPackageWidthIn: productEligibility?.package_width_in ?? null,
+    selections: undefined,
+    deliveryMethod: payload.deliveryMethod,
+    shippingConfig: config.shipping,
+    mode: 'apparel',
+  });
+
+  return NextResponse.json({ ...summary, shippingDecision });
 }
 
 async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
@@ -493,40 +597,19 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
       }
     : undefined;
 
-  // Build shipping items for SDL decision
-  const productWeight = productWithCat?.weight_lb != null ? Number(productWithCat.weight_lb) : null;
-  const productPackageWidth = productWithCat?.package_width_in != null ? Number(productWithCat.package_width_in) : null;
-  const selectedWidth = payload.selections?.width_in != null ? Number(payload.selections.width_in) : null;
-  const effectiveWidth = selectedWidth && productPackageWidth ? Math.max(selectedWidth, productPackageWidth) : (selectedWidth || productPackageWidth);
-
-  const shippingItems = [{
-    id: payload.productId,
-    quantity: totalQty,
-    product: {
-      id: payload.productId,
-      weight_lb: productWeight,
-      package_width_in: productPackageWidth,
-    },
-    quotePayload: {
-      mode: payload.mode,
-      deliveryMethod: normalizedDeliveryMethod,
-      selections: {
-        ...payload.selections,
-        ...(effectiveWidth && { width_in: effectiveWidth })
-      },
-    },
-  }];
-
-  // Get shipping config for SDL decision
-  const configRows = await query('SELECT * FROM shipping_config LIMIT 1');
-  const shippingConfig = buildShippingConfig(Array.isArray(configRows) ? configRows[0] : {});
-  const decision = getShippingDecision(shippingItems, shippingConfig);
-
   // Use the unified engine - shipping is calculated from DB config
   const summary = calculateUnifiedQuote(config, pools, unifiedRequest, dimensionPricing, payload.shippingState, payload.shippingZip);
 
-  // Add shipping review required flag to summary
-  summary.shippingReviewRequired = decision.shippingReviewRequired;
+  const shippingDecision = resolveShippingDecisionForQuote({
+    productId: payload.productId,
+    totalQuantity: totalQty,
+    productWeightLb: productWithCat?.weight_lb ?? null,
+    productPackageWidthIn: productWithCat?.package_width_in ?? null,
+    selections: payload.selections,
+    deliveryMethod: payload.deliveryMethod,
+    shippingConfig: config.shipping,
+    mode: 'print_product',
+  });
 
   if (zoneResult.available && normalizedDeliveryMethod === 'local_delivery') {
     const shippingAmount = summary.subtotal >= zoneResult.freeMinimum ? 0 : zoneResult.fee;
@@ -547,5 +630,5 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
   assertTotalValueWithinProductBounds(summary.subtotal, valueBounds);
 
-  return NextResponse.json(summary);
+  return NextResponse.json({ ...summary, shippingDecision });
 }

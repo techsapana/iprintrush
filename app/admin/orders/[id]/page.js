@@ -211,7 +211,7 @@ export default function AdminOrderDetailPage() {
   }
 
   const addr = order.billingAddress || {};
-  const fullAddress = [addr.address, addr.city, addr.state, addr.zip]
+  const fullAddress = [addr.address, addr.apartmentOrSuite, addr.city, addr.state, addr.zip]
     .filter(Boolean)
     .join(', ');
 
