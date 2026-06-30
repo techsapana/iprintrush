@@ -341,6 +341,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
         tempArtworkFiles,
         artworkFiles,
         customSizeNote,
+        shippingZip: shippingZip.trim(),
       };
 
       const res = await fetch('/api/quote/calculate', {
@@ -525,14 +526,15 @@ const fetchShippingMethods = async (items, zip = '') => {
      try {
        const items = buildShippingItems();
        const data = await fetchShippingMethods(items, zip);
-        if (data) {
-          setZipCheckStatus('success');
-          setZipCheckResult({
-            available: data.methods.some(m => m.type === 'local_delivery' && m.available !== false) || false,
-            cost: data.methods.find(m => m.type === 'local_delivery')?.cost || 0,
-            deliveryWindow: data.methods.find(m => m.type === 'local_delivery')?.deliveryWindow || null,
-          });
-       } else {
+         if (data) {
+           setZipCheckStatus('success');
+           setShippingZip(zip);
+           setZipCheckResult({
+             available: data.methods.some(m => m.type === 'local_delivery' && m.available !== false) || false,
+             cost: data.methods.find(m => m.type === 'local_delivery')?.cost || 0,
+             deliveryWindow: data.methods.find(m => m.type === 'local_delivery')?.deliveryWindow || null,
+           });
+        } else {
          setZipCheckStatus('unavailable');
          setZipCheckResult({ available: false, cost: 0, deliveryWindow: null });
        }
@@ -654,6 +656,7 @@ const handleDeliveryMethodChange = (method) => {
         tempArtworkFiles,
         artworkFiles,
         customSizeNote,
+        shippingZip: shippingZip.trim(),
       };
 
       const res = await fetch('/api/quote/calculate', {
