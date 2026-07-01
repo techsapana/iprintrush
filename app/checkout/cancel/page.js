@@ -13,7 +13,7 @@ export default function CheckoutCancelPage() {
           <p className="text-gray-600 text-lg mb-8">
             No worries—your card was not charged. You can try again anytime.
           </p>
-
+  
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/checkout">
               <Button className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-semibold">
