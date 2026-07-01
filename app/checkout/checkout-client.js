@@ -40,7 +40,6 @@ export default function CheckoutClient() {
     email: '',
     phone: '',
     address: '',
-    apartmentOrSuite: '',
     city: '',
     state: '',
     zip: '',
@@ -463,10 +462,6 @@ const handleApplyCoupon = (e) => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Street address</label>
                   <input name="address" value={formData.address} onChange={handleInputChange} required className={inputClass} />
                 </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Apartment / Suite Number (Optional)</label>
-                  <input name="apartmentOrSuite" value={formData.apartmentOrSuite} onChange={handleInputChange} maxLength={100} className={inputClass} />
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                   <input name="city" value={formData.city} onChange={handleInputChange} required className={inputClass} />
@@ -756,6 +751,7 @@ const handleApplyCoupon = (e) => {
                 </div>
                 <div className="flex justify-between text-xl font-bold">
                   <span>Total:</span>
+                  
                   <span className="text-[#29b6f6]">${(finalTotal || 0).toFixed(2)}</span>
                 </div>
               </div>
@@ -766,4 +762,5 @@ const handleApplyCoupon = (e) => {
       </div>
     </div>
   );
+}
 }
