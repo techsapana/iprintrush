@@ -2114,49 +2114,58 @@ multi-month discounts.
                           const discountType = tier.discountType || 'NONE';
                           const discountValue = Number(tier.discountValue || 0);
                           const isValidPercent = discountType !== 'PERCENT' || (discountValue >= 0 && discountValue <= 100);
-                          return (
-                            <div key={`${pool.id}-tier-${idx}`} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-start">
-                               <input
-                                 type="number"
-                                 placeholder="Min Qty"
-                                 value={tier.minQty ?? ''}
-                                 disabled={disabledPoolIds.includes(pool.id)}
-                                 onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'minQty', e.target.value)}
-                                 className="px-2 py-1 text-sm border border-gray-300 rounded"
-                               />
-                               <input
-                                 type="number"
-                                 placeholder="Max Qty"
-                                 value={tier.maxQty ?? ''}
-                                 disabled={disabledPoolIds.includes(pool.id)}
-                                 onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'maxQty', e.target.value)}
-                                 className="px-2 py-1 text-sm border border-gray-300 rounded"
-                               />
-<select
-                                  value={discountType}
-                                  disabled={disabledPoolIds.includes(pool.id)}
-                                  onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'discountType', e.target.value)}
-                                  className="px-2 py-1 text-sm border border-gray-300 rounded"
-                                >
-                                  <option value="NONE">None</option>
-                                  <option value="PERCENT">Percent</option>
-                                  <option value="FIXED">Fixed Amount</option>
-                                </select>
-                                {discountType !== 'NONE' && (
+                           return (
+                             <div key={`${pool.id}-tier-${idx}`} className="flex items-start gap-3">
+                               <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2 items-start">
                                   <input
                                     type="number"
-                                    step="0.01"
-                                    min={discountType === 'PERCENT' ? '0' : '0'}
-                                    max={discountType === 'PERCENT' ? '100' : undefined}
-                                    placeholder={discountType === 'PERCENT' ? 'Discount %' : 'Discount $'}
-                                    value={tier.discountValue ?? ''}
+                                    placeholder="Min Qty"
+                                    value={tier.minQty ?? ''}
                                     disabled={disabledPoolIds.includes(pool.id)}
-                                    onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'discountValue', e.target.value)}
-                                    className={`px-2 py-1 text-sm border rounded ${!isValidPercent ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
+                                    onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'minQty', e.target.value)}
+                                    className="px-2 py-1 text-sm border border-gray-300 rounded"
                                   />
-                                )}
-                              </div>
-                            );
+                                  <input
+                                    type="number"
+                                    placeholder="Max Qty"
+                                    value={tier.maxQty ?? ''}
+                                    disabled={disabledPoolIds.includes(pool.id)}
+                                    onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'maxQty', e.target.value)}
+                                    className="px-2 py-1 text-sm border border-gray-300 rounded"
+                                  />
+ <select
+                                     value={discountType}
+                                     disabled={disabledPoolIds.includes(pool.id)}
+                                     onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'discountType', e.target.value)}
+                                     className="px-2 py-1 text-sm border border-gray-300 rounded"
+                                   >
+                                     <option value="NONE">None</option>
+                                     <option value="PERCENT">Percent</option>
+                                     <option value="FIXED">Fixed Amount</option>
+                                   </select>
+                                   {discountType !== 'NONE' && (
+                                     <input
+                                       type="number"
+                                       step="0.01"
+                                       min={discountType === 'PERCENT' ? '0' : '0'}
+                                       max={discountType === 'PERCENT' ? '100' : undefined}
+                                       placeholder={discountType === 'PERCENT' ? 'Discount %' : 'Discount $'}
+                                       value={tier.discountValue ?? ''}
+                                       disabled={disabledPoolIds.includes(pool.id)}
+                                       onChange={(e) => updatePoolQuantityTier(pool.id, idx, 'discountValue', e.target.value)}
+                                       className={`px-2 py-1 text-sm border rounded ${!isValidPercent ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
+                                     />
+                                   )}
+                               </div>
+                               <button
+                                 type="button"
+                                 onClick={() => removePoolQuantityTier(pool.id, idx)}
+                                 className="text-red-600 hover:text-red-800 text-sm mt-6"
+                               >
+                                 Remove
+                               </button>
+                             </div>
+                           );
                           })}
                         </div>
                         <button

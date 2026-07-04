@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceHTML, buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
 import { ShippingSelector, getShippingDisplayLabel } from '../shared/ShippingSelector';
@@ -872,59 +873,91 @@ const handleDeliveryMethodChange = (method) => {
   };
 
   const renderSingleSelectStep = (group, pool, value) => {
-    const poolName = String(pool?.name || '').toLowerCase();
-    const poolKeyLower = String(pool?.key || group?.poolKey || '').toLowerCase();
-    const isPrintSizePool =
-      poolName.includes('print size') ||
-      poolKeyLower.includes('print_size') ||
-      poolKeyLower.includes('print_sizes');
+    const poolKey = pool?.key || group?.poolKey || '';
+    const isPrintSizePool = poolKey === 'print_sizes';
+    const optionCount = pool.options?.length ?? 0;
+    const useDropdown = isPrintSizePool && optionCount > 6;
     const customDimensionEntered = (() => {
       const w = parseFloat(widthIn);
       const h = parseFloat(heightIn);
       return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0;
     })();
+
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">{pool.name || group.label}</h3>
         <p className="text-sm text-gray-600">{pool.description || 'Select one option.'}</p>
         {isPrintSizePool && customDimensionEntered && (
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-            Custom width/height is active. Clicking a predefined size switches back to preset sizing.
+            Custom width/height is active. Selecting a predefined size switches back to preset sizing.
           </p>
         )}
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {pool.options?.map((opt) => {
-            const selected = value === opt.id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => {
-                  if (isPrintSizePool) {
-                    setWidthIn('');
-                    setHeightIn('');
-                  }
-                  handleSelectionChange(group.poolKey, opt.id);
-                }}
-                className={`rounded-lg border px-4 py-3 text-left transition ${
-                  selected
-                    ? 'border-[#29b6f6] bg-[#29b6f6]/5'
-                    : 'border-gray-200 hover:border-[#29b6f6]/60'
-                }`}
-              >
-                <div className="font-semibold text-gray-900">{opt.label}</div>
-                {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
-                  <div className="text-sm text-gray-600">+{opt.percentageValue}%</div>
-                ) : opt.priceModifier !== 0 ? (
-                  <div className="text-sm text-gray-600">
-                    {opt.priceModifier > 0 ? '+' : ''}${opt.priceModifier.toFixed(2)} {pool.priceType === 'per_unit' ? 'per piece' : 'per order'}
+        {useDropdown ? (
+          <Select
+            value={value || ''}
+            onValueChange={(selectedValue) => {
+              if (isPrintSizePool) {
+                setWidthIn('');
+                setHeightIn('');
+              }
+              handleSelectionChange(group.poolKey, selectedValue);
+            }}
+>
+            <SelectTrigger className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-left focus:ring-2 focus:ring-[#29b6f6]">
+              <SelectValue placeholder="Choose Print Size" />
+            </SelectTrigger>
+            <SelectContent>
+              {pool.options?.map((opt) => (
+                <SelectItem key={opt.id} value={opt.id} className="cursor-pointer">
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-gray-900">{opt.label}</span>
+                    {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
+                      <span className="text-sm text-gray-600">+{opt.percentageValue}%</span>
+                    ) : opt.priceModifier !== 0 ? (
+                      <span className="text-sm text-gray-600">
+                        {opt.priceModifier > 0 ? '+' : ''}${opt.priceModifier.toFixed(2)} {pool.priceType === 'per_unit' ? 'per piece' : 'per order'}
+                      </span>
+                    ) : null}
                   </div>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {pool.options?.map((opt) => {
+              const selected = value === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    if (isPrintSizePool) {
+                      setWidthIn('');
+                      setHeightIn('');
+                    }
+                    handleSelectionChange(group.poolKey, opt.id);
+                  }}
+                  className={`rounded-lg border px-4 py-3 text-left transition ${
+                    selected
+                      ? 'border-[#29b6f6] bg-[#29b6f6]/5'
+                      : 'border-gray-200 hover:border-[#29b6f6]/60'
+                  }`}
+                >
+                  <div className="font-semibold text-gray-900">{opt.label}</div>
+                  {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
+                    <div className="text-sm text-gray-600">+{opt.percentageValue}%</div>
+                  ) : opt.priceModifier !== 0 ? (
+                    <div className="text-sm text-gray-600">
+                      {opt.priceModifier > 0 ? '+' : ''}${opt.priceModifier.toFixed(2)} {pool.priceType === 'per_unit' ? 'per piece' : 'per order'}
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
