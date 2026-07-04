@@ -24,6 +24,7 @@ const fileModeButtonClass = (active) =>
     : 'border-gray-300 text-gray-700 hover:bg-gray-50';
 
 export default function CheckoutClient() {
+  console.log("[CHECKOUT-LIFECYCLE][L1] CheckoutClient invoked");
   const router = useRouter();
   const searchParams = useSearchParams();
   const isBuyNow = searchParams.get('mode') === 'buyNow';
@@ -367,6 +368,13 @@ const handleApplyCoupon = (e) => {
     }
   };
 
+  console.log("[CHECKOUT-LIFECYCLE][L2]", {
+    sessionReady,
+    checkoutItemsCount: checkoutItems.length,
+    isBuyNow,
+    cartItemsCount: cartItems?.length,
+    isAuthenticated
+  });
   const subtotal = computeItemsSubtotal(checkoutItems);
   const discount = appliedCoupon
     ? (subtotal || 0) * ((couponLookup[appliedCoupon] || 0) / 100)
@@ -382,6 +390,7 @@ const handleApplyCoupon = (e) => {
     fileUploadMode === 'later' ||
     (fileUploadMode === 'now' && uploadedFile && isFinalConfirmed);
 
+  console.log("[CHECKOUT-LIFECYCLE][L3] sessionReady =", sessionReady);
   if (!sessionReady) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -409,6 +418,14 @@ const handleApplyCoupon = (e) => {
       </div>
     );
   }
+
+  console.log(
+    "[CHECKOUT-LIFECYCLE][L4] Rendering full checkout page",
+    {
+      checkoutItemsCount: checkoutItems.length
+    }
+  );
+  console.log("[CHECKOUT-LIFECYCLE][L5] Rendering Order Summary sidebar");
 
   return (
     <div className="min-h-screen bg-gray-50">
