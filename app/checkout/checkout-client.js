@@ -231,9 +231,11 @@ export default function CheckoutClient() {
     } catch {
       setShippingMethods([]);
       setShippingMethodsLoading(false);
+
       if (selectedMethod === 'local_delivery') {
         setIsZipValidated(false);
         setPayError('Unable to verify ZIP code. Please try again.');
+      }
     }
   };
 
