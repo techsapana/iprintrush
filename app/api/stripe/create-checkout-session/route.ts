@@ -7,8 +7,9 @@ import { mkdir, rename } from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
 import crypto from 'crypto';
-import { buildShippingConfig, getOversizedDetails } from '@/app/lib/shippingEngine';
+import { buildShippingConfig, getShippingCost, getShippingDecision, getOversizedDetails, type CartItem } from '@/app/lib/shippingEngine';
 import { normalizeDeliveryMethod, type ValidDeliveryMethod } from '@/app/lib/quoteEngine';
+import { lookupZoneByZip } from '@/app/lib/shipping/zipZoneService';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -120,6 +121,19 @@ function assertShippingMethodSelected(
   if (!hasSelectedShipping) {
     throw new Error('A shipping method must be selected before checkout.');
   }
+}
+
+function computeNonQuoteShippingTierSubtotal(
+  items: any[],
+  productMap: Map<string, any>,
+): number {
+  return items
+    .filter((i) => !i.quotePayload)
+    .reduce((sum, i) => {
+      const p = productMap.get(i.id);
+      const unitPrice = Number(p?.price || 0);
+      return sum + unitPrice * Math.max(1, i.quantity || 1);
+    }, 0);
 }
 
 function getSplitSizeLabel(item: any): string | null {
@@ -351,6 +365,8 @@ export async function POST(req: NextRequest) {
       let shippingCents = 0;
       let shippingMeta: any = null;
       let hasNonQuoteItem = false;
+      let quoteShippingCents = 0;
+      let quoteMerchandiseCents = 0;
 
       for (const item of payload.items) {
         const p = productMap.get(item.id);
@@ -394,7 +410,10 @@ export async function POST(req: NextRequest) {
 
           if (item.splitQuote === true) {
             const split = buildSplitQuoteSummary(serverSummary, item, splitQuoteIndex, splitQuoteCount);
-            itemTotal = split.lineTotal;
+            const splitGrandTotal = split.lineTotal;
+            const splitMerchandise = split.summary.subtotal || 0;
+            const splitShipping = split.summary.shipping || 0;
+            itemTotal = splitGrandTotal; // Unchanged - customer pays grandTotal
             const serverSummaryForSplit = split.summary;
             customizationJson = JSON.stringify({
               lineItems: serverSummaryForSplit.lineItems || [],
@@ -403,9 +422,15 @@ export async function POST(req: NextRequest) {
               quotePayload: quotePayloadForRecalc,
               quoteSummary: serverSummaryForSplit,
             });
-            resolvedUnitPrice = item.quantity > 0 ? itemTotal / item.quantity : 0;
+            resolvedUnitPrice = item.quantity > 0 ? splitGrandTotal / item.quantity : 0;
+            // Track merchandise and shipping for split quotes (accounting)
+            quoteMerchandiseCents += toCents(splitMerchandise);
+            quoteShippingCents += toCents(splitShipping);
           } else {
-            itemTotal = Number(serverSummary.grandTotal || 0);
+            const grandTotal = Number(serverSummary.grandTotal || 0);
+            const merchandise = Number(serverSummary.subtotal || 0);
+            const shippingTotal = Number(serverSummary.shipping || 0);
+            itemTotal = grandTotal; // Unchanged - customer pays grandTotal
             customizationJson = JSON.stringify({
               lineItems: serverSummary.lineItems || [],
               customizationsDisplay: item.customizationsDisplay || {},
@@ -413,7 +438,10 @@ export async function POST(req: NextRequest) {
               quotePayload: quotePayloadForRecalc,
               quoteSummary: serverSummary || null,
             });
-            resolvedUnitPrice = item.quantity > 0 ? itemTotal / item.quantity : 0;
+            resolvedUnitPrice = item.quantity > 0 ? grandTotal / item.quantity : 0;
+            // Track merchandise and shipping for quotes (accounting)
+            quoteMerchandiseCents += toCents(merchandise);
+            quoteShippingCents += toCents(shippingTotal);
           }
 
         } else {
@@ -428,8 +456,15 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Quote total must be greater than zero' }, { status: 400 });
         }
 
-        const amountCents = toCents(itemTotal);
-        subtotalCents += amountCents;
+const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - customer pays grandTotal)
+        const merchandiseCents = toCents(
+          item.quotePayload
+            ? (serverSummary.subtotal || 0)
+            : itemTotal
+        ); // For accounting - merchandise amount
+
+        // Track merchandise for subtotal (already tracked for quotes in branches above)
+        subtotalCents += merchandiseCents;
 
         const productName = String(p.name || 'Product');
         const sizeLabel =
@@ -457,7 +492,7 @@ export async function POST(req: NextRequest) {
           quantity: 1,
           price_data: {
             currency: 'usd',
-            unit_amount: amountCents,
+            unit_amount: amountCents, // Unchanged - customer pays grandTotal
             product_data: {
               name: displayName,
               images: imageUrl ? [imageUrl] : undefined,
@@ -541,20 +576,40 @@ export async function POST(req: NextRequest) {
         }
         // Pickup and review-required shipping have no immediate charge.
       } else if (hasNonQuoteItem) {
-        const methodData = checkoutCustomer.shippingMethodsData;
-        if (methodData && typeof methodData.cost === 'number') {
-          shippingCents = toCents(methodData.cost);
+        const decision = getShippingDecision(oversizedItems, shippingConfig);
+        if (!decision.allowedMethods.includes(normalizedDeliveryMethod)) {
+          await rollback(conn);
+          return NextResponse.json(
+            { error: `${normalizedDeliveryMethod} is not available for this order.` },
+            { status: 400 },
+          );
+        }
+
+        const tierSubtotal = computeNonQuoteShippingTierSubtotal(payload.items, productMap);
+
+        if (normalizedDeliveryMethod === 'local_delivery') {
+          const zip = String(checkoutCustomer.shippingZip || '').trim();
+          const zone = await lookupZoneByZip(zip);
+          if (!zone) {
+            await rollback(conn);
+            return NextResponse.json(
+              { error: 'Local delivery is not available for this ZIP code.' },
+              { status: 400 },
+            );
+          }
+          const localCost = tierSubtotal >= zone.free_delivery_minimum ? 0 : zone.delivery_fee;
+          shippingCents = toCents(localCost);
           selectedRateMeta = {
-            serviceType: methodData.type || methodData.id || normalizedDeliveryMethod,
-            serviceName: methodData.label || 'Shipping',
-            cost: methodData.cost,
+            serviceType: 'local_delivery',
+            serviceName: 'Local Delivery',
+            cost: localCost,
             estimatedDeliveryDate: null,
             estimatedDeliveryLabel: null,
           };
           shippingMeta = {
-            carrier: normalizedDeliveryMethod === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
-            serviceType: methodData.type || methodData.id || normalizedDeliveryMethod,
-            serviceName: methodData.label || 'Shipping',
+            carrier: 'Local Delivery',
+            serviceType: 'local_delivery',
+            serviceName: 'Local Delivery',
             estimatedDeliveryDate: null,
             estimatedDeliveryLabel: null,
             selectedByCustomer: true,
@@ -570,19 +625,20 @@ export async function POST(req: NextRequest) {
               countryCode: 'US',
             },
           };
-        } else if (checkoutCustomer.selectedShipping && typeof checkoutCustomer.selectedShipping.cost === 'number') {
-          shippingCents = toCents(checkoutCustomer.selectedShipping.cost);
+        } else {
+          const standardCost = getShippingCost(tierSubtotal, 'standard_shipping', shippingConfig);
+          shippingCents = toCents(standardCost);
           selectedRateMeta = {
-            serviceType: checkoutCustomer.selectedShipping.serviceType || normalizedDeliveryMethod,
-            serviceName: checkoutCustomer.selectedShipping.serviceName || 'Shipping',
-            cost: checkoutCustomer.selectedShipping.cost,
+            serviceType: 'standard_shipping',
+            serviceName: 'Standard Shipping',
+            cost: standardCost,
             estimatedDeliveryDate: null,
             estimatedDeliveryLabel: null,
           };
           shippingMeta = {
-            carrier: normalizedDeliveryMethod === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
-            serviceType: checkoutCustomer.selectedShipping.serviceType || normalizedDeliveryMethod,
-            serviceName: checkoutCustomer.selectedShipping.serviceName || 'Shipping',
+            carrier: 'Standard Shipping',
+            serviceType: 'standard_shipping',
+            serviceName: 'Standard Shipping',
             estimatedDeliveryDate: null,
             estimatedDeliveryLabel: null,
             selectedByCustomer: true,
@@ -595,12 +651,6 @@ export async function POST(req: NextRequest) {
               countryCode: 'US',
             },
           };
-        } else {
-          await rollback(conn);
-          return NextResponse.json(
-            { error: 'Please select a shipping method.' },
-            { status: 400 },
-          );
         }
       }
 
@@ -651,6 +701,27 @@ export async function POST(req: NextRequest) {
             product_data: { name: shipLabel },
           },
         });
+      }
+      // For pure quote orders, shipping is already included in merchandise charge.
+      // Just set shippingCents for DB accounting - do NOT add duplicate line item.
+      if (!hasNonQuoteItem && quoteShippingCents > 0 && isShippingMethod) {
+        shippingCents = quoteShippingCents;
+        shippingMeta = {
+          carrier: normalizedDeliveryMethod === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
+          serviceType: normalizedDeliveryMethod,
+          serviceName: normalizedDeliveryMethod === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
+          estimatedDeliveryDate: null,
+          estimatedDeliveryLabel: null,
+          selectedByCustomer: false,
+          shippingReviewRequired: false,
+          destination: {
+            addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
+            city: checkoutCustomer.shippingCity || 'City',
+            stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
+            postalCode: checkoutCustomer.shippingZip || '',
+            countryCode: 'US',
+          },
+        };
       }
 
       await ensureOrderShippingColumns();

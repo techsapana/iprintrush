@@ -25,6 +25,7 @@ export function ShippingSelector({
   onZipCheck,
   deliveryMethod,
   methods,
+  zipValue,
 }) {
   const [zipInputValue, setZipInputValue] = useState('');
 
@@ -34,19 +35,22 @@ export function ShippingSelector({
   const isZipUnavailable = zipCheckStatus === 'unavailable';
   const isZipError = zipCheckStatus === 'error';
 
+  const activeZip = zipValue || zipInputValue;
+
   const handleZipInputChange = (e) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 5);
     setZipInputValue(value);
   };
 
   const handleCheckClick = () => {
-    if (zipInputValue.length === 5 && onZipCheck) {
-      onZipCheck(zipInputValue);
+    if (activeZip.length === 5 && onZipCheck) {
+      onZipCheck(activeZip);
     }
   };
 
   const showZipInput = isLocalDeliverySelected;
-  const canCheckZip = zipInputValue.length === 5 && zipCheckStatus !== 'success';
+  const canCheckZip = activeZip.length === 5 && zipCheckStatus !== 'success';
+  const showZipCheckButton = isLocalDeliverySelected && activeZip.length >= 5;
 
   const localDeliveryDisabled = isLocalDeliverySelected && !isZipAvailable && zipCheckStatus !== 'idle';
 
@@ -181,30 +185,51 @@ export function ShippingSelector({
         {methods ? methods.map(renderMethodButton) : renderFallbackMethods()}
       </div>
 
-      {showZipInput && (
+      {isLocalDeliverySelected && (
         <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={zipInputValue}
-              onChange={handleZipInputChange}
-              placeholder="Enter ZIP code"
-              className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
-              maxLength={5}
-            />
-            <button
-              type="button"
-              onClick={handleCheckClick}
-              disabled={!canCheckZip}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                canCheckZip
-                  ? 'bg-[#29b6f6] text-white hover:bg-[#1e8fc4]'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {isZipChecking ? 'Checking...' : 'Check Availability'}
-            </button>
-          </div>
+          {!zipValue && (
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={zipInputValue}
+                onChange={handleZipInputChange}
+                placeholder="Enter ZIP code"
+                className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                maxLength={5}
+              />
+              <button
+                type="button"
+                onClick={handleCheckClick}
+                disabled={!canCheckZip}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  canCheckZip
+                    ? 'bg-[#29b6f6] text-white hover:bg-[#1e8fc4]'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isZipChecking ? 'Checking...' : 'Check Availability'}
+              </button>
+            </div>
+          )}
+          {zipValue && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600">ZIP: {zipValue}</span>
+              {zipCheckStatus !== 'success' && (
+                <button
+                  type="button"
+                  onClick={handleCheckClick}
+                  disabled={isZipChecking}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    isZipChecking
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-[#29b6f6] text-white hover:bg-[#1e8fc4]'
+                  }`}
+                >
+                  {isZipChecking ? 'Checking...' : 'Check Availability'}
+                </button>
+              )}
+            </div>
+          )}
 
           {zipCheckStatus === 'success' && (
             <div className={`text-sm px-3 py-2 rounded-lg ${

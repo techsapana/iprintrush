@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useCart } from '../hooks/useCart';
 import { useAuth } from '../hooks/useAuth';
 import { SameDayNotice } from '../components/shared/SameDayNotice';
+import { ShippingSelector, getShippingDisplayLabel } from '../components/shared/ShippingSelector';
 import {
   readBuyNowItems,
   clearBuyNowItems,
@@ -57,15 +58,16 @@ export default function CheckoutClient() {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState('');
   const [couponMessage, setCouponMessage] = useState('');
-  const [oversizedDetails, setOversizedDetails] = useState(null);
+const [oversizedDetails, setOversizedDetails] = useState(null);
   const [shippingMethods, setShippingMethods] = useState([]);
   const [shippingMethodsLoading, setShippingMethodsLoading] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState(null);
+  const [zipCheckStatus, setZipCheckStatus] = useState('idle');
+  const [zipCheckResult, setZipCheckResult] = useState(null);
   const [fileUploadMode, setFileUploadMode] = useState('later');
   const [uploadedFile, setUploadedFile] = useState(null);
   const [uploadedPreview, setUploadedPreview] = useState(null);
   const [isFinalConfirmed, setIsFinalConfirmed] = useState(false);
-  const [isZipValidated, setIsZipValidated] = useState(false);
 
   const checkoutItems = useMemo(() => {
     const source = isBuyNow ? buyNowItems : cartItems;
@@ -170,25 +172,61 @@ export default function CheckoutClient() {
    loadCoupons();
     }, [checkoutItems]);
 
-  useEffect(() => {
+useEffect(() => {
     if (formData.deliveryMethod !== 'shipping') {
       setShippingMethods([]);
       setSelectedMethod(null);
-      setIsZipValidated(false);
+      setZipCheckStatus('idle');
+      setZipCheckResult(null);
       setOversizedDetails(null);
       return;
     }
-  }, [
-    formData.deliveryMethod,
-  ]);
+    const fetchMethods = async () => {
+      setShippingMethodsLoading(true);
+      try {
+        const res = await fetch('/api/shipping/methods', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: checkoutItems.map((i) => ({
+              id: i.id,
+              quantity: i.quantity,
+              quotePayload: i.options?.quotePayload || null,
+              product: {
+                weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
+                package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),
+                localDeliveryEligible: i.product?.localDeliveryEligible ?? true,
+              },
+            })),
+            shippingAddress: {},
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data?.success && Array.isArray(data.methods)) {
+          setShippingMethods(data.methods);
+          if (data.oversizedDetails) {
+            setOversizedDetails(data.oversizedDetails);
+          }
+          if (data.methods.some((m) => m.type === 'pickup')) {
+            setSelectedMethod('pickup');
+          }
+        }
+      } catch {
+        // ignore
+      } finally {
+        setShippingMethodsLoading(false);
+      }
+    };
+    fetchMethods();
+  }, [formData.deliveryMethod, checkoutItems]);
 
-  const handleZipCheck = async () => {
-    const zip = String(formData.shippingZip || '').trim();
-    if (!/^\d{5}$/.test(zip)) {
+  const handleZipCheck = async (zip) => {
+    if (!zip || zip.length !== 5) {
       setPayError('Please enter a valid 5-digit ZIP code.');
       return;
     }
-    setShippingMethodsLoading(true);
+    setZipCheckStatus('checking');
+    setZipCheckResult(null);
     try {
       const res = await fetch('/api/shipping/methods', {
         method: 'POST',
@@ -216,27 +254,22 @@ export default function CheckoutClient() {
           setOversizedDetails(null);
         }
         const hasLocal = data.methods.some((m) => m.type === 'local_delivery');
-        if (selectedMethod === 'local_delivery') {
-          setIsZipValidated(hasLocal);
-          if (!hasLocal) setPayError('Local delivery not available in this ZIP code.');
-        }
-        setShippingMethodsLoading(false);
+        setZipCheckStatus(hasLocal ? 'success' : 'unavailable');
+        setZipCheckResult({
+          available: hasLocal,
+          cost: data.methods.find((m) => m.type === 'local_delivery')?.cost || 0,
+          deliveryWindow: data.methods.find((m) => m.type === 'local_delivery')?.deliveryWindow || null,
+        });
       } else {
-        setShippingMethods([]);
-        setShippingMethodsLoading(false);
-        if (selectedMethod === 'local_delivery') {
-          setIsZipValidated(false);
-          setPayError('Unable to verify ZIP code. Please try again.');
-        }
+        setZipCheckStatus('error');
+        setZipCheckResult(null);
+        setPayError('Unable to verify ZIP code. Please try again.');
       }
     } catch {
-      setShippingMethods([]);
-      setShippingMethodsLoading(false);
-      if (selectedMethod === 'local_delivery') {
-        setIsZipValidated(false);
-        setPayError('Unable to verify ZIP code. Please try again.');
+      setZipCheckStatus('error');
+      setZipCheckResult(null);
+      setPayError('Unable to verify ZIP code. Please try again.');
     }
-  }
   };
 
   useEffect(() => {
@@ -321,7 +354,7 @@ const handleApplyCoupon = (e) => {
     if (
       formData.deliveryMethod === 'shipping' &&
       selectedMethod === 'local_delivery' &&
-      !isZipValidated
+      zipCheckStatus !== 'success'
     ) {
       setPayError('Please verify your ZIP code is eligible for local delivery.');
       return;
@@ -523,82 +556,20 @@ const handleApplyCoupon = (e) => {
               </div>
             )}
 
-            {formData.deliveryMethod === 'shipping' && (
+{formData.deliveryMethod === 'shipping' && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Methods</h2>
-                {shippingMethods.some((m) => m.type === 'review_required') &&
-                  !shippingMethods.some((m) => m.type === 'standard_shipping') && oversizedDetails && (
-                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm mb-4">
-                      <div className="font-semibold mb-2">Shipping Review Required</div>
-                      {oversizedDetails.widthExceeded && (
-                        <div className="mb-1">
-                          Maximum allowed width: {oversizedDetails.widthExceeded.maxAllowedWidth} in. Selected: {oversizedDetails.widthExceeded.selectedWidth} in.
-                        </div>
-                      )}
-                      {oversizedDetails.weightExceeded && (
-                        <div className="mb-1">
-                          Maximum allowed weight: {oversizedDetails.weightExceeded.maxAllowedWeight} lb. Product weight: {oversizedDetails.weightExceeded.productWeight} lb.
-                        </div>
-                      )}
-                      <div>Our team will review shipping options and contact you.</div>
-                    </div>
-                  )}
-                {shippingMethods.length === 0 ? (
-                    <p className="text-sm text-gray-500">
-                      Enter street, city, state, and ZIP in Shipping Address to load shipping methods.
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {shippingMethods.map((method) => {
-                        const checked = selectedMethod === method.type;
-                        const isLocalDelivery = method.type === 'local_delivery';
-                        const canSelectLocal = !isLocalDelivery || (isLocalDelivery && isZipValidated);
-                        return (
-                          <label
-                            key={method.type}
-                            className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
-                              checked
-                                ? 'border-[#29b6f6] bg-sky-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            } ${canSelectLocal ? '' : 'opacity-60'}`}
-                          >
-                            <input
-                              type="radio"
-                              name="ruleBasedShippingOption"
-                              checked={checked}
-                              onChange={() => {
-                                setSelectedMethod(method.type);
-                                if (method.type !== 'local_delivery') {
-                                  setIsZipValidated(false);
-                                }
-                              }}
-                              disabled={!canSelectLocal}
-                              className="mt-1"
-                            />
-                            <span className="text-sm text-gray-900">
-                              {method.label} — ${Number(method.cost || 0).toFixed(2)}
-                            </span>
-                          </label>
-                        );
-                      })}
-                      {selectedMethod === 'local_delivery' && !isZipValidated && (
-                        <div className="mt-3 p-3 border-t border-gray-200">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleZipCheck}
-                            className="text-sm"
-                          >
-                            Check ZIP Availability
-                          </Button>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Verify your ZIP code is eligible for local delivery.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <ShippingSelector
+                  selectedMethod={selectedMethod}
+                  onMethodChange={setSelectedMethod}
+                  decision={oversizedDetails ? { isOversized: true, details: oversizedDetails } : null}
+                  zipCheckStatus={zipCheckStatus}
+                  zipCheckResult={zipCheckResult}
+                  onZipCheck={handleZipCheck}
+                  methods={shippingMethods}
+                  zipValue={formData.shippingZip}
+                />
+              </div>
             )}
 
             <div className="bg-white rounded-lg shadow-sm p-6">
