@@ -42,10 +42,6 @@ export default function CheckoutClient() {
     lastName: '',
     email: '',
     phone: '',
-    address: '',
-    city: '',
-    state: '',
-    zip: '',
     notes: '',
     deliveryMethod: 'pickup',
     shippingAddress: '',
@@ -61,7 +57,6 @@ export default function CheckoutClient() {
   const [couponMessage, setCouponMessage] = useState('');
 const [oversizedDetails, setOversizedDetails] = useState(null);
   const [shippingMethods, setShippingMethods] = useState([]);
-  const [shippingMethodsLoading, setShippingMethodsLoading] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [zipCheckStatus, setZipCheckStatus] = useState('idle');
   const [zipCheckResult, setZipCheckResult] = useState(null);
@@ -99,6 +94,10 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
 
   const handleMethodSelect = (methodType) => {
     setSelectedMethod(methodType);
+    if (methodType !== 'local_delivery') {
+      setZipCheckStatus('idle');
+      setZipCheckResult(null);
+    }
     setFormData((prev) => ({
       ...prev,
       deliveryMethod: methodType === 'pickup' ? 'pickup' : 'shipping',
@@ -184,7 +183,6 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
 useEffect(() => {
     if (!sessionReady || checkoutItems.length === 0) return;
     const fetchMethods = async () => {
-      setShippingMethodsLoading(true);
       try {
         const res = await fetch('/api/shipping/methods', {
           method: 'POST',
@@ -216,7 +214,6 @@ useEffect(() => {
       } catch {
         // ignore
       } finally {
-        setShippingMethodsLoading(false);
       }
     };
     fetchMethods();
@@ -262,6 +259,9 @@ useEffect(() => {
           cost: data.methods.find((m) => m.type === 'local_delivery')?.cost || 0,
           deliveryWindow: data.methods.find((m) => m.type === 'local_delivery')?.deliveryWindow || null,
         });
+        if (hasLocal) {
+          setFormData((prev) => ({ ...prev, shippingZip: zip }));
+        }
       } else {
         setZipCheckStatus('error');
         setZipCheckResult(null);
@@ -322,45 +322,35 @@ const handleApplyCoupon = (e) => {
       return;
     }
     const zipRegex = /^\d{5}$/;
-    if (!zipRegex.test(String(formData.zip || '').trim())) {
-      setPayError('Billing ZIP code must be exactly 5 digits.');
-      return;
-    }
-    if (
-      formData.deliveryMethod === 'shipping' &&
-      (!formData.shippingAddress || !formData.shippingCity || !formData.shippingZip)
-    ) {
-      setPayError('Please fill shipping address, city, and ZIP code for shipping delivery.');
-      return;
-    }
-    if (
-      formData.deliveryMethod === 'shipping' &&
-      !zipRegex.test(String(formData.shippingZip || '').trim())
-    ) {
-      setPayError('Shipping ZIP code must be exactly 5 digits.');
-      return;
-    }
-    if (
-      formData.deliveryMethod === 'shipping' &&
-      !selectedMethod
-    ) {
+    if (!selectedMethod) {
       setPayError('Please select a shipping method.');
       return;
     }
+    if (selectedMethod === 'standard_shipping') {
+      if (!formData.shippingAddress || !formData.shippingCity || !formData.shippingState || !formData.shippingZip) {
+        setPayError('Please complete the shipping address (street, city, state, and ZIP).');
+        return;
+      }
+      if (!zipRegex.test(String(formData.shippingZip || '').trim())) {
+        setPayError('Shipping ZIP code must be exactly 5 digits.');
+        return;
+      }
+    }
+    if (selectedMethod === 'local_delivery') {
+      if (zipCheckStatus !== 'success' || !zipCheckResult?.available) {
+        setPayError('Please verify your ZIP code is eligible for local delivery.');
+        return;
+      }
+      if (!formData.shippingAddress || !formData.shippingCity || !formData.shippingState) {
+        setPayError('Please complete the shipping address (street, city, and state).');
+        return;
+      }
+    }
     if (
-      formData.deliveryMethod === 'shipping' &&
       selectedMethod === 'review_required' &&
       (!formData.shippingAddress.trim() || !formData.shippingCity.trim() || !formData.shippingZip.trim())
     ) {
       setPayError('Please enter a complete shipping address for shipping review.');
-      return;
-    }
-    if (
-      formData.deliveryMethod === 'shipping' &&
-      selectedMethod === 'local_delivery' &&
-      zipCheckStatus !== 'success'
-    ) {
-      setPayError('Please verify your ZIP code is eligible for local delivery.');
       return;
     }
     setIsPaying(true);
@@ -428,6 +418,11 @@ const handleApplyCoupon = (e) => {
     fileUploadMode === 'later' ||
     (fileUploadMode === 'now' && uploadedFile && isFinalConfirmed);
 
+  const needsShippingAddress =
+    selectedMethod === 'standard_shipping' ||
+    selectedMethod === 'review_required' ||
+    (selectedMethod === 'local_delivery' && zipCheckStatus === 'success' && zipCheckResult?.available);
+
   console.log("[CHECKOUT-LIFECYCLE][L3] sessionReady =", sessionReady);
   if (!sessionReady) {
     return (
@@ -483,127 +478,76 @@ const handleApplyCoupon = (e) => {
 
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Method</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {shippingMethods.length > 0
-                  ? shippingMethods.map((method) => {
-                      const methodType = method.type || method.id;
-                      const methodLabel = method.label || methodType;
-                      const isSelected = selectedMethod === methodType;
-                      const isLocalDelivery = methodType === 'local_delivery';
-                      const isDisabled = isLocalDelivery && zipCheckStatus !== 'success' && zipCheckStatus !== 'idle';
-                      return (
-                        <button
-                          key={methodType}
-                          type="button"
-                          onClick={() => handleMethodSelect(methodType)}
-                          disabled={isDisabled}
-                          className={`rounded-xl border px-4 py-3 text-left transition relative ${
-                            isSelected
-                              ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
-                              : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
-                          } ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                        >
-                          <div className="font-semibold text-gray-900">{methodLabel}</div>
-                          {methodType === 'local_delivery' && zipCheckStatus === 'success' && zipCheckResult && (
-                            <div className="text-sm text-gray-600">
-                              ${Number(zipCheckResult.cost || method.cost || 0).toFixed(2)} delivery fee
-                              {zipCheckResult.deliveryWindow || method.deliveryWindow ? ` • Delivery: ${zipCheckResult.deliveryWindow || method.deliveryWindow}` : ''}
-                            </div>
-                          )}
-                          {method.zipRequired && (
-                            <div className="text-sm text-gray-600">Enter ZIP to enable Local Delivery</div>
-                          )}
-                          {isLocalDelivery && !isSelected && method.zipRequired && (
-                            <div className="text-sm text-gray-600">Enter ZIP to check availability</div>
-                          )}
-                        </button>
-                      );
-                    })
-                  : shippingMethodsLoading
-                  ? (
-                    <div className="col-span-full text-sm text-gray-500">Loading shipping methods...</div>
-                  )
-                  : (
-                    <div className="col-span-full text-sm text-gray-500">No shipping methods available.</div>
-                  )}
-              </div>
               <ShippingSelector
                 selectedMethod={selectedMethod}
-                onMethodChange={setSelectedMethod}
+                onMethodChange={handleMethodSelect}
                 decision={oversizedDetails ? { isOversized: true, details: oversizedDetails } : null}
                 zipCheckStatus={zipCheckStatus}
                 zipCheckResult={zipCheckResult}
                 onZipCheck={handleZipCheck}
                 methods={shippingMethods}
                 zipValue={formData.shippingZip}
-                hideMethods
+                commitLocalDeliveryOnVerify
               />
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First name</label>
-                  <input name="firstName" value={formData.firstName} onChange={handleInputChange} required className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last name</label>
-                  <input name="lastName" value={formData.lastName} onChange={handleInputChange} required className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input type="email" name="email" value={formData.email} onChange={handleInputChange} required className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className={inputClass} />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Street address</label>
-                  <input name="address" value={formData.address} onChange={handleInputChange} required className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                  <input name="city" value={formData.city} onChange={handleInputChange} required className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                  <input name="state" value={formData.state} onChange={handleInputChange} required className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
-                  <input name="zip" value={formData.zip} onChange={handleInputChange} required className={inputClass} maxLength={5} />
-                </div>
-              </div>
-            </div>
-
-            {selectedMethod && selectedMethod !== 'pickup' && (
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Address</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Contact Information</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Street</label>
-                    <input name="shippingAddress" value={formData.shippingAddress} onChange={handleInputChange} required className={inputClass} />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">First name</label>
+                    <input name="firstName" value={formData.firstName} onChange={handleInputChange} required className={inputClass} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Apt (optional)</label>
-                    <input name="shippingApt" value={formData.shippingApt} onChange={handleInputChange} className={inputClass} />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Last name</label>
+                    <input name="lastName" value={formData.lastName} onChange={handleInputChange} required className={inputClass} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                    <input name="shippingCity" value={formData.shippingCity} onChange={handleInputChange} required className={inputClass} />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" name="email" value={formData.email} onChange={handleInputChange} required className={inputClass} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                    <input name="shippingState" value={formData.shippingState} onChange={handleInputChange} required className={inputClass} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
-                    <input name="shippingZip" value={formData.shippingZip} onChange={handleInputChange} required className={inputClass} maxLength={5} />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className={inputClass} />
                   </div>
                 </div>
               </div>
-            )}
+
+              {needsShippingAddress && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Address</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Street address</label>
+                      <input name="shippingAddress" value={formData.shippingAddress} onChange={handleInputChange} required className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Apartment (optional)</label>
+                      <input name="shippingApt" value={formData.shippingApt} onChange={handleInputChange} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                      <input name="shippingCity" value={formData.shippingCity} onChange={handleInputChange} required className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                      <input name="shippingState" value={formData.shippingState} onChange={handleInputChange} required className={inputClass} />
+                    </div>
+                    {(selectedMethod === 'standard_shipping' || selectedMethod === 'review_required') && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                        <input name="shippingZip" value={formData.shippingZip} onChange={handleInputChange} required className={inputClass} maxLength={5} />
+                      </div>
+                    )}
+                    {selectedMethod === 'local_delivery' && (
+                      <div className="sm:col-span-2 text-sm text-gray-600">
+                        ✓ Delivery ZIP verified: {formData.shippingZip}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
 
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Upload Your Design (Optional but recommended)</h2>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const SHIPPING_METHOD_LABELS = {
   pickup: 'Store Pickup',
@@ -27,13 +27,14 @@ export function ShippingSelector({
   methods,
   zipValue,
   hideMethods = false,
+  commitLocalDeliveryOnVerify = false,
 }) {
   const [zipInputValue, setZipInputValue] = useState('');
+  const [localDeliveryArmed, setLocalDeliveryArmed] = useState(false);
 
   const isLocalDeliverySelected = selectedMethod === 'local_delivery';
   const isZipChecking = zipCheckStatus === 'checking';
   const isZipAvailable = zipCheckStatus === 'success' && zipCheckResult?.available;
-  const isZipUnavailable = zipCheckStatus === 'unavailable';
   const isZipError = zipCheckStatus === 'error';
 
   const activeZip = zipValue || zipInputValue;
@@ -49,7 +50,26 @@ export function ShippingSelector({
     }
   };
 
-  const showZipInput = isLocalDeliverySelected;
+  // When commitLocalDeliveryOnVerify is enabled (checkout), clicking Local
+  // Delivery only arms the ZIP entry and does NOT select the method. The method
+  // is committed via onMethodChange only after ZIP verification succeeds.
+  const handleMethodButtonClick = (methodType) => {
+    if (methodType === 'local_delivery' && commitLocalDeliveryOnVerify) {
+      setLocalDeliveryArmed(true);
+      return;
+    }
+    setLocalDeliveryArmed(false);
+    onMethodChange(methodType);
+  };
+
+  useEffect(() => {
+    if (commitLocalDeliveryOnVerify && localDeliveryArmed && zipCheckStatus === 'success' && isZipAvailable) {
+      setLocalDeliveryArmed(false);
+      onMethodChange('local_delivery');
+    }
+  }, [commitLocalDeliveryOnVerify, localDeliveryArmed, zipCheckStatus, isZipAvailable, zipCheckResult, onMethodChange]);
+
+  const showZipInput = isLocalDeliverySelected || localDeliveryArmed;
   const canCheckZip = activeZip.length === 5 && zipCheckStatus !== 'success';
   const showZipCheckButton = isLocalDeliverySelected && activeZip.length >= 5;
 
@@ -60,7 +80,6 @@ export function ShippingSelector({
     const methodLabel = method.label || SHIPPING_METHOD_LABELS[methodType] || 'Unknown';
     const methodCost = method.cost;
     const methodWindow = method.deliveryWindow;
-    const methodZipRequired = method.zipRequired === true;
 
     const disabled = methodType === 'local_delivery' && localDeliveryDisabled && !isZipAvailable;
 
@@ -68,7 +87,7 @@ export function ShippingSelector({
       <button
         key={methodType || idx}
         type="button"
-        onClick={() => onMethodChange(methodType)}
+        onClick={() => handleMethodButtonClick(methodType)}
         disabled={disabled}
         className={`rounded-xl border px-4 py-3 text-left transition relative ${
           selectedMethod === methodType
@@ -83,15 +102,16 @@ export function ShippingSelector({
             {zipCheckResult.deliveryWindow || methodWindow ? ` • Delivery: ${zipCheckResult.deliveryWindow || methodWindow}` : ''}
           </div>
         )}
-        {methodZipRequired && (
-          <div className="text-sm text-gray-600">Enter ZIP to enable Local Delivery</div>
+        {methodType === 'local_delivery' && isZipChecking && (
+          <div className="text-sm text-gray-600">Checking availability…</div>
         )}
-        {!isZipAvailable && selectedMethod === methodType && zipCheckStatus !== 'idle' && (
-          <div className="text-sm text-gray-600">
-            {isZipUnavailable ? 'Not available in your area' : isZipError ? 'Check failed - try again' : 'Checking...'}
-          </div>
+        {methodType === 'local_delivery' && isZipError && (
+          <div className="text-sm text-gray-600">Check failed - try again</div>
         )}
-        {methodType === 'local_delivery' && selectedMethod !== 'local_delivery' && !methodZipRequired && (
+        {methodType === 'local_delivery' && zipCheckStatus === 'success' && !isZipAvailable && (
+          <div className="text-sm text-gray-600">Not available in your area</div>
+        )}
+        {methodType === 'local_delivery' && zipCheckStatus === 'idle' && !isZipAvailable && (
           <div className="text-sm text-gray-600">Enter ZIP to check availability</div>
         )}
         {disabled && methodType === 'local_delivery' && !isZipAvailable && (
@@ -122,7 +142,7 @@ export function ShippingSelector({
       </button>
       <button
         type="button"
-        onClick={() => onMethodChange('local_delivery')}
+        onClick={() => handleMethodButtonClick('local_delivery')}
         disabled={localDeliveryDisabled && !isZipAvailable}
         className={`rounded-xl border px-4 py-3 text-left transition relative ${
           selectedMethod === 'local_delivery'
@@ -131,12 +151,16 @@ export function ShippingSelector({
         } ${localDeliveryDisabled && !isZipAvailable ? 'opacity-60 cursor-not-allowed' : ''}`}
       >
         <div className="font-semibold text-gray-900">Local Delivery</div>
-        {!isZipAvailable && selectedMethod === 'local_delivery' && zipCheckStatus !== 'idle' && (
-          <div className="text-sm text-gray-600">
-            {isZipUnavailable ? 'Not available in your area' : isZipError ? 'Check failed - try again' : 'Checking...'}
-          </div>
+        {isZipChecking && (
+          <div className="text-sm text-gray-600">Checking availability…</div>
         )}
-        {selectedMethod !== 'local_delivery' && (
+        {isZipError && (
+          <div className="text-sm text-gray-600">Check failed - try again</div>
+        )}
+        {zipCheckStatus === 'success' && !isZipAvailable && (
+          <div className="text-sm text-gray-600">Not available in your area</div>
+        )}
+        {zipCheckStatus === 'idle' && !isZipAvailable && (
           <div className="text-sm text-gray-600">Enter ZIP to check availability</div>
         )}
         {localDeliveryDisabled && !isZipAvailable && (
@@ -188,7 +212,7 @@ export function ShippingSelector({
         </div>
       )}
 
-      {isLocalDeliverySelected && (
+      {(isLocalDeliverySelected || localDeliveryArmed) && (
         <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
           {!zipValue && (
             <div className="flex items-center gap-3">
