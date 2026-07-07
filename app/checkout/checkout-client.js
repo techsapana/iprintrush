@@ -607,7 +607,7 @@ const handleApplyCoupon = (e) => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Upload Your Design (Optional but recommended)</h2>
               <p className="text-sm text-gray-600 mb-4">
-                Upload your final design now, or continue and uploads it later from dashboard.
+                Upload your final design now, or continue and upload it later from dashboard.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 mb-4">
                 <Button
