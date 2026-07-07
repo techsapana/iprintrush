@@ -13,8 +13,14 @@ import { clearBuyNowItems, requireLoginForCheckout } from '../lib/checkoutFlow';
 export default function CartPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
-  const { items, removeFromCart, updateQuantity, getTotal, clearCart } =
-    useCart();
+  const {
+    items,
+    removeFromCart,
+    updateQuantity,
+    updateQuoteQuantity,
+    getTotal,
+    clearCart,
+  } = useCart();
   const eligibility = useSameDayEligibility();
 
   const handleEditItem = (item) => {
@@ -88,6 +94,10 @@ export default function CartPage() {
                     item.options?.splitQuote === true ||
                     item.options?.customLineTotal != null;
 
+                  const canEditQuoteQuantity =
+                    !!item.options?.quotePayload &&
+                    item.options?.splitQuote !== true;
+
                   return (
                     <div
                       key={idx}
@@ -143,7 +153,7 @@ export default function CartPage() {
                         <div
                           className="flex items-center gap-2 mt-4"
                           title={
-                            isQuoteItem
+                            isQuoteItem && !canEditQuoteQuantity
                               ? 'Edit product to change quantity'
                               : undefined
                           }
@@ -168,6 +178,36 @@ export default function CartPage() {
                               <button
                                 onClick={() =>
                                   updateQuantity(
+                                    item.id,
+                                    item.quantity + 1,
+                                    item.options,
+                                  )
+                                }
+                                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
+                              >
+                                +
+                              </button>
+                            </>
+                          ) : canEditQuoteQuantity ? (
+                            <>
+                              <button
+                                onClick={() =>
+                                  updateQuoteQuantity(
+                                    item.id,
+                                    Math.max(1, item.quantity - 1),
+                                    item.options,
+                                  )
+                                }
+                                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
+                              >
+                                −
+                              </button>
+                              <span className="px-4 py-1 border border-gray-300 rounded">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  updateQuoteQuantity(
                                     item.id,
                                     item.quantity + 1,
                                     item.options,
