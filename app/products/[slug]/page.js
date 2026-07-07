@@ -24,6 +24,7 @@ import {
   requireLoginForCheckout,
 } from '../../lib/checkoutFlow';
 import { readQuotePrefill, clearQuotePrefill } from '../../lib/quotePrefill';
+import { clearQuoteDraft } from '../../lib/quoteDraft';
 
 export default function ProductDetailPage({ params }) {
   // Await params promise
@@ -243,6 +244,7 @@ export default function ProductDetailPage({ params }) {
     }));
 
   const handleAddToCart = () => {
+    clearQuoteDraft(product.id);
     if (currentQuote) {
       const entries = buildQuoteCartEntries();
       entries.forEach((options) => addToCart(product, options));
@@ -260,6 +262,7 @@ const canProceedToPayment = Boolean(
   const handleProceedToPayment = () => {
      if (!canProceedToPayment) return;
      clearBuyNowItems();
+     clearQuoteDraft(product.id);
      const entries = buildQuoteCartEntries();
      saveBuyNowItems(buildBuyNowLines(entries));
      if (!isAuthenticated) {

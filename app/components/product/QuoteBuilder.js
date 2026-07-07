@@ -6,6 +6,7 @@ import { DynamicQuoteBuilder } from './DynamicQuoteBuilder';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
 import { ShippingSelector, getShippingDisplayLabel } from '../shared/ShippingSelector';
+import { saveQuoteDraft, readQuoteDraft, clearQuoteDraft } from '../../lib/quoteDraft';
 
 function debounce(fn, delay) {
   let timeoutId;
@@ -73,8 +74,10 @@ const [availableMethods, setAvailableMethods] = useState([]);
   const [fabricChoice, setFabricChoice] = useState('');
   const isCustomApparels = /custom\s*apparel/i.test(String(productCategory || ''));
 
-  const latestCalcRequestIdRef = useRef(0);
-  const hasEverCalculatedRef = useRef(false);
+   const latestCalcRequestIdRef = useRef(0);
+   const hasEverCalculatedRef = useRef(false);
+   const hydratedRef = useRef(false);
+   const latestDraftRef = useRef(null);
 
   useEffect(() => {
     if (hasCalculated) hasEverCalculatedRef.current = true;
@@ -159,6 +162,22 @@ const [availableMethods, setAvailableMethods] = useState([]);
           initialQuantities[id] = 0;
         });
         setQuantities(initialQuantities);
+
+        // Restore product draft (independent of the Edit-Product prefill flow).
+        // Only when there is no active Edit-Product prefill, and only after
+        // config/productSettings have loaded (so IDs can be validated).
+        if (!prefillQuote?.payload) {
+          const draft = readQuoteDraft(productId);
+          if (draft?.payload) {
+            const sanitized = sanitizeApparelDraft(draft.payload, json.config, json.productSettings);
+            if (sanitized) {
+              applyQuotePrefill(sanitized, draft.summary);
+            } else {
+              clearQuoteDraft(productId);
+            }
+          }
+        }
+        hydratedRef.current = true;
       } catch (err) {
         if (!cancelled) {
           setError(err.message || 'Failed to load quote configuration');
@@ -173,9 +192,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
     };
   }, [productId]);
 
-  useEffect(() => {
-    const p = prefillQuote?.payload;
-    if (!p || !config) return;
+  const applyQuotePrefill = (p, summary) => {
     if (p.decorationOptionId) setDecorationId(p.decorationOptionId);
     if (p.colorOptionId) setColorId(p.colorOptionId);
     if (p.turnaroundOptionId) setTurnaroundId(p.turnaroundOptionId);
@@ -206,11 +223,93 @@ const [availableMethods, setAvailableMethods] = useState([]);
     ) {
       setArtworkConfirmed(true);
     }
-    if (prefillQuote.summary) {
-      setQuoteSummary(prefillQuote.summary);
+    if (summary) {
+      setQuoteSummary(summary);
       setHasCalculated(true);
     }
+  };
+
+  // Drop selections whose option no longer exists in the current config.
+  // If a critical option (decoration/color/turnaround/designer help) is gone,
+  // return null so the caller clears the draft and continues with defaults.
+  const sanitizeApparelDraft = (p, config, productSettings) => {
+    if (!config || !productSettings) return null;
+    const has = (arr, id) => Array.isArray(arr) && arr.some((x) => x && x.id === id);
+    const decOk = !p.decorationOptionId || has(config.decorations, p.decorationOptionId);
+    const colOk = !p.colorOptionId || has(config.colors, p.colorOptionId);
+    const turnOk = !p.turnaroundOptionId || has(config.turnarounds, p.turnaroundOptionId);
+    const dhOk = !p.designerHelpOptionId || has(config.designerHelp, p.designerHelpOptionId);
+    if (!decOk || !colOk || !turnOk || !dhOk) return null;
+    const validSizeIds = new Set(productSettings.sizeOptionIds || []);
+    const sanitized = { ...p };
+    if (Array.isArray(p.printLocationIds)) {
+      sanitized.printLocationIds = p.printLocationIds.filter((id) => has(config.printLocations, id));
+    }
+    if (Array.isArray(p.quantities)) {
+      sanitized.quantities = p.quantities.filter((q) => q && validSizeIds.has(q.sizeId));
+    }
+    return sanitized;
+  };
+
+  const buildDraftPayload = () => ({
+    productId,
+    decorationOptionId: decorationId,
+    colorOptionId: colorId,
+    quantities: Object.entries(quantities)
+      .filter(([, qty]) => (qty || 0) > 0)
+      .map(([sizeId, quantity]) => ({ sizeId, quantity: Number(quantity || 0) })),
+    printLocationIds,
+    turnaroundOptionId: turnaroundId,
+    designerHelpOptionId: designerHelpId,
+    deliveryMethod,
+    isCustomApparels,
+    useMyCloth: fabricChoice === 'own',
+    artworkReady: artworkReadyChoice === 'ready',
+    tempArtworkFiles,
+    artworkFiles,
+    customSizeNote,
+    shippingZip: shippingZip.trim(),
+  });
+
+  useEffect(() => {
+    const p = prefillQuote?.payload;
+    if (!p || !config) return;
+    applyQuotePrefill(p, prefillQuote.summary);
   }, [prefillQuote, config]);
+
+  // Debounced autosave of the serializable quote payload (apparel mode only).
+  // Gated on hydration so it never overwrites a draft with empty defaults.
+  useEffect(() => {
+    if (!hydratedRef.current || configMode !== 'apparel') return;
+    const t = setTimeout(() => {
+      const draft = { payload: buildDraftPayload(), summary: quoteSummary ?? null };
+      latestDraftRef.current = draft;
+      saveQuoteDraft(productId, draft);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [
+    decorationId, colorId, quantities, printLocationIds, turnaroundId, designerHelpId,
+    deliveryMethod, fabricChoice, artworkReadyChoice, tempArtworkFiles, artworkFiles,
+    customSizeNote, shippingZip, quoteSummary, configMode,
+  ]);
+
+  // Flush pending edits on tab hide / unload so the last <500ms changes survive.
+  useEffect(() => {
+    const flush = () => {
+      if (!hydratedRef.current || configMode !== 'apparel') return;
+      saveQuoteDraft(productId, { payload: buildDraftPayload(), summary: quoteSummary ?? null });
+    };
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+    };
+  }, [
+    productId, decorationId, colorId, quantities, printLocationIds, turnaroundId, designerHelpId,
+    deliveryMethod, fabricChoice, artworkReadyChoice, tempArtworkFiles, artworkFiles,
+    customSizeNote, shippingZip, quoteSummary, configMode,
+  ]);
 
   const availableSizes = useMemo(() => {
     if (!config || !productSettings) return [];

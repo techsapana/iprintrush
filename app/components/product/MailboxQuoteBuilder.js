@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { saveQuoteDraft, readQuoteDraft } from '../../lib/quoteDraft';
 
 export function MailboxQuoteBuilder({ productId, productName, pricePerMonth, onQuoteReady }) {
   const [months, setMonths] = useState(1);
@@ -9,6 +10,47 @@ export function MailboxQuoteBuilder({ productId, productName, pricePerMonth, onQ
   const [calculating, setCalculating] = useState(false);
   const [hasCalculated, setHasCalculated] = useState(false);
   const [error, setError] = useState('');
+
+  const hydratedRef = useRef(false);
+  const latestDraftRef = useRef(null);
+
+  useEffect(() => {
+    const draft = readQuoteDraft(productId);
+    if (draft?.payload && typeof draft.payload.months === 'number' && draft.payload.months > 0) {
+      setMonths(draft.payload.months);
+      if (draft.summary) {
+        setQuoteSummary(draft.summary);
+        setHasCalculated(true);
+      }
+    }
+    hydratedRef.current = true;
+  }, [productId]);
+
+  // Debounced autosave of the serializable quote payload.
+  // Gated on hydration so it never overwrites a draft with empty defaults.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const t = setTimeout(() => {
+      const draft = { payload: { mode: 'mailbox', months }, summary: quoteSummary ?? null };
+      latestDraftRef.current = draft;
+      saveQuoteDraft(productId, draft);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [months, quoteSummary]);
+
+  // Flush pending edits on tab hide / unload so the last <500ms changes survive.
+  useEffect(() => {
+    const flush = () => {
+      if (!hydratedRef.current) return;
+      saveQuoteDraft(productId, { payload: { mode: 'mailbox', months }, summary: quoteSummary ?? null });
+    };
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+    };
+  }, [productId, months, quoteSummary]);
 
   const handleCalculate = async () => {
     setError('');

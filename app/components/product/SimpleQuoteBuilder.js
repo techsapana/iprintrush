@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { ShippingSelector, getShippingDisplayLabel } from '../shared/ShippingSelector';
+import { saveQuoteDraft, readQuoteDraft } from '../../lib/quoteDraft';
 
 function debounce(fn, delay) {
   let timeoutId;
@@ -34,34 +35,80 @@ export function SimpleQuoteBuilder({
   const [zipCheckResult, setZipCheckResult] = useState(null);
   const [oversizedDetails, setOversizedDetails] = useState(null);
 
+  const hydratedRef = useRef(false);
+  const latestDraftRef = useRef(null);
+
+  const applyQuotePrefill = (stored, summary) => {
+    if (typeof stored.quantity === 'number') {
+      setQuantity(stored.quantity);
+    }
+    if (stored.deliveryMethod) {
+      setDeliveryMethod(stored.deliveryMethod);
+    }
+    if (stored.shippingZip) {
+      setShippingZip(stored.shippingZip);
+    }
+    if (summary) {
+      setQuoteSummary(summary);
+      setHasCalculated(true);
+    }
+    if (summary?.shippingDecision) {
+      const decision = summary.shippingDecision;
+      if (decision.isOversized && decision.details) {
+        setOversizedDetails({
+          anyOversized: decision.isOversized,
+          widthExceeded: decision.details.widthExceeded,
+          weightExceeded: decision.details.weightExceeded,
+        });
+      }
+    }
+  };
+
+  const buildDraftPayload = () => ({
+    mode: 'simple',
+    quantity,
+    deliveryMethod,
+    shippingZip: shippingZip.trim(),
+  });
+
   useEffect(() => {
     const stored = prefillQuote?.payload;
     if (stored) {
-      if (typeof stored.quantity === 'number') {
-        setQuantity(stored.quantity);
-      }
-      if (stored.deliveryMethod) {
-        setDeliveryMethod(stored.deliveryMethod);
-      }
-      if (stored.shippingZip) {
-        setShippingZip(stored.shippingZip);
-      }
-      if (prefillQuote.summary) {
-        setQuoteSummary(prefillQuote.summary);
-        setHasCalculated(true);
-      }
-      if (prefillQuote.summary?.shippingDecision) {
-        const decision = prefillQuote.summary.shippingDecision;
-        if (decision.isOversized && decision.details) {
-          setOversizedDetails({
-            anyOversized: decision.isOversized,
-            widthExceeded: decision.details.widthExceeded,
-            weightExceeded: decision.details.weightExceeded,
-          });
-        }
+      applyQuotePrefill(stored, prefillQuote.summary);
+    } else {
+      const draft = readQuoteDraft(productId);
+      if (draft?.payload) {
+        applyQuotePrefill(draft.payload, draft.summary);
       }
     }
-  }, [prefillQuote]);
+    hydratedRef.current = true;
+  }, [prefillQuote, productId]);
+
+  // Debounced autosave of the serializable quote payload.
+  // Gated on hydration so it never overwrites a draft with empty defaults.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const t = setTimeout(() => {
+      const draft = { payload: buildDraftPayload(), summary: quoteSummary ?? null };
+      latestDraftRef.current = draft;
+      saveQuoteDraft(productId, draft);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [quantity, deliveryMethod, shippingZip, quoteSummary]);
+
+  // Flush pending edits on tab hide / unload so the last <500ms changes survive.
+  useEffect(() => {
+    const flush = () => {
+      if (!hydratedRef.current) return;
+      saveQuoteDraft(productId, { payload: buildDraftPayload(), summary: quoteSummary ?? null });
+    };
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+    };
+  }, [productId, quantity, deliveryMethod, shippingZip, quoteSummary]);
 
   const quantityMin = useMemo(() => {
     if (productMin == null || productMin === '') return null;

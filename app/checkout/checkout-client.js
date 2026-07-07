@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useCart } from '../hooks/useCart';
 import { useAuth } from '../hooks/useAuth';
 import { SameDayNotice } from '../components/shared/SameDayNotice';
-import { ShippingSelector, getShippingDisplayLabel } from '../components/shared/ShippingSelector';
+import { clearAllQuoteDrafts } from '../lib/quoteDraft';
 import {
   readBuyNowItems,
   clearBuyNowItems,
@@ -398,6 +398,7 @@ const handleApplyCoupon = (e) => {
       if (!res.ok) throw new Error(data?.error || 'Payment initialization failed');
       if (!data?.url) throw new Error('Missing Stripe redirect URL');
       if (isBuyNow) clearBuyNowItems();
+      clearAllQuoteDrafts();
       window.location.href = data.url;
     } catch (err) {
       setPayError(err?.message || 'Payment initialization failed');

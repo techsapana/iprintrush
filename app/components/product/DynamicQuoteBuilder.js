@@ -6,6 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceHTML, buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
 import { ShippingSelector, getShippingDisplayLabel } from '../shared/ShippingSelector';
+import { saveQuoteDraft, readQuoteDraft, clearQuoteDraft } from '../../lib/quoteDraft';
 
 const SHIPPING_METHOD_LABELS = {
   pickup: 'Store Pickup',
@@ -83,8 +84,10 @@ const artworkFileRef = useRef(null);
   const [artworkError, setArtworkError] = useState('');
   const [artworkConfirmed, setArtworkConfirmed] = useState(false);
 
-const latestCalcRequestIdRef = useRef(0);
-  const hasEverCalculatedRef = useRef(false);
+   const latestCalcRequestIdRef = useRef(0);
+   const hasEverCalculatedRef = useRef(false);
+   const hydratedRef = useRef(false);
+   const latestDraftRef = useRef(null);
 
 const [zipCheckStatus, setZipCheckStatus] = useState('idle');
     const [zipCheckResult, setZipCheckResult] = useState(null);
@@ -187,6 +190,22 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
           setHasCalculated(true);
           setStep((json.schema?.groups || []).length + 2);
         }
+
+        // Restore product draft (independent of the Edit-Product prefill flow).
+        // Only when there is no active Edit-Product prefill, and only after
+        // schema/pools have loaded (so selections can be validated).
+        if (!prefillPayload) {
+          const draft = readQuoteDraft(productId);
+          if (draft?.payload) {
+            const sanitized = sanitizeDynamicDraft(draft.payload, json.pools);
+            if (sanitized) {
+              applyQuotePrefill(sanitized, draft.summary, json.schema, json.pools);
+            } else {
+              clearQuoteDraft(productId);
+            }
+          }
+        }
+        hydratedRef.current = true;
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to load configuration');
       } finally {
@@ -196,6 +215,97 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
     load();
     return () => { cancelled = true; };
   }, [productId, prefillQuote]);
+
+  const applyQuotePrefill = (p, summary, schema, pools) => {
+    if (p.selections && typeof p.selections === 'object') {
+      setSelections({ ...p.selections });
+      if (p.selections.width_in != null) setWidthIn(String(p.selections.width_in));
+      if (p.selections.height_in != null) setHeightIn(String(p.selections.height_in));
+    }
+    if (p.deliveryMethod) setDeliveryMethod(p.deliveryMethod);
+    if (p.artworkReady) setArtworkReadyChoice('ready');
+    if (Array.isArray(p.tempArtworkFiles)) setTempArtworkFiles(p.tempArtworkFiles);
+    if (Array.isArray(p.artworkFiles)) {
+      setArtworkFiles(p.artworkFiles);
+      if (!artworkReadyChoice) setArtworkReadyChoice('ready');
+    }
+    if (
+      (Array.isArray(p.tempArtworkFiles) && p.tempArtworkFiles.length > 0) ||
+      (Array.isArray(p.artworkFiles) && p.artworkFiles.length > 0)
+    ) {
+      setArtworkConfirmed(true);
+    }
+    if (typeof p.customSizeNote === 'string') setCustomSizeNote(p.customSizeNote);
+    if (summary) {
+      setQuoteSummary(summary);
+      setHasCalculated(true);
+      const groups = (schema?.groups || []).filter((g) => (pools || []).some((pl) => pl.key === g.poolKey));
+      setStep(groups.length + 2);
+    }
+  };
+
+  // Drop any selection whose pool no longer exists. If no valid selections
+  // remain, return null so the caller clears the draft and continues with defaults.
+  const sanitizeDynamicDraft = (p, pools) => {
+    if (!p || typeof p.selections !== 'object' || !p.selections) return null;
+    const poolKeys = new Set((pools || []).map((pl) => String(pl.key)));
+    if (!poolKeys.size) return null;
+    const sanitizedSelections = {};
+    for (const [k, v] of Object.entries(p.selections)) {
+      if (poolKeys.has(k)) sanitizedSelections[k] = v;
+    }
+    if (Object.keys(sanitizedSelections).length === 0) return null;
+    return { ...p, selections: sanitizedSelections };
+  };
+
+  const buildDraftPayload = () => {
+    const dimensionSelections =
+      widthIn && heightIn && parseFloat(widthIn) > 0 && parseFloat(heightIn) > 0
+        ? { width_in: parseFloat(widthIn), height_in: parseFloat(heightIn) }
+        : {};
+    return {
+      mode: 'print_product',
+      selections: { ...selections, ...dimensionSelections },
+      deliveryMethod,
+      shippingZip: shippingZip.trim(),
+      artworkReady: artworkReadyChoice === 'ready',
+      tempArtworkFiles,
+      artworkFiles,
+      customSizeNote,
+    };
+  };
+
+  // Debounced autosave of the serializable quote payload.
+  // Gated on hydration so it never overwrites a draft with empty defaults.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const t = setTimeout(() => {
+      const draft = { payload: buildDraftPayload(), summary: quoteSummary ?? null };
+      latestDraftRef.current = draft;
+      saveQuoteDraft(productId, draft);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [
+    selections, widthIn, heightIn, deliveryMethod, shippingZip,
+    artworkReadyChoice, tempArtworkFiles, artworkFiles, customSizeNote, quoteSummary,
+  ]);
+
+  // Flush pending edits on tab hide / unload so the last <500ms changes survive.
+  useEffect(() => {
+    const flush = () => {
+      if (!hydratedRef.current) return;
+      saveQuoteDraft(productId, { payload: buildDraftPayload(), summary: quoteSummary ?? null });
+    };
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+    };
+  }, [
+    productId, selections, widthIn, heightIn, deliveryMethod, shippingZip,
+    artworkReadyChoice, tempArtworkFiles, artworkFiles, customSizeNote, quoteSummary,
+  ]);
 
   const poolMap = useMemo(() => new Map(pools.map((p) => [p.key, p])), [pools]);
 
