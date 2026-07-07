@@ -6,8 +6,28 @@ export function computeLineTotal(item) {
   if (item.options?.customLineTotal != null) {
     return Number(item.options.customLineTotal) || 0;
   }
-  if (item.options?.quoteSummary?.grandTotal != null) {
-    return Number(item.options.quoteSummary.grandTotal) || 0;
+  if (item.options?.quoteSummary) {
+    if (item.options.quoteSummary.merchandiseSubtotal != null) {
+      return Number(item.options.quoteSummary.merchandiseSubtotal) || 0;
+    }
+    if (item.options.quoteSummary.subtotal != null) {
+      return Number(item.options.quoteSummary.subtotal) || 0;
+    }
+    if (item.options.quoteSummary.shippingTierSubtotal != null) {
+      return Number(item.options.quoteSummary.shippingTierSubtotal) || 0;
+    }
+  }
+  if (item.shippingTierSubtotal != null) {
+    return Number(item.shippingTierSubtotal) || 0;
+  }
+  if (item.merchandiseSubtotal != null) {
+    return Number(item.merchandiseSubtotal) || 0;
+  }
+  if (item.options?.shippingTierSubtotal != null) {
+    return Number(item.options.shippingTierSubtotal) || 0;
+  }
+  if (item.options?.merchandiseSubtotal != null) {
+    return Number(item.options.merchandiseSubtotal) || 0;
   }
   const qty = Number(item.quantity || 1);
   const base = Number(item.price || 0);

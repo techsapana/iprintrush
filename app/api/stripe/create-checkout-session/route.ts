@@ -367,6 +367,7 @@ export async function POST(req: NextRequest) {
       let hasNonQuoteItem = false;
       let quoteShippingCents = 0;
       let quoteMerchandiseCents = 0;
+      let serverSummary: any = null;
 
       for (const item of payload.items) {
         const p = productMap.get(item.id);
@@ -393,7 +394,7 @@ export async function POST(req: NextRequest) {
             const errData = await calcRes.json().catch(() => ({}));
             return NextResponse.json({ error: errData?.error || 'Quote validation failed' }, { status: 400 });
           }
-          const serverSummary = await calcRes.json();
+          serverSummary = await calcRes.json();
           if (serverSummary.productId !== item.id) {
             await rollback(conn);
             return NextResponse.json({ error: 'Quote product mismatch' }, { status: 400 });
@@ -558,13 +559,6 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
       }
 
       const taxableBaseCents = Math.max(0, subtotalCents - discountCents);
-      let selectedRateMeta: {
-        serviceType: string;
-        serviceName: string;
-        cost: number;
-        estimatedDeliveryDate: string | null;
-        estimatedDeliveryLabel: string | null;
-      } | null = null;
 
       if (normalizedDeliveryMethod === 'pickup' || normalizedDeliveryMethod === 'review_required') {
         if (normalizedDeliveryMethod === 'review_required' && !checkoutCustomer.shippingAddress) {
@@ -654,6 +648,27 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
         }
       }
 
+      if (!hasNonQuoteItem && quoteShippingCents > 0 && isShippingMethod) {
+        shippingCents = quoteShippingCents;
+        shippingMeta = {
+          carrier: normalizedDeliveryMethod === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
+          serviceType: normalizedDeliveryMethod,
+          serviceName: normalizedDeliveryMethod === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
+          estimatedDeliveryDate: null,
+          estimatedDeliveryLabel: null,
+          selectedByCustomer: false,
+          shippingReviewRequired: false,
+          destination: {
+            addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
+            city: checkoutCustomer.shippingCity || 'City',
+            stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
+            postalCode: checkoutCustomer.shippingZip || '',
+            countryCode: 'US',
+          },
+        };
+      }
+
+      // Tax and total are calculated exactly once, after shippingCents is finalized.
       const taxCents = Math.round((taxableBaseCents + shippingCents) * taxRate);
       const totalCents = taxableBaseCents + shippingCents + taxCents;
 
@@ -688,41 +703,6 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
             zip: checkoutCustomer.shippingZip || '',
           }
         : null;
-
-      if (hasNonQuoteItem && isShippingMethod && shippingCents > 0) {
-        const shipLabel = selectedRateMeta?.serviceName
-          ? `Shipping (${selectedRateMeta.serviceName})`
-          : 'Shipping';
-        lineItems.push({
-          quantity: 1,
-          price_data: {
-            currency: 'usd',
-            unit_amount: shippingCents,
-            product_data: { name: shipLabel },
-          },
-        });
-      }
-      // For pure quote orders, shipping is already included in merchandise charge.
-      // Just set shippingCents for DB accounting - do NOT add duplicate line item.
-      if (!hasNonQuoteItem && quoteShippingCents > 0 && isShippingMethod) {
-        shippingCents = quoteShippingCents;
-        shippingMeta = {
-          carrier: normalizedDeliveryMethod === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
-          serviceType: normalizedDeliveryMethod,
-          serviceName: normalizedDeliveryMethod === 'local_delivery' ? 'Local Delivery' : 'Standard Shipping',
-          estimatedDeliveryDate: null,
-          estimatedDeliveryLabel: null,
-          selectedByCustomer: false,
-          shippingReviewRequired: false,
-          destination: {
-            addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
-            city: checkoutCustomer.shippingCity || 'City',
-            stateOrProvinceCode: checkoutCustomer.shippingState || 'CA',
-            postalCode: checkoutCustomer.shippingZip || '',
-            countryCode: 'US',
-          },
-        };
-      }
 
       await ensureOrderShippingColumns();
       const orderColumns = [

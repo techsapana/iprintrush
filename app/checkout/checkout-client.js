@@ -12,6 +12,7 @@ import {
   readBuyNowItems,
   clearBuyNowItems,
   computeItemsSubtotal,
+  computeItemsMerchandiseSubtotal,
   computeLineTotal,
   requireLoginForCheckout,
 } from '../lib/checkoutFlow';
@@ -408,7 +409,7 @@ const handleApplyCoupon = (e) => {
     cartItemsCount: cartItems?.length,
     isAuthenticated
   });
-  const subtotal = computeItemsSubtotal(checkoutItems);
+  const subtotal = computeItemsMerchandiseSubtotal(checkoutItems);
   const discount = appliedCoupon
     ? (subtotal || 0) * ((couponLookup[appliedCoupon] || 0) / 100)
     : 0;
