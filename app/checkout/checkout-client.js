@@ -97,6 +97,14 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleMethodSelect = (methodType) => {
+    setSelectedMethod(methodType);
+    setFormData((prev) => ({
+      ...prev,
+      deliveryMethod: methodType === 'pickup' ? 'pickup' : 'shipping',
+    }));
+  };
+
   const handleDesignFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -174,14 +182,7 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     }, [checkoutItems]);
 
 useEffect(() => {
-    if (formData.deliveryMethod !== 'shipping') {
-      setShippingMethods([]);
-      setSelectedMethod(null);
-      setZipCheckStatus('idle');
-      setZipCheckResult(null);
-      setOversizedDetails(null);
-      return;
-    }
+    if (!sessionReady || checkoutItems.length === 0) return;
     const fetchMethods = async () => {
       setShippingMethodsLoading(true);
       try {
@@ -219,7 +220,7 @@ useEffect(() => {
       }
     };
     fetchMethods();
-  }, [formData.deliveryMethod, checkoutItems]);
+  }, [sessionReady, checkoutItems]);
 
   const handleZipCheck = async (zip) => {
     if (!zip || zip.length !== 5) {
@@ -281,6 +282,7 @@ useEffect(() => {
       shippingMethods.some((m) => m.type === 'pickup')
     ) {
       setSelectedMethod('pickup');
+      setFormData((prev) => ({ ...prev, deliveryMethod: 'pickup' }));
     }
   }, [shippingMethods, selectedMethod]);
 
@@ -291,6 +293,7 @@ useEffect(() => {
       shippingMethods.some((m) => m.type === 'pickup')
     ) {
       setSelectedMethod('pickup');
+      setFormData((prev) => ({ ...prev, deliveryMethod: 'pickup' }));
     }
   }, [shippingMethods, selectedMethod]);
 
@@ -415,7 +418,7 @@ const handleApplyCoupon = (e) => {
     : 0;
   const taxableBase = Math.max(0, (subtotal || 0) - discount);
   const shippingAmount =
-    formData.deliveryMethod === 'shipping'
+    selectedMethod && selectedMethod !== 'pickup'
       ? Number(shippingMethods.find((m) => m.type === selectedMethod)?.cost || 0)
       : 0;
   const taxAmount = (taxableBase + shippingAmount) * ((Number(taxRatePercent) || 0) / 100);
@@ -478,21 +481,65 @@ const handleApplyCoupon = (e) => {
             <SameDayNotice />
 
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Delivery Method</h2>
-              <div className="space-y-3">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="radio" name="deliveryMethod" value="pickup" checked={formData.deliveryMethod === 'pickup'} onChange={handleInputChange} />
-                  <span>Store pickup</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="radio" name="deliveryMethod" value="shipping" checked={formData.deliveryMethod === 'shipping'} onChange={handleInputChange} />
-                  <span>Ship to address</span>
-                </label>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Method</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {shippingMethods.length > 0
+                  ? shippingMethods.map((method) => {
+                      const methodType = method.type || method.id;
+                      const methodLabel = method.label || methodType;
+                      const isSelected = selectedMethod === methodType;
+                      const isLocalDelivery = methodType === 'local_delivery';
+                      const isDisabled = isLocalDelivery && zipCheckStatus !== 'success' && zipCheckStatus !== 'idle';
+                      return (
+                        <button
+                          key={methodType}
+                          type="button"
+                          onClick={() => handleMethodSelect(methodType)}
+                          disabled={isDisabled}
+                          className={`rounded-xl border px-4 py-3 text-left transition relative ${
+                            isSelected
+                              ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
+                              : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
+                          } ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        >
+                          <div className="font-semibold text-gray-900">{methodLabel}</div>
+                          {methodType === 'local_delivery' && zipCheckStatus === 'success' && zipCheckResult && (
+                            <div className="text-sm text-gray-600">
+                              ${Number(zipCheckResult.cost || method.cost || 0).toFixed(2)} delivery fee
+                              {zipCheckResult.deliveryWindow || method.deliveryWindow ? ` • Delivery: ${zipCheckResult.deliveryWindow || method.deliveryWindow}` : ''}
+                            </div>
+                          )}
+                          {method.zipRequired && (
+                            <div className="text-sm text-gray-600">Enter ZIP to enable Local Delivery</div>
+                          )}
+                          {isLocalDelivery && !isSelected && method.zipRequired && (
+                            <div className="text-sm text-gray-600">Enter ZIP to check availability</div>
+                          )}
+                        </button>
+                      );
+                    })
+                  : shippingMethodsLoading
+                  ? (
+                    <div className="col-span-full text-sm text-gray-500">Loading shipping methods...</div>
+                  )
+                  : (
+                    <div className="col-span-full text-sm text-gray-500">No shipping methods available.</div>
+                  )}
               </div>
+              <ShippingSelector
+                selectedMethod={selectedMethod}
+                onMethodChange={setSelectedMethod}
+                decision={oversizedDetails ? { isOversized: true, details: oversizedDetails } : null}
+                zipCheckStatus={zipCheckStatus}
+                zipCheckResult={zipCheckResult}
+                onZipCheck={handleZipCheck}
+                methods={shippingMethods}
+                zipValue={formData.shippingZip}
+                hideMethods
+              />
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping &amp; Delivery</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">First name</label>
@@ -529,7 +576,7 @@ const handleApplyCoupon = (e) => {
               </div>
             </div>
 
-            {formData.deliveryMethod === 'shipping' && (
+            {selectedMethod && selectedMethod !== 'pickup' && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Address</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -554,22 +601,6 @@ const handleApplyCoupon = (e) => {
                     <input name="shippingZip" value={formData.shippingZip} onChange={handleInputChange} required className={inputClass} maxLength={5} />
                   </div>
                 </div>
-              </div>
-            )}
-
-{formData.deliveryMethod === 'shipping' && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Methods</h2>
-                <ShippingSelector
-                  selectedMethod={selectedMethod}
-                  onMethodChange={setSelectedMethod}
-                  decision={oversizedDetails ? { isOversized: true, details: oversizedDetails } : null}
-                  zipCheckStatus={zipCheckStatus}
-                  zipCheckResult={zipCheckResult}
-                  onZipCheck={handleZipCheck}
-                  methods={shippingMethods}
-                  zipValue={formData.shippingZip}
-                />
               </div>
             )}
 
@@ -719,7 +750,7 @@ const handleApplyCoupon = (e) => {
                     <span>- ${(discount || 0).toFixed(2)}</span>
                   </div>
                 )}
-                {formData.deliveryMethod === 'shipping' && (
+                {selectedMethod && selectedMethod !== 'pickup' && (
                   <div className="flex justify-between items-center text-sm text-gray-700 gap-2">
                     <span className="min-w-0">
                       {shippingMethods.find((m) => m.type === selectedMethod)

@@ -26,6 +26,7 @@ export function ShippingSelector({
   deliveryMethod,
   methods,
   zipValue,
+  hideMethods = false,
 }) {
   const [zipInputValue, setZipInputValue] = useState('');
 
@@ -181,9 +182,11 @@ export function ShippingSelector({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {methods ? methods.map(renderMethodButton) : renderFallbackMethods()}
-      </div>
+      {!hideMethods && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {methods ? methods.map(renderMethodButton) : renderFallbackMethods()}
+        </div>
+      )}
 
       {isLocalDeliverySelected && (
         <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
