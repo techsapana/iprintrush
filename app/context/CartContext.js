@@ -225,8 +225,26 @@ export function CartProvider({ children }) {
       const payload = currentOptions.quotePayload;
       const mode = payload?.mode;
 
-      if (!payload || options?.splitQuote === true) return;
-      if (!SUPPORTED_QUOTE_MODES.includes(mode)) return;
+      console.debug('[CartQtyDebug] updateQuoteQuantity:start', {
+        productId,
+        requestedNewTotal: requested,
+        currentItemQuantity: matched?.quantity,
+        mode,
+        splitQuote: options?.splitQuote === true,
+        hasQuotePayload: !!payload,
+      });
+
+      if (!payload || options?.splitQuote === true) {
+        console.debug('[CartQtyDebug] EARLY_RETURN_NO_PAYLOAD', {
+          hasPayload: !!payload,
+          splitQuote: options?.splitQuote === true,
+        });
+        return;
+      }
+      if (!SUPPORTED_QUOTE_MODES.includes(mode)) {
+        console.debug('[CartQtyDebug] EARLY_RETURN_UNSUPPORTED_MODE', { mode });
+        return;
+      }
 
       const oldTotal = Number(
         currentOptions.quoteSummary?.totalQuantity || matched?.quantity || 1,
@@ -234,7 +252,17 @@ export function CartProvider({ children }) {
 
       // Guard: if the mode-specific quantity field cannot be located, abort
       // to avoid a quantity/price desync.
-      if (mode === 'print_product' && findPrintQuantityKey(payload.selections, oldTotal) == null) {
+      const resolvedQuantityKey =
+        mode === 'print_product'
+          ? findPrintQuantityKey(payload.selections, oldTotal)
+          : undefined;
+      console.debug('[CartQtyDebug] findPrintQuantityKey', {
+        oldTotal,
+        selections: payload.selections,
+        quantityKey: resolvedQuantityKey,
+      });
+      if (mode === 'print_product' && resolvedQuantityKey == null) {
+        console.debug('[CartQtyDebug] EARLY_RETURN_NO_QUANTITY_KEY');
         return;
       }
 
@@ -242,22 +270,51 @@ export function CartProvider({ children }) {
       const myToken = (recalcTokens.current[tokenKey] || 0) + 1;
       recalcTokens.current[tokenKey] = myToken;
 
+      console.debug('[CartQtyDebug] buildUpdatedQuotePayload:input', { payload });
       const updatedPayload = buildUpdatedQuotePayload(
         payload,
         requested,
         oldTotal,
       );
+      console.debug('[CartQtyDebug] buildUpdatedQuotePayload:output', { updatedPayload });
 
       try {
+        console.debug('[CartQtyDebug] FETCH_POST', {
+          url: '/api/quote/calculate',
+          body: updatedPayload,
+        });
         const res = await fetch('/api/quote/calculate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedPayload),
         });
-        if (!res.ok) return; // keep previous cart state
+        console.debug('[CartQtyDebug] FETCH_RESPONSE', {
+          status: res.status,
+          statusText: res.statusText,
+          ok: res.ok,
+        });
+        if (!res.ok) {
+          let bodyText = '';
+          try {
+            bodyText = await res.text();
+          } catch {
+            // ignore body read failure
+          }
+          console.debug('[CartQtyDebug] API_ERROR', {
+            status: res.status,
+            body: bodyText,
+          });
+          return; // keep previous cart state
+        }
         const summary = await res.json();
+        console.debug('[CartQtyDebug] RESPONSE_JSON', { summary });
         if (recalcTokens.current[tokenKey] !== myToken) return; // stale
 
+        console.debug('[CartQtyDebug] APPLY_CART_UPDATE', {
+          productId,
+          newQuantity: requested,
+          grandTotal: summary?.grandTotal,
+        });
         setItems((prevItems) =>
           prevItems.map((it) => {
             if (
@@ -284,7 +341,11 @@ export function CartProvider({ children }) {
             };
           }),
         );
-      } catch {
+      } catch (err) {
+        console.debug('[CartQtyDebug] CATCH_ERROR', {
+          error: err,
+          stack: err?.stack,
+        });
         // Network/server error: keep previous cart state, no partial update.
       }
     },
