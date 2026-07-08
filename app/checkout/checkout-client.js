@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useCart } from '../hooks/useCart';
 import { useAuth } from '../hooks/useAuth';
 import { SameDayNotice } from '../components/shared/SameDayNotice';
+import { ShippingSelector } from '../components/shared/ShippingSelector';
 import { clearAllQuoteDrafts } from '../lib/quoteDraft';
 import {
   readBuyNowItems,
