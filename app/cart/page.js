@@ -161,13 +161,18 @@ export default function CartPage() {
                           {!isQuoteItem ? (
                             <>
                               <button
-                                onClick={() =>
+                                onClick={() => {
+                                  console.debug('[BranchA -]', {
+                                    product: item.name,
+                                    id: item.id,
+                                    quantity: item.quantity,
+                                  });
                                   updateQuantity(
                                     item.id,
                                     Math.max(1, item.quantity - 1),
                                     item.options,
-                                  )
-                                }
+                                  );
+                                }}
                                 className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
                               >
                                 −
@@ -176,13 +181,18 @@ export default function CartPage() {
                                 {item.quantity}
                               </span>
                               <button
-                                onClick={() =>
+                                onClick={() => {
+                                  console.debug('[BranchA +]', {
+                                    product: item.name,
+                                    id: item.id,
+                                    quantity: item.quantity,
+                                  });
                                   updateQuantity(
                                     item.id,
                                     item.quantity + 1,
                                     item.options,
-                                  )
-                                }
+                                  );
+                                }}
                                 className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
                               >
                                 +
