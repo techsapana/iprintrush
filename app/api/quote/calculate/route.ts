@@ -219,6 +219,7 @@ quantityTiers: tiersToUse.map((t: any) => ({
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
+    console.error('[Q] entry', payload?.mode, payload?.productId, 'sel=' + !!payload?.selections);
 
     // Handle mailbox mode separately (no unification needed - different domain)
     if (payload.mode === 'mailbox') {
@@ -240,9 +241,10 @@ export async function POST(req: NextRequest) {
       return handlePrintProductQuote(payload);
     }
 
+    console.error('[Q] early-return invalid-mode', payload?.mode, 'hasSel=' + !!payload?.selections);
     return NextResponse.json({ error: 'Invalid quote mode specified' }, { status: 400 });
   } catch (err: any) {
-    console.error('Quote calculation error:', err);
+    console.error('[Q] catch', 'msg=' + err?.message, 'code=' + err?.code);
     return NextResponse.json({ error: err?.message ?? 'Failed to calculate quote' }, { status: 400 });
   }
 }
@@ -365,6 +367,7 @@ async function handleSimpleQuote(payload: SimpleQuoteRequestPayload) {
   });
 
   // Use the unified engine
+
   const summary = calculateUnifiedQuote(
     config,
     [],
@@ -388,7 +391,7 @@ async function handleSimpleQuote(payload: SimpleQuoteRequestPayload) {
   } else if (normalizeDeliveryMethod(payload.deliveryMethod) === 'local_delivery') {
     summary.shipping = 0;
     summary.grandTotal = summary.subtotal;
-    summary.localDeliveryZone = { available: false };
+   summary.localDeliveryZone = zoneResult;
   }
 
   const valueBounds = await getProductOrderValueBounds(productId);
@@ -517,7 +520,7 @@ async function handleApparelQuote(payload: QuoteRequestPayload) {
   } else if (normalizeDeliveryMethod(payload.deliveryMethod) === 'local_delivery') {
     summary.shipping = 0;
     summary.grandTotal = summary.subtotal;
-    summary.localDeliveryZone = { available: false };
+    summary.localDeliveryZone = zoneResult;
   }
 
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
@@ -544,6 +547,7 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
     'SELECT p.id, p.price, p.min_width_in, p.max_width_in, p.min_height_in, p.max_height_in, p.price_per_sq_inch, c.customization_schema FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?',
     [payload.productId],
   );
+  console.error('[Q] db1 product', 'found=' + !!productWithCat, 'hasSchema=' + !!productWithCat?.customization_schema);
 
   let schema: any = { mode: 'print_product', groups: [] };
   if (productWithCat?.customization_schema) {
@@ -556,12 +560,14 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
 
   const { getDynamicConfig } = await import('@/app/lib/dynamicQuoteConfig');
   const { pools } = await getDynamicConfig(payload.productId, schema);
+  console.error('[Q] dynamic-config', 'pools=' + (pools?.length ?? 0));
 
   // Normalize delivery method before shipping decisions and quote calculation.
   const normalizedDeliveryMethod = normalizeDeliveryMethod(payload.deliveryMethod);
 
   // Get config for apparel-style options
   const config = await getConfigWithCustomPrices(payload.productId);
+  console.error('[Q] config', 'qtyTiers=' + config?.quantityTiers?.length, 'base=' + config?.baseUnitPrice);
 
   const productEligibility = await queryOne(
     'SELECT local_delivery_eligible FROM products WHERE id = ? LIMIT 1',
@@ -578,6 +584,7 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
     ...payload,
     deliveryMethod: normalizedDeliveryMethod,
   }, pools);
+  console.error('[Q] normalized', 'totalQty=' + unifiedRequest?.quantityBreakdown?.reduce((s, q) => s + q.quantity, 0));
 
   // Validate quantity
   const totalQty = unifiedRequest.quantityBreakdown.reduce((sum, q) => sum + q.quantity, 0);
@@ -598,7 +605,9 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
     : undefined;
 
   // Use the unified engine - shipping is calculated from DB config
+  console.error('[Q] calc-in', payload?.productId);
   const summary = calculateUnifiedQuote(config, pools, unifiedRequest, dimensionPricing, payload.shippingState, payload.shippingZip);
+  console.error('[Q] calc-out', 'subtotal=' + summary?.subtotal, 'gt=' + summary?.grandTotal);
 
   const shippingDecision = resolveShippingDecisionForQuote({
     productId: payload.productId,
@@ -610,6 +619,7 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
     shippingConfig: config.shipping,
     mode: 'print_product',
   });
+  console.error('[Q] shipping', 'status=' + shippingDecision?.status);
 
   if (zoneResult.available && normalizedDeliveryMethod === 'local_delivery') {
     const shippingAmount = summary.subtotal >= zoneResult.freeMinimum ? 0 : zoneResult.fee;
@@ -624,11 +634,12 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
   } else if (normalizedDeliveryMethod === 'local_delivery') {
     summary.shipping = 0;
     summary.grandTotal = summary.subtotal;
-    summary.localDeliveryZone = { available: false };
+   summary.localDeliveryZone = zoneResult;
   }
 
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
   assertTotalValueWithinProductBounds(summary.subtotal, valueBounds);
 
+  console.error('[Q] return-200', payload?.productId);
   return NextResponse.json({ ...summary, shippingDecision });
 }
