@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { beginTransaction, commit, rollback, query, queryOne } from '@/app/lib/db';
 import { getStripe } from '@/app/lib/stripe';
+import Stripe from 'stripe';
 import { getCustomerFromRequest } from '@/app/lib/customerAuth';
 import { mkdir, rename } from 'fs/promises';
 import path from 'path';
@@ -23,6 +24,8 @@ const CreateCheckoutSessionSchema = z.object({
         quotePayload: z.any().optional(),
         customizationsDisplay: z.record(z.string()).optional(),
         splitQuote: z.boolean().optional(),
+        splitGroupId: z.string().optional(),
+        splitSizeLabel: z.string().optional(),
         artworkReady: z.boolean().optional(),
         tempArtworkFiles: z.array(z.string()).optional(),
         artworkFiles: z.array(z.string()).optional(),
@@ -278,18 +281,8 @@ export async function POST(req: NextRequest) {
 
     const stripe = getStripe();
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
-    const checkoutCustomer = (payload.customer || {}) as {
-      deliveryMethod?: 'pickup' | 'local_delivery' | 'standard_shipping' | 'review_required' | 'shipping';
-      selectedShipping?: { serviceType: string; cost: number };
-      shippingAddress?: string;
-      shippingCity?: string;
-      shippingState?: string;
-      shippingZip?: string;
-      shippingRatesUnavailable?: boolean;
-      useRuleBasedShipping?: boolean;
-      selectedMethod?: string;
-      shippingMethodsData?: { type?: string; id?: string; serviceType?: string; label?: string; cost: number } | null;
-    } & Record<string, unknown>;
+    type CheckoutCustomer = NonNullable<z.infer<typeof CreateCheckoutSessionSchema>['customer']>;
+    const checkoutCustomer = (payload.customer || {}) as CheckoutCustomer;
 
     const normalizedDeliveryMethod = normalizeCheckoutDeliveryMethod(
       checkoutCustomer.deliveryMethod,
@@ -368,6 +361,7 @@ export async function POST(req: NextRequest) {
       let quoteShippingCents = 0;
       let quoteMerchandiseCents = 0;
       let serverSummary: any = null;
+      const isShippingMethod = normalizedDeliveryMethod === 'local_delivery' || normalizedDeliveryMethod === 'standard_shipping';
 
       for (const item of payload.items) {
         const p = productMap.get(item.id);
@@ -593,13 +587,6 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
           }
           const localCost = tierSubtotal >= zone.free_delivery_minimum ? 0 : zone.delivery_fee;
           shippingCents = toCents(localCost);
-          selectedRateMeta = {
-            serviceType: 'local_delivery',
-            serviceName: 'Local Delivery',
-            cost: localCost,
-            estimatedDeliveryDate: null,
-            estimatedDeliveryLabel: null,
-          };
           shippingMeta = {
             carrier: 'Local Delivery',
             serviceType: 'local_delivery',
@@ -622,13 +609,6 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
         } else {
           const standardCost = getShippingCost(tierSubtotal, 'standard_shipping', shippingConfig);
           shippingCents = toCents(standardCost);
-          selectedRateMeta = {
-            serviceType: 'standard_shipping',
-            serviceName: 'Standard Shipping',
-            cost: standardCost,
-            estimatedDeliveryDate: null,
-            estimatedDeliveryLabel: null,
-          };
           shippingMeta = {
             carrier: 'Standard Shipping',
             serviceType: 'standard_shipping',
@@ -657,7 +637,7 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
           estimatedDeliveryDate: null,
           estimatedDeliveryLabel: null,
           selectedByCustomer: false,
-          shippingReviewRequired: false,
+          shippingReviewRequired,
           destination: {
             addressLines: [checkoutCustomer.shippingAddress || 'Address Line'],
             city: checkoutCustomer.shippingCity || 'City',
@@ -673,7 +653,6 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
       const totalCents = taxableBaseCents + shippingCents + taxCents;
 
       const orderNumber = makeOrderNumber();
-      const isShippingMethod = normalizedDeliveryMethod === 'local_delivery' || normalizedDeliveryMethod === 'standard_shipping';
       const requiresShippingAddress =
         isShippingMethod || normalizedDeliveryMethod === 'review_required';
       if (
@@ -745,7 +724,7 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
         checkoutCustomer.notes || null,
         normalizedDeliveryMethod,
         shippingMeta?.carrier || null,
-        shippingMeta?.serviceType || selectedRateMeta?.serviceType || null,
+        shippingMeta?.serviceType || null,
         shippingMeta ? JSON.stringify(shippingMeta) : null,
         shippingReviewRequired,
       ];
@@ -754,13 +733,13 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
       const hasDeliveryCol = await queryOne(`SHOW COLUMNS FROM orders LIKE 'estimated_delivery_date'`);
       if (hasServiceNameCol) {
         orderColumns.push('shipping_service_name');
-        orderValues.push(selectedRateMeta?.serviceName || shippingMeta?.serviceName || null);
+        orderValues.push(shippingMeta?.serviceName || null);
       }
       if (hasDeliveryCol) {
         orderColumns.push('estimated_delivery_date');
         orderValues.push(
-          selectedRateMeta?.estimatedDeliveryDate ||
-            selectedRateMeta?.estimatedDeliveryLabel ||
+          shippingMeta?.estimatedDeliveryDate ||
+            shippingMeta?.estimatedDeliveryLabel ||
             null,
         );
       }

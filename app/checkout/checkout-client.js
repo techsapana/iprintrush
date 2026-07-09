@@ -95,12 +95,11 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
 
   const handleMethodSelect = (methodType) => {
     setSelectedMethod(methodType);
-    if (methodType !== 'local_delivery') {
-      setZipCheckStatus('idle');
-      setZipCheckResult(null);
-    }
+    setZipCheckStatus('idle');
+    setZipCheckResult(null);
     setFormData((prev) => ({
       ...prev,
+      shippingZip: '',
       deliveryMethod: methodType === 'pickup' ? 'pickup' : 'shipping',
     }));
   };
@@ -366,6 +365,8 @@ const handleApplyCoupon = (e) => {
             quotePayload: i.options?.quotePayload,
             customizationsDisplay: i.options?.customizationsDisplay,
             splitQuote: i.options?.splitQuote === true,
+            splitGroupId: i.options?.splitGroupId,
+            splitSizeLabel: i.options?.splitSizeLabel,
             artworkReady: i.options?.artworkReady === true,
             tempArtworkFiles: i.options?.tempArtworkFiles || [],
             artworkFiles: i.options?.artworkFiles || [],
