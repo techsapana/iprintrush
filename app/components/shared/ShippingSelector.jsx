@@ -65,7 +65,7 @@ export function ShippingSelector({
   useEffect(() => {
     if (commitLocalDeliveryOnVerify && localDeliveryArmed && zipCheckStatus === 'success' && isZipAvailable) {
       setLocalDeliveryArmed(false);
-      onMethodChange('local_delivery');
+      onMethodChange('local_delivery', { preserveZipVerification: true });
     }
   }, [commitLocalDeliveryOnVerify, localDeliveryArmed, zipCheckStatus, isZipAvailable, zipCheckResult, onMethodChange]);
 

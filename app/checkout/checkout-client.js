@@ -93,13 +93,15 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleMethodSelect = (methodType) => {
+  const handleMethodSelect = (methodType, options) => {
     setSelectedMethod(methodType);
-    setZipCheckStatus('idle');
-    setZipCheckResult(null);
+    if (!options?.preserveZipVerification) {
+      setZipCheckStatus('idle');
+      setZipCheckResult(null);
+    }
     setFormData((prev) => ({
       ...prev,
-      shippingZip: '',
+      shippingZip: options?.preserveZipVerification ? prev.shippingZip : '',
       deliveryMethod: methodType === 'pickup' ? 'pickup' : 'shipping',
     }));
   };
@@ -253,9 +255,12 @@ useEffect(() => {
           setOversizedDetails(null);
         }
         const hasLocal = data.methods.some((m) => m.type === 'local_delivery');
-        setZipCheckStatus(hasLocal ? 'success' : 'unavailable');
+        const localDeliveryAvailable = data.methods.some(
+          (m) => m.type === 'local_delivery' && m.available !== false
+        );
+        setZipCheckStatus('success');
         setZipCheckResult({
-          available: hasLocal,
+          available: localDeliveryAvailable,
           cost: data.methods.find((m) => m.type === 'local_delivery')?.cost || 0,
           deliveryWindow: data.methods.find((m) => m.type === 'local_delivery')?.deliveryWindow || null,
         });
