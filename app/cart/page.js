@@ -191,13 +191,21 @@ export default function CartPage() {
                           ) : canEditQuoteQuantity ? (
                             <>
                               <button
-                                onClick={() =>
+                                onClick={() => {
+                                  console.debug('[CartClick]', {
+                                    productId: item.id,
+                                    name: item.name,
+                                    quantity: item.quantity,
+                                    mode: item.options?.quotePayload?.mode,
+                                    splitQuote: item.options?.splitQuote,
+                                  });
                                   updateQuoteQuantity(
                                     item.id,
                                     Math.max(1, item.quantity - 1),
                                     item.options,
-                                  )
-                                }
+                                  );
+                                  console.debug('[CartClick] after updateQuoteQuantity');
+                                }}
                                 className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
                               >
                                 −
@@ -206,13 +214,21 @@ export default function CartPage() {
                                 {item.quantity}
                               </span>
                               <button
-                                onClick={() =>
+                                onClick={() => {
+                                  console.debug('[CartClick]', {
+                                    productId: item.id,
+                                    name: item.name,
+                                    quantity: item.quantity,
+                                    mode: item.options?.quotePayload?.mode,
+                                    splitQuote: item.options?.splitQuote,
+                                  });
                                   updateQuoteQuantity(
                                     item.id,
                                     item.quantity + 1,
                                     item.options,
-                                  )
-                                }
+                                  );
+                                  console.debug('[CartClick] after updateQuoteQuantity');
+                                }}
                                 className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
                               >
                                 +
