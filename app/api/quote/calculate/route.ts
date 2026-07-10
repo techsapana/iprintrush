@@ -220,6 +220,7 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
     console.error('[Q] entry', payload?.mode, payload?.productId, 'sel=' + !!payload?.selections);
+    console.error('[DBG][POST] entry', { productId: payload?.productId, mode: payload?.mode });
 
     // Handle mailbox mode separately (no unification needed - different domain)
     if (payload.mode === 'mailbox') {
@@ -541,6 +542,7 @@ async function handleApparelQuote(payload: QuoteRequestPayload) {
 }
 
 async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
+  console.error('[DBG][HANDLE_PRINT] entry', { productId: payload?.productId, mode: payload?.mode, hasSelections: !!payload?.selections });
   const qtyBounds = await getProductQuantityBounds(String(payload.productId));
 
   const productWithCat = await queryOne(
@@ -559,8 +561,9 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
   }
 
   const { getDynamicConfig } = await import('@/app/lib/dynamicQuoteConfig');
-  const { pools } = await getDynamicConfig(payload.productId, schema);
-  console.error('[Q] dynamic-config', 'pools=' + (pools?.length ?? 0));
+    const { pools } = await getDynamicConfig(payload.productId, schema);
+    console.error('[DBG][AFTER_GET_DYNAMIC_CONFIG]', { productId: payload?.productId, poolCount: pools?.length ?? 0, poolKeys: (pools as any[]).map(p => p?.key) });
+    console.error('[Q] dynamic-config', 'pools=' + (pools?.length ?? 0));
 
   // Normalize delivery method before shipping decisions and quote calculation.
   const normalizedDeliveryMethod = normalizeDeliveryMethod(payload.deliveryMethod);
@@ -605,8 +608,18 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
     : undefined;
 
   // Use the unified engine - shipping is calculated from DB config
-  console.error('[Q] calc-in', payload?.productId);
-  const summary = calculateUnifiedQuote(config, pools, unifiedRequest, dimensionPricing, payload.shippingState, payload.shippingZip);
+    console.error('[Q] calc-in', payload?.productId);
+    console.error('[DBG][BEFORE_CALC]', {
+      productId: payload?.productId,
+      configBaseUnitPrice: config?.baseUnitPrice,
+      configQtyTierCount: config?.quantityTiers?.length ?? 0,
+      poolCount: pools?.length ?? 0,
+      poolKeys: (pools as any[]).map(p => p?.key),
+      qtyBreakdown: (unifiedRequest?.quantityBreakdown || []).map((q: any) => ({ key: q?.key, qty: q?.quantity })),
+      selectionKeys: Object.keys(unifiedRequest?.selections || {}),
+      dimensionPricing: dimensionPricing ? { pricePerSqInch: dimensionPricing.pricePerSqInch, hasMinWidth: dimensionPricing.minWidthIn != null } : null,
+    });
+    const summary = calculateUnifiedQuote(config, pools, unifiedRequest, dimensionPricing, payload.shippingState, payload.shippingZip);
   console.error('[Q] calc-out', 'subtotal=' + summary?.subtotal, 'gt=' + summary?.grandTotal);
 
   const shippingDecision = resolveShippingDecisionForQuote({
@@ -640,6 +653,7 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
   assertTotalValueWithinProductBounds(summary.subtotal, valueBounds);
 
-  console.error('[Q] return-200', payload?.productId);
-  return NextResponse.json({ ...summary, shippingDecision });
+    console.error('[Q] return-200', payload?.productId);
+    console.error('[DBG][BEFORE_RETURN]', { productId: payload?.productId, subtotal: summary?.subtotal, grandTotal: summary?.grandTotal, shippingStatus: shippingDecision?.status });
+    return NextResponse.json({ ...summary, shippingDecision });
 }

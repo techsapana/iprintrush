@@ -856,8 +856,11 @@ export function calculateUnifiedQuote(
   state?: string,
   zip?: string,
   options: { allowZeroQuote?: boolean } = {},
-): QuoteSummary {
-  const { mode, quantityBreakdown, selections, deliveryMethod, useMyCloth } = unifiedRequest;
+  ): QuoteSummary {
+  const __t0 = Date.now();
+  console.error('[DBG][CALC_UNIFIED] entry', { productId: (unifiedRequest as any)?.productId, mode: (unifiedRequest as any)?.mode });
+  try {
+    const { mode, quantityBreakdown, selections, deliveryMethod, useMyCloth } = unifiedRequest;
   const normalizedDeliveryMethod = normalizeDeliveryMethod(deliveryMethod);
 
   // Calculate total quantity from normalized breakdown
@@ -1018,6 +1021,7 @@ export function calculateUnifiedQuote(
     quantity: q.quantity,
   }));
 
+  console.error('[DBG][CALC_UNIFIED] exit', { productId: (unifiedRequest as any)?.productId, ms: Date.now() - __t0 });
   return {
     productId: unifiedRequest.productId,
     totalQuantity,
@@ -1030,6 +1034,10 @@ export function calculateUnifiedQuote(
     grandTotal,
     shippingTierSubtotal: subtotal,
   };
+  } catch (err) {
+    console.error('[DBG][CALC_UNIFIED] error', { productId: (unifiedRequest as any)?.productId, message: (err as any)?.message, stack: (err as any)?.stack });
+    throw err;
+  }
 }
 
 /**
