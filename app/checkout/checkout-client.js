@@ -484,7 +484,7 @@ const handleApplyCoupon = (e) => {
             <SameDayNotice />
 
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Method</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Methods</h2>
               <ShippingSelector
                 selectedMethod={selectedMethod}
                 onMethodChange={handleMethodSelect}
