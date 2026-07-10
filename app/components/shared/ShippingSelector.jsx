@@ -35,6 +35,7 @@ export function ShippingSelector({
   const isLocalDeliverySelected = selectedMethod === 'local_delivery';
   const isZipChecking = zipCheckStatus === 'checking';
   const isZipAvailable = zipCheckStatus === 'success' && zipCheckResult?.available;
+  console.log("[SHIPPING SELECTOR]", { zipCheckStatus, zipCheckResult, isZipAvailable });
   const isZipError = zipCheckStatus === 'error';
 
   const activeZip = zipValue || zipInputValue;
@@ -265,8 +266,8 @@ export function ShippingSelector({
                 : 'bg-red-50 text-red-800 border border-red-200'
             }`}>
               {isZipAvailable
-                ? `✓ Available in your area${zipCheckResult?.deliveryWindow ? ` • Delivery window: ${zipCheckResult.deliveryWindow}` : ''}`
-                : '✗ Not available in your area'}
+                ? (console.log("[RENDER AVAILABLE]"), `✓ Available in your area${zipCheckResult?.deliveryWindow ? ` • Delivery window: ${zipCheckResult.deliveryWindow}` : ''}`)
+                : (console.log("[RENDER NOT AVAILABLE]"), '✗ Not available in your area')}
             </div>
           )}
 

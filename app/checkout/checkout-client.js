@@ -258,7 +258,25 @@ useEffect(() => {
         const localDeliveryAvailable = data.methods.some(
           (m) => m.type === 'local_delivery' && m.available !== false
         );
+        console.log(
+          "[ZIP VERIFY]",
+          {
+            backendMethods: data.methods,
+            localDeliveryMethod: data.methods.find((m) => m.type === "local_delivery"),
+            localDeliveryAvailable,
+            zipCheckStatusBeforeSet: zipCheckStatus,
+            zipCheckResultBeforeSet: zipCheckResult,
+          }
+        );
         setZipCheckStatus('success');
+        console.log(
+          "[SET ZIP RESULT]",
+          {
+            available: localDeliveryAvailable,
+            cost: data.methods.find((m) => m.type === "local_delivery")?.cost || 0,
+            deliveryWindow: data.methods.find((m) => m.type === "local_delivery")?.deliveryWindow || null,
+          }
+        );
         setZipCheckResult({
           available: localDeliveryAvailable,
           cost: data.methods.find((m) => m.type === 'local_delivery')?.cost || 0,
