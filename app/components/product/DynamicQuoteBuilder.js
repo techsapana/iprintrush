@@ -1400,12 +1400,6 @@ const renderDimensionStep = (group, pool, value) => {
               <span>Subtotal</span>
               <span>${quoteSummary.subtotal.toFixed(2)}</span>
             </div>
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-sm text-emerald-700">
-                <span>Quantity Discount Applied</span>
-                <span>-${discountAmount.toFixed(2)}</span>
-              </div>
-            )}
 
             <div className="flex justify-between text-sm">
               <span>

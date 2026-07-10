@@ -834,6 +834,38 @@ if (opt) {
   };
 }
 
+/**
+ * Resolve the applicable quantity tier based on product mode.
+ * Each mode has a dedicated tier source. No fallback between systems.
+ */
+function resolveApplicableTier({
+  mode,
+  config,
+  pools,
+  totalQuantity,
+}: {
+  mode: 'apparel' | 'print_product' | 'simple';
+  config: QuoteConfigStore;
+  pools: CustomizationPool[];
+  totalQuantity: number;
+}): QuantityTier | null {
+  switch (mode) {
+    case 'apparel':
+      return findApplicableTier(config.quantityTiers, totalQuantity);
+    case 'print_product': {
+      const quantityPool = pools.find(
+        (p) => String(p.selectionType).toLowerCase() === 'quantity'
+      );
+      if (!quantityPool?.quantityTiers?.length) return null;
+      return findDynamicTier(quantityPool.quantityTiers, totalQuantity);
+    }
+    case 'simple':
+      return null;
+    default:
+      return null;
+  }
+}
+
 // =============================================================================
 // UNIFIED QUOTE ENGINE (Phase 2)
 // =============================================================================
@@ -873,12 +905,9 @@ export function calculateUnifiedQuote(
     throw new Error('Product base price cannot be negative');
   }
 
-  // Determine which tiers to use based on mode
-  const tiers = config.quantityTiers;
-
-  // Find applicable tier
-  const tier = findApplicableTier(tiers, totalQuantity);
-  if (!tier && config.quantityTiers.length > 0 && mode !== 'simple') {
+  // Determine which tier applies based on mode
+  const tier = resolveApplicableTier({ mode, config, pools, totalQuantity });
+  if (!tier && mode === 'apparel' && config.quantityTiers.length > 0) {
     throw new Error('No quantity pricing tier configured for this quantity');
   }
 

@@ -1457,15 +1457,9 @@ const renderDeliveryStep = () => {
             <div className="flex justify-between text-sm text-gray-900">
               <span>Subtotal</span>
               <span>${(typeof quoteSummary.subtotal === 'number' ? quoteSummary.subtotal : 0).toFixed(2)}</span>
-            </div>
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-sm text-emerald-700">
-                <span>Quantity Discount Applied</span>
-                <span>-${discountAmount.toFixed(2)}</span>
-              </div>
-            )}
+             </div>
 
-            <div className="flex justify-between text-sm text-gray-900">
+             <div className="flex justify-between text-sm text-gray-900">
               <span>
                 Shipping {shippingLabel ? `(${shippingLabel})` : ''}
               </span>
