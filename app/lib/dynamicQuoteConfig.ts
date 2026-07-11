@@ -8,6 +8,7 @@ export async function getDynamicConfig(
   const poolKeys = (schema.groups || [])
     .map((g: any) => g.poolKey)
     .filter(Boolean);
+  const includeDisabledPools = options.includeDisabledPools ?? false;
 
   if (poolKeys.length === 0) {
     return { pools: [], shipping: await getShippingConfig() };
@@ -114,7 +115,7 @@ const tiersToUse = (productQtyTiers as any[]).length > 0 ? productQtyTiers : qty
       quantityTiers: pool.selection_type === 'quantity' ? quantityTiers : undefined,
     };
 
-    if (options.includeDisabledPools || !disabledPoolIds.includes(String(pool.id))) {
+    if (includeDisabledPools || !disabledPoolIds.includes(String(pool.id))) {
       poolsWithOptions.push(mappedPool);
     }
   }
