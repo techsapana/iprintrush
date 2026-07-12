@@ -424,6 +424,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
     try {
       setCalculating(true);
       const payload = {
+        mode: 'apparel',
         productId,
         decorationOptionId: decorationId,
         colorOptionId: colorId,
@@ -739,6 +740,7 @@ const handleDeliveryMethodChange = (method) => {
 
       // Add dimension data if available
       const payload = {
+        mode: 'apparel',
         productId,
         decorationOptionId: decorationId,
         colorOptionId: colorId,
