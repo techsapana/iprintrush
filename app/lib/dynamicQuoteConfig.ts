@@ -108,7 +108,7 @@ const tiersToUse = (productQtyTiers as any[]).length > 0 ? productQtyTiers : qty
       id: pool.id,
       key: pool.key,
       name: pool.name,
-      selectionType: pool.selection_type,
+      selectionType: pool.selection_type ?? 'single',
       priceType: pool.price_type,
       options: opts,
       quantityTiers: pool.selection_type === 'quantity' ? quantityTiers : undefined,
@@ -117,7 +117,7 @@ const tiersToUse = (productQtyTiers as any[]).length > 0 ? productQtyTiers : qty
     if (options.includeDisabledPools || !disabledPoolIds.includes(String(pool.id))) {
       poolsWithOptions.push(mappedPool);
     }
-  }
+  } 
 
   const shipping = await getShippingConfig();
   return { pools: poolsWithOptions, shipping };
