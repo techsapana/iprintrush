@@ -801,6 +801,32 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
         );
       }
 
+      if (hasNonQuoteItem && shippingCents > 0) {
+        lineItems.push({
+          quantity: 1,
+          price_data: {
+            currency: 'usd',
+            unit_amount: shippingCents,
+            product_data: {
+              name: 'Shipping',
+            },
+          },
+        });
+      }
+
+      if (taxCents > 0) {
+        lineItems.push({
+          quantity: 1,
+          price_data: {
+            currency: 'usd',
+            unit_amount: taxCents,
+            product_data: {
+              name: 'Tax',
+            },
+          },
+        });
+      }
+
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
         line_items: lineItems,
