@@ -247,9 +247,26 @@ function normalizeDynamicSelectionType(value: unknown): 'quantity' | 'single' | 
 }
 
 function parsePositiveNumber(value: unknown): number | null {
-  const parsed =
-    typeof value === 'number' ? value : Number.parseFloat(String(value ?? '').trim());
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  if (value == null) return null;
+  const n = typeof value === 'number' ? value : Number.parseFloat(String(value ?? '').trim());
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * Parse a print size option's `value` (e.g. "8.5x11", "24 x 36") into width/height.
+ * Accepts an optional space around a lowercase or uppercase "x" separator.
+ * Rejects anything that is not exactly two positive numbers around "x"
+ * (unicode × and other separators are rejected). Returns null instead of throwing.
+ */
+export function parseDimensionsFromValue(value: unknown): { width: number; height: number } | null {
+  if (value == null) return null;
+  const raw = typeof value === 'string' ? value : String(value);
+  const match = raw.match(/^\s*(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)\s*$/);
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+  return { width, height };
 }
 
 function resolveDynamicQuantity(
@@ -1087,6 +1104,7 @@ function resolveAddonsForMode(
 ): { addonBreakdown: { label: string; perUnit: number }[]; addonsPerUnit: number } {
   const addonBreakdown: { label: string; perUnit: number }[] = [];
   const poolMap = new Map(pools.map(p => [p.key, p]));
+  let resolvedPrintSizeOption: any = null;
 
   if (mode === 'simple') {
     // Simple products have no addons - just the base price
@@ -1134,6 +1152,9 @@ function resolveAddonsForMode(
           throw new Error(`Invalid print product option ID for ${poolKey}`);
         }
         const opt = requireEnabledId(id, pool.options, `print product option ${poolKey}`);
+        if (poolKey === 'print_sizes') {
+          resolvedPrintSizeOption = opt;
+        }
         if (opt && opt.priceModifier !== 0) {
           addonBreakdown.push({
             label: `${pool.name} (${opt.label})`,
@@ -1145,8 +1166,21 @@ function resolveAddonsForMode(
 
     // Handle dimension-based pricing
     if (dimensionPricing?.pricePerSqInch && dimensionPricing.pricePerSqInch > 0) {
-      const width = Number(selections.width_in);
-      const height = Number(selections.height_in);
+      let width = Number(selections.width_in);
+      let height = Number(selections.height_in);
+
+      // Fallback for area-priced products quoted with a preset print size:
+      // derive width/height from the selected option's value when explicit custom
+      // dimensions were not supplied. Never overwrites valid custom dimensions, and
+      // only applies when the value is parseable (e.g. "8.5x11").
+      if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+        const dims = resolvedPrintSizeOption ? parseDimensionsFromValue(resolvedPrintSizeOption.value) : null;
+        if (dims) {
+          if (!Number.isFinite(width) || width <= 0) width = dims.width;
+          if (!Number.isFinite(height) || height <= 0) height = dims.height;
+        }
+      }
+
       if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
         throw new Error('Valid width and height are required for dimension pricing');
       }
