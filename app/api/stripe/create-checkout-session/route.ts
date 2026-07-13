@@ -511,7 +511,6 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
             : [],
           customSizeNote: typeof item.customSizeNote === 'string' ? item.customSizeNote : '',
         });
-      }
 
         // TEMP DEBUG LOG
         console.log('--- PRODUCT DEBUG ---');
@@ -523,6 +522,7 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
         console.log('serverSummary?.subtotal:', serverSummary?.subtotal);
         console.log('serverSummary?.shipping:', serverSummary?.shipping);
         console.log('serverSummary?.grandTotal:', serverSummary?.grandTotal);
+      }
 
       if (lineItems.length === 0) {
         await rollback(conn);
