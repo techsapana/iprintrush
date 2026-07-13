@@ -513,6 +513,17 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
         });
       }
 
+        // TEMP DEBUG LOG
+        console.log('--- PRODUCT DEBUG ---');
+        console.log('displayName:', displayName);
+        console.log('isQuote:', !!item.quotePayload);
+        console.log('item.quantity:', item.quantity);
+        console.log('itemTotal:', itemTotal);
+        console.log('amountCents:', amountCents);
+        console.log('serverSummary?.subtotal:', serverSummary?.subtotal);
+        console.log('serverSummary?.shipping:', serverSummary?.shipping);
+        console.log('serverSummary?.grandTotal:', serverSummary?.grandTotal);
+
       if (lineItems.length === 0) {
         await rollback(conn);
         return NextResponse.json({ error: 'No chargeable items in checkout' }, { status: 400 });
@@ -825,9 +836,33 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
             },
           },
         });
-      }
+       }
 
-      const session = await stripe.checkout.sessions.create({
+       // TEMP DEBUG LOG
+       console.log('--- PRE-STRIPE CHECKOUT DEBUG ---');
+       console.log('subtotalCents:', subtotalCents);
+       console.log('discountCents:', discountCents);
+       console.log('shippingCents:', shippingCents);
+       console.log('taxCents:', taxCents);
+       console.log('totalCents:', totalCents);
+       console.log('hasNonQuoteItem:', hasNonQuoteItem);
+       console.log('quoteShippingCents:', quoteShippingCents);
+       console.log('normalizedDeliveryMethod:', normalizedDeliveryMethod);
+       console.log(
+         'lineItems:',
+         lineItems.map((li) => ({
+           name: li.price_data?.product_data?.name,
+           quantity: li.quantity,
+           unit_amount: li.price_data?.unit_amount,
+         }))
+       );
+       const stripeTotalFromLineItems = lineItems.reduce(
+         (sum, item) => sum + ((item.price_data?.unit_amount || 0) * (item.quantity || 1)),
+         0
+       );
+       console.log('stripeTotalFromLineItems:', stripeTotalFromLineItems);
+
+       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
         line_items: lineItems,
         success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -838,9 +873,15 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
           orderId: String(orderId),
           orderNumber,
         },
-      });
+       });
 
-      await conn.query(
+       // TEMP DEBUG LOG
+       console.log('--- POST-STRIPE CHECKOUT DEBUG ---');
+       console.log('session.amount_subtotal:', session.amount_subtotal);
+       console.log('session.amount_total:', session.amount_total);
+       console.log('session.id:', session.id);
+
+       await conn.query(
         'UPDATE orders SET stripe_checkout_session_id = ? WHERE id = ?',
         [session.id, orderId]
       );
