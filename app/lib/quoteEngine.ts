@@ -269,6 +269,24 @@ export function parseDimensionsFromValue(value: unknown): { width: number; heigh
   return { width, height };
 }
 
+/**
+ * Detect whether a pool represents a Print Size selection.
+ * Mirrors the frontend detection so a selected preset size resolves on the
+ * server even when the pool key is product-specific (e.g. "sign_print_sizes")
+ * rather than the canonical "print_sizes".
+ */
+function isPrintSizePool(pool: { key?: string; name?: string } | null | undefined): boolean {
+  if (!pool) return false;
+  const key = String(pool.key || '').toLowerCase();
+  const name = String(pool.name || '').toLowerCase();
+  return (
+    key === 'print_sizes' ||
+    key.includes('print_sizes') ||
+    name === 'print size' ||
+    name.includes('print size')
+  );
+}
+
 function resolveDynamicQuantity(
   pools: CustomizationPool[],
   selections: Record<string, unknown>,
@@ -1089,7 +1107,7 @@ export function calculateUnifiedQuote(
 /**
  * Resolve add-ons based on mode.
  */
-function resolveAddonsForMode(
+export function resolveAddonsForMode(
   config: QuoteConfigStore,
   pools: CustomizationPool[],
   mode: 'apparel' | 'print_product' | 'simple',
@@ -1152,7 +1170,7 @@ function resolveAddonsForMode(
           throw new Error(`Invalid print product option ID for ${poolKey}`);
         }
         const opt = requireEnabledId(id, pool.options, `print product option ${poolKey}`);
-        if (poolKey === 'print_sizes') {
+        if (isPrintSizePool(pool)) {
           resolvedPrintSizeOption = opt;
         }
         if (opt && opt.priceModifier !== 0) {
@@ -1166,50 +1184,22 @@ function resolveAddonsForMode(
 
     // Handle dimension-based pricing
     if (dimensionPricing?.pricePerSqInch && dimensionPricing.pricePerSqInch > 0) {
-      console.error("[DIMDBG] selections", selections);
-      console.error("[DIMDBG] print_size selection", selections.print_sizes);
       let width = Number(selections.width_in);
       let height = Number(selections.height_in);
 
       // Fallback for area-priced products quoted with a preset print size:
       // derive width/height from the selected option's value when explicit custom
       // dimensions were not supplied. Never overwrites valid custom dimensions, and
-      // only applies when the value is parseable (e.g. "8.5x11").
-      console.error("[DIMDBG] resolvedPrintSizeOption", {
-        id: resolvedPrintSizeOption?.id,
-        label: resolvedPrintSizeOption?.label,
-        value: resolvedPrintSizeOption?.value,
-        enabled: resolvedPrintSizeOption?.enabled,
-      });
-      let dims = null;
+      // only applies when the value is parseable (e.g. "24x36").
       if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
-        dims = resolvedPrintSizeOption ? parseDimensionsFromValue(resolvedPrintSizeOption.value) : null;
-        console.error("[DIMDBG] parsed-dimensions", {
-          parsedWidth: dims?.width,
-          parsedHeight: dims?.height,
-          rawValue: resolvedPrintSizeOption?.value,
-        });
+        const dims = resolvedPrintSizeOption ? parseDimensionsFromValue(resolvedPrintSizeOption.value) : null;
         if (dims) {
           if (!Number.isFinite(width) || width <= 0) width = dims.width;
           if (!Number.isFinite(height) || height <= 0) height = dims.height;
         }
       }
 
-      console.error("[DIMDBG] final-dimensions", {
-        width,
-        height,
-        width_in: selections.width_in,
-        height_in: selections.height_in,
-        pricePerSqInch: dimensionPricing?.pricePerSqInch
-      });
       if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-        console.error("[DIMDBG] THROWING_DIMENSION_ERROR", {
-          width,
-          height,
-          parsed: dims,
-          resolvedPrintSizeOption,
-          selections
-        });
         throw new Error('Valid width and height are required for dimension pricing');
       }
       const area = width * height;
