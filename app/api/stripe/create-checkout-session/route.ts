@@ -370,6 +370,7 @@ export async function POST(req: NextRequest) {
         let itemTotal = 0;
         let resolvedUnitPrice = 0;
         let customizationJson: string | null = null;
+        let itemMerchandise = 0;
 
         if (item.quotePayload) {
           const quotePayloadForRecalc = {
@@ -408,7 +409,8 @@ export async function POST(req: NextRequest) {
             const splitGrandTotal = split.lineTotal;
             const splitMerchandise = split.summary.subtotal || 0;
             const splitShipping = split.summary.shipping || 0;
-            itemTotal = splitGrandTotal; // Unchanged - customer pays grandTotal
+            itemTotal = splitMerchandise;
+            itemMerchandise = splitMerchandise;
             const serverSummaryForSplit = split.summary;
             customizationJson = JSON.stringify({
               lineItems: serverSummaryForSplit.lineItems || [],
@@ -417,15 +419,15 @@ export async function POST(req: NextRequest) {
               quotePayload: quotePayloadForRecalc,
               quoteSummary: serverSummaryForSplit,
             });
-            resolvedUnitPrice = item.quantity > 0 ? splitGrandTotal / item.quantity : 0;
-            // Track merchandise and shipping for split quotes (accounting)
+            resolvedUnitPrice = item.quantity > 0 ? splitMerchandise / item.quantity : 0;
             quoteMerchandiseCents += toCents(splitMerchandise);
             quoteShippingCents += toCents(splitShipping);
           } else {
             const grandTotal = Number(serverSummary.grandTotal || 0);
             const merchandise = Number(serverSummary.subtotal || 0);
             const shippingTotal = Number(serverSummary.shipping || 0);
-            itemTotal = grandTotal; // Unchanged - customer pays grandTotal
+            itemTotal = merchandise;
+            itemMerchandise = merchandise;
             customizationJson = JSON.stringify({
               lineItems: serverSummary.lineItems || [],
               customizationsDisplay: item.customizationsDisplay || {},
@@ -433,8 +435,7 @@ export async function POST(req: NextRequest) {
               quotePayload: quotePayloadForRecalc,
               quoteSummary: serverSummary || null,
             });
-            resolvedUnitPrice = item.quantity > 0 ? grandTotal / item.quantity : 0;
-            // Track merchandise and shipping for quotes (accounting)
+            resolvedUnitPrice = item.quantity > 0 ? merchandise / item.quantity : 0;
             quoteMerchandiseCents += toCents(merchandise);
             quoteShippingCents += toCents(shippingTotal);
           }
@@ -443,6 +444,7 @@ export async function POST(req: NextRequest) {
           hasNonQuoteItem = true;
           const unitPrice = Number(p.price || 0);
           itemTotal = unitPrice * item.quantity;
+          itemMerchandise = itemTotal;
           resolvedUnitPrice = unitPrice;
         }
 
@@ -451,14 +453,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Quote total must be greater than zero' }, { status: 400 });
         }
 
-const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - customer pays grandTotal)
-        const merchandiseCents = toCents(
-          item.quotePayload
-            ? (serverSummary.subtotal || 0)
-            : itemTotal
-        ); // For accounting - merchandise amount
-
-        // Track merchandise for subtotal (already tracked for quotes in branches above)
+        const amountCents = toCents(itemTotal);
+        const merchandiseCents = toCents(itemMerchandise);
         subtotalCents += merchandiseCents;
 
         const productName = String(p.name || 'Product');
@@ -499,8 +495,8 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
           productId: item.id,
           name: productName,
           qty: item.quantity,
-          unitPrice: resolvedUnitPrice,
-          lineTotal: itemTotal,
+          unitPrice: item.quantity > 0 ? itemMerchandise / item.quantity : 0,
+          lineTotal: itemMerchandise,
           customizationJson,
           artworkReady: item.artworkReady === true,
           tempArtworkFiles: Array.isArray(item.tempArtworkFiles)
@@ -812,7 +808,7 @@ const amountCents = toCents(itemTotal); // For Stripe line item (unchanged - cus
         );
       }
 
-      if (hasNonQuoteItem && shippingCents > 0) {
+      if (shippingCents > 0) {
         lineItems.push({
           quantity: 1,
           price_data: {

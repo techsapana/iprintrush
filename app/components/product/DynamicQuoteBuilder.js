@@ -7,6 +7,7 @@ import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizatio
 import { buildInvoiceHTML, buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
 import { ShippingSelector, getShippingDisplayLabel } from '../shared/ShippingSelector';
 import { saveQuoteDraft, readQuoteDraft, clearQuoteDraft } from '../../lib/quoteDraft';
+import { parseDimensionsFromValue } from '../../lib/quoteEngine';
 
 const SHIPPING_METHOD_LABELS = {
   pickup: 'Store Pickup',
@@ -745,13 +746,32 @@ const handleDeliveryMethodChange = (method) => {
         setCalculating(true);
     const dimensionSelections =
       shouldUseCustomDimensions
-          ? {
-              width_in: parseFloat(widthIn),
-              height_in: parseFloat(heightIn),
-            }
-          : {};
+        ? {
+            width_in: parseFloat(widthIn),
+            height_in: parseFloat(heightIn),
+          }
+        : {};
 
-      const payload = {
+    if (!shouldUseCustomDimensions) {
+      const printSizePool = (pools || []).find((p) => {
+        const key = String(p.key || '').toLowerCase();
+        const name = String(p.name || '').toLowerCase();
+        return key === 'print_sizes' || key.includes('print_sizes') || name === 'print size' || name.includes('print size');
+      });
+      const selectedPrintSizeId = selections[printSizePool?.key];
+      if (printSizePool && selectedPrintSizeId != null) {
+        const selectedOption = printSizePool.options?.find((o) => o.id === selectedPrintSizeId);
+        if (selectedOption?.value) {
+          const dims = parseDimensionsFromValue(selectedOption.value);
+          if (dims) {
+            dimensionSelections.width_in = dims.width;
+            dimensionSelections.height_in = dims.height;
+          }
+        }
+      }
+    }
+
+    const payload = {
         productId,
         mode: 'print_product',
         selections: { ...selections, ...dimensionSelections },
