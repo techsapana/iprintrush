@@ -560,7 +560,7 @@ export async function POST(req: NextRequest) {
       }
 
       const taxableBaseCents = Math.max(0, subtotalCents - discountCents);
-
+    
       if (normalizedDeliveryMethod === 'pickup' || normalizedDeliveryMethod === 'review_required') {
         if (normalizedDeliveryMethod === 'review_required' && !checkoutCustomer.shippingAddress) {
           await rollback(conn);
