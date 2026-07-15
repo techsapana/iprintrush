@@ -533,7 +533,7 @@ export async function POST(req: NextRequest) {
           ? Number(siteSettings[0].tax_rate_percent)
           : Number(process.env.NEXT_PUBLIC_TAX_RATE || 0) * 100;
       const taxRate = (Number.isFinite(taxRatePercent) ? taxRatePercent : 0) / 100;
-
+ 
       // Apply coupon discount (must match product-level code)
       let discountCents = 0;
       let appliedCouponCode: string | null = null;
