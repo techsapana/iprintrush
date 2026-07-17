@@ -1123,10 +1123,6 @@ export function resolveAddonsForMode(
   const addonBreakdown: { label: string; perUnit: number }[] = [];
   const poolMap = new Map(pools.map(p => [p.key, p]));
   let resolvedPrintSizeOption: any = null;
-  let resolvedPrintSizePoolKey: string | null = null;
-  let resolvedPrintSizeSelId: any = null;
-  let resolvedPrintSizeMatchedPool = false;
-  let resolvedPrintSizeMatchedOption = false;
 
   if (mode === 'simple') {
     // Simple products have no addons - just the base price
@@ -1175,10 +1171,6 @@ export function resolveAddonsForMode(
         }
         const opt = requireEnabledId(id, pool.options, `print product option ${poolKey}`);
         if (isPrintSizePool(pool)) {
-          resolvedPrintSizePoolKey = poolKey;
-          resolvedPrintSizeSelId = sel;
-          resolvedPrintSizeMatchedPool = !!pool?.options;
-          resolvedPrintSizeMatchedOption = !!opt;
           resolvedPrintSizeOption = opt;
         }
         if (opt && opt.priceModifier !== 0) {
@@ -1190,60 +1182,37 @@ export function resolveAddonsForMode(
       }
     }
 
-    // Handle dimension-based pricing
+    // Handle dimension-based pricing.
+    // Two independent, mutually exclusive resolution paths:
+    //   PATH 1 (preset): a print size option was selected whose value parses to
+    //     real dimensions (e.g. "24x36", "36x72"). Use those dimensions directly.
+    //     Custom width/height are never required on this path.
+    //   PATH 2 (custom): the selected print size option does not parse to
+    //     dimensions (e.g. "Custom Size"). Require width_in/height_in and validate
+    //     them. This is the ONLY path that may throw.
+    // A valid preset selection always wins over blank custom fields; custom
+    // dimensions are only used when the preset option is the custom marker.
     if (dimensionPricing?.pricePerSqInch && dimensionPricing.pricePerSqInch > 0) {
-      let width = Number(selections.width_in);
-      let height = Number(selections.height_in);
+      let width = 0;
+      let height = 0;
 
-      // Fallback for area-priced products quoted with a preset print size:
-      // derive width/height from the selected option's value when explicit custom
-      // dimensions were not supplied. Never overwrites valid custom dimensions, and
-      // only applies when the value is parseable (e.g. "24x36").
-      if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
-        // [DIM] diagnostics only — no pricing/validation/fallback behavior change
-        const __dimParseResult = resolvedPrintSizeOption ? parseDimensionsFromValue(resolvedPrintSizeOption.value) : null;
-        const __beforeW = width;
-        const __beforeH = height;
-        if (__dimParseResult) {
-          if (!Number.isFinite(width) || width <= 0) width = __dimParseResult.width;
-          if (!Number.isFinite(height) || height <= 0) height = __dimParseResult.height;
-        }
-        console.error('[DIM] diagnostic', {
-          selectedPrintSizePoolKey: resolvedPrintSizePoolKey,
-          selectedOptionId: resolvedPrintSizeSelId,
-          matchingPoolFound: resolvedPrintSizeMatchedPool,
-          matchingOptionFound: resolvedPrintSizeMatchedOption,
-          resolvedOption: resolvedPrintSizeOption
-            ? {
-                id: resolvedPrintSizeOption.id,
-                label: resolvedPrintSizeOption.label,
-                value: resolvedPrintSizeOption.value,
-                enabled: resolvedPrintSizeOption.enabled,
-              }
-            : null,
-          parseResult: __dimParseResult,
-          beforeWidth: __beforeW,
-          beforeHeight: __beforeH,
-          finalWidth: width,
-          finalHeight: height,
-        });
-        if (!resolvedPrintSizeOption) {
-          console.error('[DIM] NO_MATCHING_OPTION');
-        } else if (!__dimParseResult) {
-          console.error('[DIM] PARSE_FAILED');
-        } else {
-          console.error('[DIM] PARSE_SUCCESS');
-        }
-        const dims = __dimParseResult;
-        if (dims) {
-          if (!Number.isFinite(width) || width <= 0) width = dims.width;
-          if (!Number.isFinite(height) || height <= 0) height = dims.height;
+      const presetDims = resolvedPrintSizeOption
+        ? parseDimensionsFromValue(resolvedPrintSizeOption.value)
+        : null;
+
+      if (presetDims) {
+        // PATH 1 — predefined print size selected.
+        width = presetDims.width;
+        height = presetDims.height;
+      } else {
+        // PATH 2 — custom size option selected (or no printable preset value).
+        width = Number(selections.width_in);
+        height = Number(selections.height_in);
+        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+          throw new Error('Valid width and height are required for dimension pricing');
         }
       }
 
-      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-        throw new Error('Valid width and height are required for dimension pricing');
-      }
       const area = width * height;
       const rate = dimensionPricing.pricePerSqInch;
       const areaPerUnit = area * rate;

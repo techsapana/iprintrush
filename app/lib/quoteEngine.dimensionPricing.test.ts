@@ -95,10 +95,23 @@ describe('resolveAddonsForMode dimension pricing', () => {
     expect(area!.perUnit).toBeCloseTo(8.5 * 11 * 0.05, 5);
   });
 
-  it('does not overwrite valid custom dimensions', () => {
+  it('uses the preset dimensions when a predefined size is selected (PATH 1)', () => {
     const result = resolveAddonsForMode(
       {} as never,
       makePrintSizePool('8.5x11') as never,
+      'print_product',
+      { print_sizes: 'opt-size-1', width_in: 10, height_in: 20 },
+      { pricePerSqInch: 0.05 },
+    );
+    const area = result.addonBreakdown.find((a) => a.label.startsWith('Area'));
+    expect(area).toBeDefined();
+    expect(area!.perUnit).toBeCloseTo(8.5 * 11 * 0.05, 5);
+  });
+
+  it('uses custom dimensions when the custom-size option is selected (PATH 2)', () => {
+    const result = resolveAddonsForMode(
+      {} as never,
+      makePrintSizePool('Custom') as never,
       'print_product',
       { print_sizes: 'opt-size-1', width_in: 10, height_in: 20 },
       { pricePerSqInch: 0.05 },
