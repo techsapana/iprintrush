@@ -138,6 +138,7 @@ async function handleMailboxQuote(payload: any) {
     subtotal,
     shipping: 0,
     grandTotal: subtotal,
+    shippingTierSubtotal: subtotal,
     shippingDecision,
   });
 }

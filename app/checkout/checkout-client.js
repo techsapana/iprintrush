@@ -194,6 +194,10 @@ useEffect(() => {
               id: i.id,
               quantity: i.quantity,
               quotePayload: i.options?.quotePayload || null,
+              shippingTierSubtotal:
+                i.options?.quoteSummary?.shippingTierSubtotal ??
+                i.options?.shippingTierSubtotal ??
+                null,
               product: {
                 weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
                 package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),
@@ -237,6 +241,10 @@ useEffect(() => {
             id: i.id,
             quantity: i.quantity,
             quotePayload: i.options?.quotePayload || null,
+            shippingTierSubtotal:
+              i.options?.quoteSummary?.shippingTierSubtotal ??
+              i.options?.shippingTierSubtotal ??
+              null,
             product: {
               weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
               package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),

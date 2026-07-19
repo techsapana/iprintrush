@@ -3,13 +3,12 @@ import { query } from "@/app/lib/db";
 import {
   detectOversizedItems,
   getOversizedDetails,
+  getShippingTierSubtotalFromCartItems,
   getShippingCost,
   buildShippingConfig,
   getShippingDecision,
 } from "@/app/lib/shippingEngine";
 import { lookupZoneByZip } from "@/app/lib/shipping/zipZoneService";
-import { normalizeDeliveryMethod } from "@/app/lib/quoteEngine";
-import { resolveShippingTierSubtotalForCart } from "@/app/lib/quoteHelpers";
 
 export async function POST(req: Request) {
   try {
@@ -28,12 +27,7 @@ export async function POST(req: Request) {
     const oversizedDetails = getOversizedDetails(items, config);
     const shippingTierSubtotal = Number.isFinite(Number(body.shippingTierSubtotal))
       ? Math.max(0, Number(body.shippingTierSubtotal))
-      : await resolveShippingTierSubtotalForCart(
-          items,
-          normalizeDeliveryMethod(body.deliveryMethod),
-          shippingAddress?.state,
-          shippingAddress?.zip,
-        );
+      : getShippingTierSubtotalFromCartItems(items);
 
     const decision = getShippingDecision(items, config);
     const standardCost = getShippingCost(shippingTierSubtotal, 'standard_shipping', config);

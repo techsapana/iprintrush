@@ -1,13 +1,9 @@
 import { query, queryOne } from '@/app/lib/db';
-import { calculateUnifiedQuote, normalizeDeliveryMethod } from '@/app/lib/quoteEngine';
-import { normalizeQuoteRequest } from '@/app/lib/quote/QuoteNormalizer';
-import { getDynamicConfig } from '@/app/lib/dynamicQuoteConfig';
 import type {
   QuoteRequestPayload,
   QuoteConfigStore,
   DynamicQuoteRequestPayload,
   SimpleQuoteRequestPayload,
-  CustomizationPool,
 } from '@/app/lib/quoteConfigTypes';
 
 export async function getProductQuantityBounds(productId: string): Promise<{ min: number | null; max: number | null }> {
@@ -212,106 +208,4 @@ export async function getConfigWithCustomPrices(productId: string): Promise<Quot
     productSettings: [],
     baseUnitPrice: productBasePrice?.price != null ? Number(productBasePrice.price) : null,
   };
-}
-
-export async function resolveShippingTierSubtotalForCart(
-  items: any[],
-  deliveryMethod: string,
-  shippingState?: string,
-  shippingZip?: string,
-): Promise<number> {
-  let total = 0;
-  const configCache = new Map<string, QuoteConfigStore>();
-  const dynamicCache = new Map<string, { pools: CustomizationPool[]; schema: any }>();
-  const processedSplitGroups = new Set<string>();
-
-  for (const item of items) {
-    const payload = item?.quotePayload;
-    if (!payload || !payload.productId) {
-      const unitPrice = Math.max(0, Number(item?.price || 0) + Number(item?.options?.extraPrice || 0));
-      total += unitPrice * Number(item?.quantity || 1);
-      continue;
-    }
-
-    const productId = String(payload.productId);
-
-    if (item.splitQuote === true && item.splitGroupId != null) {
-      if (processedSplitGroups.has(item.splitGroupId)) {
-        continue;
-      }
-      processedSplitGroups.add(item.splitGroupId);
-    }
-
-    const mode = payload.mode;
-
-    let config = configCache.get(productId);
-    if (!config) {
-      config = await getConfigWithCustomPrices(productId);
-      configCache.set(productId, config);
-    }
-
-    let pools: CustomizationPool[] = [];
-    let dimensionPricing: any;
-
-    if (mode === 'print_product') {
-      let dynamic = dynamicCache.get(productId);
-      let productDimensionData: any = null;
-
-      if (!dynamic) {
-        productDimensionData = await queryOne(
-          'SELECT p.min_width_in, p.max_width_in, p.min_height_in, p.max_height_in, p.price_per_sq_inch, c.customization_schema FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?',
-          [productId],
-        );
-        let schema: any = { mode: 'print_product', groups: [] };
-        if (productDimensionData?.customization_schema) {
-          try {
-            schema = typeof productDimensionData.customization_schema === 'string'
-              ? JSON.parse(productDimensionData.customization_schema)
-              : productDimensionData.customization_schema;
-          } catch {
-            // ignore parse errors
-          }
-        }
-        const { pools: dynamicPools } = await getDynamicConfig(productId, schema);
-        dynamic = { pools: dynamicPools, schema };
-        dynamicCache.set(productId, dynamic);
-      }
-      pools = dynamic.pools;
-
-      if (!productDimensionData) {
-        productDimensionData = await queryOne(
-          'SELECT p.min_width_in, p.max_width_in, p.min_height_in, p.max_height_in, p.price_per_sq_inch FROM products p WHERE p.id = ?',
-          [productId],
-        );
-      }
-      if (productDimensionData) {
-        dimensionPricing = {
-          minWidthIn: productDimensionData.min_width_in != null ? Number(productDimensionData.min_width_in) : null,
-          maxWidthIn: productDimensionData.max_width_in != null ? Number(productDimensionData.max_width_in) : null,
-          minHeightIn: productDimensionData.min_height_in != null ? Number(productDimensionData.min_height_in) : null,
-          maxHeightIn: productDimensionData.max_height_in != null ? Number(productDimensionData.max_height_in) : null,
-          pricePerSqInch: productDimensionData.price_per_sq_inch != null ? Number(productDimensionData.price_per_sq_inch) : null,
-        };
-      }
-    }
-
-    const normalizedDeliveryMethod = normalizeDeliveryMethod(payload.deliveryMethod);
-    const unifiedRequest = normalizeQuoteRequest(
-      { ...payload, deliveryMethod: normalizedDeliveryMethod },
-      mode === 'apparel' ? config.sizes : mode === 'print_product' ? pools : undefined,
-    );
-
-    const summary = calculateUnifiedQuote(
-      config,
-      pools,
-      unifiedRequest,
-      dimensionPricing,
-      payload.shippingState,
-      payload.shippingZip,
-    );
-
-    total += Number(summary.shippingTierSubtotal || summary.subtotal || 0);
-  }
-
-  return Math.max(0, total);
 }
