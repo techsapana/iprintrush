@@ -372,7 +372,7 @@ const canProceedToPayment = Boolean(
           {/* Product Info + Customizer */}
           <div className="flex flex-col">
             <h1 className="text-4xl font-bold text-gray-900 mb-2">{product.name}</h1>
-
+ 
             <div className="flex items-center gap-4 mb-6">
               {isSameDayPrintingProduct(product) && <SameDayBadge />}
               <div className="leading-tight">
