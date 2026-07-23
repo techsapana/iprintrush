@@ -617,7 +617,7 @@ const handleDeliveryMethodChange = (method) => {
       selectedPrintSize !== '' &&
       (!Array.isArray(selectedPrintSize) || selectedPrintSize.length > 0);
     const hasAreaPricing = dimensionConfig?.pricePerSqInch != null;
-    const shouldUseCustomDimensions = hasAreaPricing && !hasPresetPrintSize;
+    const shouldUseCustomDimensions = hasAreaPricing && !hasPresetPrintSize && allowCustomDimensions;
 
     // Validate custom dimensions only when no preset print size is selected.
     if (shouldUseCustomDimensions) {
@@ -1136,12 +1136,15 @@ const handleDeliveryMethodChange = (method) => {
   };
 
 const renderDimensionStep = (group, pool, value) => {
+    if (!allowCustomDimensions) {
+      return null;
+    }
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">{pool.name || group.label}</h3>
         <p className="text-sm text-gray-600">{pool.description || 'Enter your custom dimensions.'}</p>
         
-        {allowCustomDimensions && renderDimensionFields()}
+        {renderDimensionFields()}
       </div>
     );
   };

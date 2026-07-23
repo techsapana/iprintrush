@@ -1204,13 +1204,17 @@ export function resolveAddonsForMode(
         // PATH 1 — predefined print size selected.
         width = presetDims.width;
         height = presetDims.height;
-      } else {
-        // PATH 2 — custom size option selected (or no printable preset value).
-        width = Number(selections.width_in);
-        height = Number(selections.height_in);
+      } else if (config.allowCustomDimensions) {
+        // PATH 2 — custom size selected; require and validate width_in/height_in.
+        const widthRaw = (selections as any).width_in;
+        const heightRaw = (selections as any).height_in;
+        width = typeof widthRaw === 'number' ? widthRaw : NaN;
+        height = typeof heightRaw === 'number' ? heightRaw : NaN;
         if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
           throw new Error('Valid width and height are required for dimension pricing');
         }
+      } else {
+        throw new Error('Please select a print size.');
       }
 
       const area = width * height;

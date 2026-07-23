@@ -108,7 +108,7 @@ export async function getConfigWithCustomPrices(productId: string): Promise<Quot
     query('SELECT turnaround_option_id as id, custom_price, pricing_type, percentage_value FROM product_turnaround_options WHERE product_id = ?', [productId]),
     query('SELECT designer_help_option_id as id, custom_price FROM product_designer_help_options WHERE product_id = ?', [productId]),
     query('SELECT * FROM product_quantity_tiers WHERE product_id = ? AND enabled = TRUE ORDER BY display_order, min_qty', [productId]),
-    queryOne('SELECT price FROM products WHERE id = ? LIMIT 1', [productId]),
+    queryOne('SELECT price, allow_custom_dimensions FROM products WHERE id = ? LIMIT 1', [productId]),
   ]);
 
   const customPrices = {
@@ -206,6 +206,7 @@ export async function getConfigWithCustomPrices(productId: string): Promise<Quot
       })),
     },
     productSettings: [],
+    allowCustomDimensions: Boolean(productBasePrice?.allow_custom_dimensions),
     baseUnitPrice: productBasePrice?.price != null ? Number(productBasePrice.price) : null,
   };
 }

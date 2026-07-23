@@ -111,6 +111,7 @@ export type QuoteConfigStore = {
   shipping: ShippingConfig;
   productSettings: ProductQuoteSettings[];
   baseUnitPrice?: number | null; // Product's base price for print products
+  allowCustomDimensions: boolean;
 };
 
 export type QuoteLineItem = {

@@ -82,6 +82,7 @@ function createDefaultConfig(): QuoteConfigStore {
     ],
     shipping,
     productSettings: [],
+    allowCustomDimensions: false,
   };
 }
 
