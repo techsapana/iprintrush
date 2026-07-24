@@ -366,6 +366,13 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
 
   const { getDynamicConfig } = await import('@/app/lib/dynamicQuoteConfig');
     const { pools } = await getDynamicConfig(payload.productId, schema);
+    console.error('[DBG][BACKEND_ENTRY]', {
+      productId: payload.productId,
+      payloadSelectionsKeys: Object.keys(payload.selections || {}),
+      payloadSelectionsRaw: payload.selections,
+      width_in: (payload.selections as any)?.width_in,
+      height_in: (payload.selections as any)?.height_in,
+    });
     console.error('[DBG][AFTER_GET_DYNAMIC_CONFIG]', { productId: payload?.productId, poolCount: pools?.length ?? 0, poolKeys: (pools as any[]).map(p => p?.key) });
     console.error('[Q] dynamic-config', 'pools=' + (pools?.length ?? 0));
 
@@ -410,6 +417,19 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
         pricePerSqInch: productWithCat.price_per_sq_inch != null ? Number(productWithCat.price_per_sq_inch) : null,
       }
     : undefined;
+
+    console.error('[DBG][PRODUCT_DIMENSIONS]', {
+      productId: payload.productId,
+      productWithCat: {
+        price_per_sq_inch: productWithCat?.price_per_sq_inch,
+        min_width_in: productWithCat?.min_width_in,
+        max_width_in: productWithCat?.max_width_in,
+        min_height_in: productWithCat?.min_height_in,
+        max_height_in: productWithCat?.max_height_in,
+        allow_custom_dimensions: productWithCat?.allow_custom_dimensions,
+      },
+      dimensionPricing,
+    });
 
   // Use the unified engine - shipping is calculated from DB config
     console.error('[Q] calc-in', payload?.productId);

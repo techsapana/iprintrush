@@ -786,6 +786,24 @@ const handleDeliveryMethodChange = (method) => {
         customSizeNote,
       };
 
+      console.error('[DBG][FRONTEND_PAYLOAD]', {
+        productId,
+        widthIn,
+        heightIn,
+        shouldUseCustomDimensions,
+        hasPresetPrintSize,
+        selectedPrintSizeId: printSizePoolKey ? selections[printSizePoolKey] : null,
+        selectedPrintSizeValue: (() => {
+          if (!printSizePoolKey) return null;
+          const pool = (pools || []).find(p => p.key === printSizePoolKey);
+          const selId = selections[printSizePoolKey];
+          const opt = pool?.options?.find(o => o.id === selId);
+          return opt?.value ?? null;
+        })(),
+        dimensionSelections,
+        payloadSelectionsKeys: Object.keys(payload.selections),
+      });
+
       const res = await fetch('/api/quote/calculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

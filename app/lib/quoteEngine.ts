@@ -1177,12 +1177,27 @@ export function resolveAddonsForMode(
           addonBreakdown.push({
             label: `${pool.name} (${opt.label})`,
             perUnit: opt.priceModifier,
-          });
-        }
-      }
-    }
+           });
+         }
+       }
+     }
 
-    // Handle dimension-based pricing.
+     console.error('[DBG][PRE_DIMENSION_BLOCK]', {
+       productId: unifiedRequest.productId,
+       resolvedPrintSizeOption: resolvedPrintSizeOption
+         ? { id: resolvedPrintSizeOption.id, value: resolvedPrintSizeOption.value, label: resolvedPrintSizeOption.label }
+         : null,
+       presetDims: resolvedPrintSizeOption
+         ? (() => {
+             const d = parseDimensionsFromValue(resolvedPrintSizeOption.value);
+             return d ? { width: d.width, height: d.height } : null;
+           })()
+         : null,
+       dimensionPricing,
+       configAllowCustomDimensions: config.allowCustomDimensions,
+     });
+
+     // Handle dimension-based pricing.
     // Two independent, mutually exclusive resolution paths:
     //   PATH 1 (preset): a print size option was selected whose value parses to
     //     real dimensions (e.g. "24x36", "36x72"). Use those dimensions directly.
@@ -1208,6 +1223,15 @@ export function resolveAddonsForMode(
         // PATH 2 — custom size selected; require and validate width_in/height_in.
         const widthRaw = (selections as any).width_in;
         const heightRaw = (selections as any).height_in;
+        console.error('[DBG][PATH2_ENTRY]', {
+          productId: unifiedRequest.productId,
+          widthRaw,
+          heightRaw,
+          widthType: typeof widthRaw,
+          heightType: typeof heightRaw,
+          selectionsKeys: Object.keys(selections),
+          selections: selections,
+        });
         width = typeof widthRaw === 'number' ? widthRaw : NaN;
         height = typeof heightRaw === 'number' ? heightRaw : NaN;
         if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
