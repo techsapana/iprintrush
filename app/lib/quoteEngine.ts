@@ -1182,11 +1182,10 @@ export function resolveAddonsForMode(
        }
      }
 
-     console.error('[DBG][PRE_DIMENSION_BLOCK]', {
-       productId: unifiedRequest.productId,
-       resolvedPrintSizeOption: resolvedPrintSizeOption
-         ? { id: resolvedPrintSizeOption.id, value: resolvedPrintSizeOption.value, label: resolvedPrintSizeOption.label }
-         : null,
+      console.error('[DBG][PRE_DIMENSION_BLOCK]', {
+        resolvedPrintSizeOption: resolvedPrintSizeOption
+          ? { id: resolvedPrintSizeOption.id, value: resolvedPrintSizeOption.value, label: resolvedPrintSizeOption.label }
+          : null,
        presetDims: resolvedPrintSizeOption
          ? (() => {
              const d = parseDimensionsFromValue(resolvedPrintSizeOption.value);
@@ -1224,7 +1223,6 @@ export function resolveAddonsForMode(
         const widthRaw = (selections as any).width_in;
         const heightRaw = (selections as any).height_in;
         console.error('[DBG][PATH2_ENTRY]', {
-          productId: unifiedRequest.productId,
           widthRaw,
           heightRaw,
           widthType: typeof widthRaw,
