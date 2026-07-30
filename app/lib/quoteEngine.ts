@@ -261,7 +261,7 @@ function parsePositiveNumber(value: unknown): number | null {
 export function parseDimensionsFromValue(value: unknown): { width: number; height: number } | null {
   if (value == null) return null;
   const raw = typeof value === 'string' ? value : String(value);
-  const match = raw.match(/^\s*(\d+(?:\.\d+)?)[^xX]*[xX]\s*(\d+(?:\.\d+)?)/);
+  const match = raw.match(/^\s*(\d+(?:\.\d+)?)[^xX\u00d7]*[xX\u00d7]\s*(\d+(?:\.\d+)?)/);
   if (!match) return null;
   const width = Number(match[1]);
   const height = Number(match[2]);
@@ -925,7 +925,6 @@ export function calculateUnifiedQuote(
   options: { allowZeroQuote?: boolean } = {},
   ): QuoteSummary {
   const __t0 = Date.now();
-  console.error('[DBG][CALC_UNIFIED] entry', { productId: (unifiedRequest as any)?.productId, mode: (unifiedRequest as any)?.mode });
   try {
     const { mode, quantityBreakdown, selections, deliveryMethod, useMyCloth } = unifiedRequest;
   const normalizedDeliveryMethod = normalizeDeliveryMethod(deliveryMethod);
@@ -1085,7 +1084,6 @@ export function calculateUnifiedQuote(
     quantity: q.quantity,
   }));
 
-  console.error('[DBG][CALC_UNIFIED] exit', { productId: (unifiedRequest as any)?.productId, ms: Date.now() - __t0 });
   return {
     productId: unifiedRequest.productId,
     totalQuantity,
@@ -1099,7 +1097,6 @@ export function calculateUnifiedQuote(
     shippingTierSubtotal: subtotal,
   };
   } catch (err) {
-    console.error('[DBG][CALC_UNIFIED] error', { productId: (unifiedRequest as any)?.productId, message: (err as any)?.message, stack: (err as any)?.stack });
     throw err;
   }
 }
@@ -1157,7 +1154,7 @@ export function resolveAddonsForMode(
 
       const pool = poolMap.get(poolKey);
       if (!pool?.options) {
-        throw new Error(`Invalid print product option pool selected: ${poolKey}`);
+        continue;
       }
 
       if (sel === undefined || sel === null || sel === '' || (Array.isArray(sel) && sel.length === 0)) {
@@ -1185,20 +1182,6 @@ export function resolveAddonsForMode(
        }
      }
 
-      console.error('[DBG][PRE_DIMENSION_BLOCK]', {
-        resolvedPrintSizeOption: resolvedPrintSizeOption
-          ? { id: resolvedPrintSizeOption.id, value: resolvedPrintSizeOption.value, label: resolvedPrintSizeOption.label }
-          : null,
-       presetDims: resolvedPrintSizeOption
-         ? (() => {
-             const d = parseDimensionsFromValue(resolvedPrintSizeOption.value);
-             return d ? { width: d.width, height: d.height } : null;
-           })()
-         : null,
-       dimensionPricing,
-       configAllowCustomDimensions: config.allowCustomDimensions,
-     });
-
      // Handle dimension-based pricing.
     // Two independent, mutually exclusive resolution paths:
     //   PATH 1 (preset): a print size option was selected whose value parses to
@@ -1214,7 +1197,8 @@ export function resolveAddonsForMode(
       let height = 0;
 
       const presetDims = resolvedPrintSizeOption
-        ? (parseDimensionsFromValue(resolvedPrintSizeOption.value) || parseDimensionsFromValue(resolvedPrintSizeOption.label))
+        ? (parseDimensionsFromValue(resolvedPrintSizeOption.value) || 
+           (!/custom/i.test(resolvedPrintSizeOption.label || '') ? parseDimensionsFromValue(resolvedPrintSizeOption.label) : null))
         : null;
 
       if (presetDims) {
@@ -1225,14 +1209,6 @@ export function resolveAddonsForMode(
         // PATH 2 — custom size selected; require and validate width_in/height_in.
         const widthRaw = (selections as any).width_in;
         const heightRaw = (selections as any).height_in;
-        console.error('[DBG][PATH2_ENTRY]', {
-          widthRaw,
-          heightRaw,
-          widthType: typeof widthRaw,
-          heightType: typeof heightRaw,
-          selectionsKeys: Object.keys(selections),
-          selections: selections,
-        });
         const parsedWidth = parseFloat(widthRaw);
         const parsedHeight = parseFloat(heightRaw);
         width = Number.isFinite(parsedWidth) ? parsedWidth : NaN;
@@ -1242,6 +1218,20 @@ export function resolveAddonsForMode(
         }
       } else {
         throw new Error('Please select a print size.');
+      }
+
+      // Validate dimension bounds
+      if (dimensionPricing.minWidthIn && width < dimensionPricing.minWidthIn) {
+        throw new Error(`Width must be at least ${dimensionPricing.minWidthIn} inches`);
+      }
+      if (dimensionPricing.maxWidthIn && width > dimensionPricing.maxWidthIn) {
+        throw new Error(`Width must be at most ${dimensionPricing.maxWidthIn} inches`);
+      }
+      if (dimensionPricing.minHeightIn && height < dimensionPricing.minHeightIn) {
+        throw new Error(`Height must be at least ${dimensionPricing.minHeightIn} inches`);
+      }
+      if (dimensionPricing.maxHeightIn && height > dimensionPricing.maxHeightIn) {
+        throw new Error(`Height must be at most ${dimensionPricing.maxHeightIn} inches`);
       }
 
       const area = width * height;

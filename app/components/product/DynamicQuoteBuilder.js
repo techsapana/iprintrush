@@ -454,7 +454,7 @@ const handleZipCheck = async (zip) => {
          quantity: totalQuantity > 0 ? totalQuantity : 1,
          quotePayload: {
            mode: 'print_product',
-           selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn) } : {}) },
+           selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn), height_in: parseFloat(heightIn) } : {}) },
          },
          product: {
            weight_lb: Number(weightLb) || 0,
@@ -506,7 +506,7 @@ const handleZipCheck = async (zip) => {
            quantity: totalQuantity > 0 ? totalQuantity : 1,
            quotePayload: {
              mode: 'print_product',
-             selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn) } : {}) },
+             selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn), height_in: parseFloat(heightIn) } : {}) },
            },
            product: {
              weight_lb: Number(weightLb) || 0,
@@ -810,11 +810,15 @@ const handleDeliveryMethodChange = (method) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) {
+        let errMsg = 'Failed to calculate quote';
+        try { const errJson = await res.json(); errMsg = errJson.error || errMsg; } catch {}
+        throw new Error(errMsg);
+      }
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to calculate quote');
       if (requestId !== latestCalcRequestIdRef.current) return;
       setQuoteSummary(json);
-      setStep(stepTitles.length - 1);
+      if (step >= stepTitles.length - 2) setStep(stepTitles.length - 1);
       setHasCalculated(true);
       if (onQuoteReady && json) {
         const customizationsDisplay = {};
@@ -868,11 +872,6 @@ const handleDeliveryMethodChange = (method) => {
 
   handleCalculateRef.current = handleCalculate;
 
-  const handleEstimateShipping = async () => {
-    // Shipping is now calculated from DB config at quote time - no separate estimate needed
-    setEstimateError('');
-    setEstimatedShipping(quoteSummary?.shipping ?? 0);
-  };
 
   if (loading) {
     return (
@@ -1001,8 +1000,14 @@ const handleDeliveryMethodChange = (method) => {
                 }
                 const parsed = parseInt(raw, 10);
                 if (!Number.isFinite(parsed)) return;
-                const newValue = Math.min(inputMax, Math.max(inputMin, parsed));
+                const newValue = Math.min(inputMax, parsed);
                 handleSelectionChange(group.poolKey, newValue);
+              }}
+              onBlur={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!Number.isFinite(val) || val < inputMin) {
+                  handleSelectionChange(group.poolKey, inputMin);
+                }
               }}
               className="w-28 px-4 py-2 border border-gray-300 rounded-lg text-lg font-medium"
             />
@@ -1632,7 +1637,7 @@ const renderDeliveryStep = () => {
       quantity: totalQuantity > 0 ? totalQuantity : 1,
       quotePayload: {
         mode: 'print_product',
-        selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn) } : {}) },
+        selections: { ...selections, ...(widthIn ? { width_in: parseFloat(widthIn), height_in: parseFloat(heightIn) } : {}) },
       },
       product: {
         weight_lb: Number(weightLb) || 0,
