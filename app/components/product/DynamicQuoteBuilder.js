@@ -786,7 +786,7 @@ const handleDeliveryMethodChange = (method) => {
         customSizeNote,
       };
 
-      console.error('[DBG][FRONTEND_PAYLOAD]', {
+      console.log('[DBG][FRONTEND_PAYLOAD]', {
         productId,
         widthIn,
         heightIn,
@@ -884,7 +884,7 @@ const handleDeliveryMethodChange = (method) => {
   if (error && !schema) {
     return (
       <div className="mt-10 p-6 bg-white rounded-xl shadow-sm border border-gray-200">
-        <p className="text-red-600">{error}</p>
+        <p className="text-emerald-600">{error}</p>
       </div>
     );
   }
@@ -1173,24 +1173,20 @@ const renderDimensionStep = (group, pool, value) => {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Width (inches)</label>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={widthIn}
             onChange={(e) => setWidthIn(e.target.value)}
-            min={dimensionConfig?.minWidthIn || 1}
-            max={dimensionConfig?.maxWidthIn || 999}
-            step="0.1"
             className="w-full border border-gray-300 rounded-lg px-3 py-2"
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Height (inches)</label>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={heightIn}
             onChange={(e) => setHeightIn(e.target.value)}
-            min={dimensionConfig?.minHeightIn || 1}
-            max={dimensionConfig?.maxHeightIn || 999}
-            step="0.1"
             className="w-full border border-gray-300 rounded-lg px-3 py-2"
           />
         </div>
@@ -1784,7 +1780,7 @@ return (
 
         <div className="space-y-6">
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
               {error}
             </div>
           )}

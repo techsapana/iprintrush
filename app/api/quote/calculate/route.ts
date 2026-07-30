@@ -22,8 +22,8 @@ import type {
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
-    console.error('[Q] entry', payload?.mode, payload?.productId, 'sel=' + !!payload?.selections);
-    console.error('[DBG][POST] entry', { productId: payload?.productId, mode: payload?.mode });
+    console.log('[Q] entry', payload?.mode, payload?.productId, 'sel=' + !!payload?.selections);
+    console.log('[DBG][POST] entry', { productId: payload?.productId, mode: payload?.mode });
 
     // Handle mailbox mode separately (no unification needed - different domain)
     if (payload.mode === 'mailbox') {

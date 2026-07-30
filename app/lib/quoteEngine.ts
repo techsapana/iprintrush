@@ -1161,6 +1161,9 @@ export function resolveAddonsForMode(
       }
 
       if (sel === undefined || sel === null || sel === '' || (Array.isArray(sel) && sel.length === 0)) {
+        if (isPrintSizePool(pool) && config.allowCustomDimensions) {
+          continue;
+        }
         throw new Error(`Missing print product option for ${poolKey}`);
       }
 

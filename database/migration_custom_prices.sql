@@ -1,4 +1,4 @@
-﻿-- Migration: Add custom price columns to product-option relationship tables
+-- Migration: Add custom price columns to product-option relationship tables
 -- This allows per-product price customization (overriding global defaults)
 -- Run this migration on your existing database
 
