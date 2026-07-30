@@ -761,8 +761,9 @@ const handleDeliveryMethodChange = (method) => {
       const selectedPrintSizeId = selections[printSizePool?.key];
       if (printSizePool && selectedPrintSizeId != null) {
         const selectedOption = printSizePool.options?.find((o) => o.id === selectedPrintSizeId);
-        if (selectedOption?.value) {
-          const dims = parseDimensionsFromValue(selectedOption.value);
+        const dimSource = selectedOption?.value || selectedOption?.label;
+        if (dimSource) {
+          const dims = parseDimensionsFromValue(dimSource);
           if (dims) {
             dimensionSelections.width_in = dims.width;
             dimensionSelections.height_in = dims.height;
