@@ -1197,8 +1197,7 @@ export function resolveAddonsForMode(
       let height = 0;
 
       const presetDims = resolvedPrintSizeOption
-        ? (parseDimensionsFromValue(resolvedPrintSizeOption.value) || 
-           (!/custom/i.test(resolvedPrintSizeOption.label || '') ? parseDimensionsFromValue(resolvedPrintSizeOption.label) : null))
+        ? (parseDimensionsFromValue(resolvedPrintSizeOption.value) || parseDimensionsFromValue(resolvedPrintSizeOption.label))
         : null;
 
       if (presetDims) {
