@@ -1233,8 +1233,10 @@ export function resolveAddonsForMode(
           selectionsKeys: Object.keys(selections),
           selections: selections,
         });
-        width = typeof widthRaw === 'number' ? widthRaw : NaN;
-        height = typeof heightRaw === 'number' ? heightRaw : NaN;
+        const parsedWidth = parseFloat(widthRaw);
+        const parsedHeight = parseFloat(heightRaw);
+        width = Number.isFinite(parsedWidth) ? parsedWidth : NaN;
+        height = Number.isFinite(parsedHeight) ? parsedHeight : NaN;
         if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
           throw new Error('Valid width and height are required for dimension pricing');
         }
