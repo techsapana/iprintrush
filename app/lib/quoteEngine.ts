@@ -261,7 +261,7 @@ function parsePositiveNumber(value: unknown): number | null {
 export function parseDimensionsFromValue(value: unknown): { width: number; height: number } | null {
   if (value == null) return null;
   const raw = typeof value === 'string' ? value : String(value);
-  const match = raw.match(/(\d+(?:\.\d+)?)\s*[xX\u00d7]\s*(\d+(?:\.\d+)?)/);
+  const match = raw.match(/(\d+(?:\.\d+)?)\s*(?:in|inch|inches|["'])?\s*[xX\u00d7]\s*(\d+(?:\.\d+)?)\s*(?:in|inch|inches|["'])?/i);
   if (!match) return null;
   const width = Number(match[1]);
   const height = Number(match[2]);
