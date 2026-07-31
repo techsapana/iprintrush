@@ -656,11 +656,25 @@ const handleDeliveryMethodChange = (method) => {
 
     const printSizePoolKey = getPrintSizePoolKey();
     const selectedPrintSize = printSizePoolKey ? selections[printSizePoolKey] : null;
-    const hasPresetPrintSize =
+    let hasPresetPrintSize = false;
+    if (
       selectedPrintSize !== undefined &&
       selectedPrintSize !== null &&
       selectedPrintSize !== '' &&
-      (!Array.isArray(selectedPrintSize) || selectedPrintSize.length > 0);
+      (!Array.isArray(selectedPrintSize) || selectedPrintSize.length > 0)
+    ) {
+      const printSizePool = (pools || []).find((p) => p.key === printSizePoolKey);
+      if (printSizePool) {
+        const selectedOptionId = Array.isArray(selectedPrintSize) ? selectedPrintSize[0] : selectedPrintSize;
+        const selectedOption = printSizePool.options?.find((o) => o.id === selectedOptionId);
+        if (selectedOption) {
+          const dimSource = selectedOption.value || selectedOption.label;
+          if (parseDimensionsFromValue(dimSource)) {
+            hasPresetPrintSize = true;
+          }
+        }
+      }
+    }
     const hasAreaPricing = dimensionConfig?.pricePerSqInch != null;
     const shouldUseCustomDimensions = hasAreaPricing && !hasPresetPrintSize && allowCustomDimensions;
 
