@@ -484,14 +484,14 @@ export function Navbar() {
                       onMouseLeave={() => closeDropdown(category.id)}
                     >
                       <Link
-                        href={`/products?category=${category.slug}`}
+                        href={`/products?category=${encodeURIComponent(category.slug)}`}
                         onClick={onLinkClick}
                         className="px-4 py-2 text-white font-bold text-sm rounded-full hover:bg-white/20 active:bg-white/30 transition-colors whitespace-nowrap hidden md:inline-block"
                       >
                         {category.name}
                       </Link>
                       <Link
-                        href={`/products?category=${category.slug}`}
+                        href={`/products?category=${encodeURIComponent(category.slug)}`}
                         onClick={onLinkClick}
                         className="flex-shrink-0 px-4 py-2 text-white font-bold text-sm rounded-full hover:bg-white/20 active:bg-white/30 transition-colors whitespace-nowrap md:hidden"
                       >
@@ -634,7 +634,7 @@ export function Navbar() {
                   {navbarStripCategories.map((category) => (
                     <Link
                       key={category.id}
-                      href={`/products?category=${category.slug}`}
+                      href={`/products?category=${encodeURIComponent(category.slug)}`}
                       onClick={() => setMobileMenuOpen(false)}
                       className="block px-3 py-2.5 rounded-md text-white font-bold text-sm hover:bg-white/15"
                     >
