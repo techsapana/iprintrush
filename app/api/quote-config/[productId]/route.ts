@@ -237,7 +237,7 @@ export async function GET(
         [actualProductId]
       ),
       query(
-        'SELECT color_option_id as id FROM product_color_options WHERE product_id = ?',
+        'SELECT color_option_id as id, image_url FROM product_color_options WHERE product_id = ?',
         [actualProductId]
       ),
       query(
@@ -299,6 +299,7 @@ export async function GET(
           .filter((d) => d.enabled)
           .map((d) => d.id),
         colorOptionIds: config.colors.filter((c) => c.enabled).map((c) => c.id),
+        colorImages: {},
         sizeOptionIds: config.sizes.filter((s) => s.baseEnabled).map((s) => s.id),
         printLocationOptionIds: config.printLocations
           .filter((p) => p.enabled)
@@ -338,6 +339,9 @@ export async function GET(
         useCustomQuantityTiers: Boolean(productSettings.use_custom_quantity_tiers),
         decorationOptionIds: (decorationOptions as any[]).map((r: any) => r.id),
         colorOptionIds: (colorIds as any[]).map((r: any) => r.id),
+        colorImages: Object.fromEntries(
+          colorIds.map((c: any) => [c.id, c.image_url || null])
+        ),
         sizeOptionIds: (sizeOptions as any[]).map((r: any) => r.id),
         printLocationOptionIds: (printLocationOptions as any[]).map((r: any) => r.id),
         turnaroundOptionIds: (turnaroundOptions as any[]).map((r: any) => r.id),
@@ -477,9 +481,13 @@ if (body.colorOptionIds) {
          actualProductId,
        ]);
        if (body.colorOptionIds.length > 0) {
-         const values = body.colorOptionIds.map((id: string) => [actualProductId, id]);
+         const values = body.colorOptionIds.map((id: string) => [
+           actualProductId,
+           id,
+           body.colorImages?.[id] || null,
+         ]);
          await query(
-           'INSERT INTO product_color_options (product_id, color_option_id) VALUES ?',
+           'INSERT INTO product_color_options (product_id, color_option_id, image_url) VALUES ?',
            [values]
          );
        }

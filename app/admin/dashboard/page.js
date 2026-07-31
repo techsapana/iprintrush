@@ -32,6 +32,11 @@ export default function AdminDashboardPage() {
   const [contactFaqs, setContactFaqs] = useState([
     { question: '', answer: '' },
   ]);
+  const [popupEnabled, setPopupEnabled] = useState(false);
+  const [popupTitle, setPopupTitle] = useState('');
+  const [popupMessage, setPopupMessage] = useState('');
+  const [popupImageUrl, setPopupImageUrl] = useState('');
+  const [popupColor, setPopupColor] = useState('#FFC520');
 
 useEffect(() => {
      if (!adminLoading && !adminUser) {
@@ -67,6 +72,11 @@ useEffect(() => {
             ? data.contactFaqs
             : [{ question: '', answer: '' }],
         );
+        setPopupEnabled(data.popupEnabled === true);
+        setPopupTitle(data.popupTitle || '');
+        setPopupMessage(data.popupMessage || '');
+        setPopupImageUrl(data.popupImageUrl || '');
+        setPopupColor(data.popupColor || '#FFC520');
       } catch {
       }
     };
@@ -117,6 +127,11 @@ useEffect(() => {
           contactPhone,
           contactEmail,
           contactFaqs,
+          popupEnabled,
+          popupTitle,
+          popupMessage,
+          popupImageUrl,
+          popupColor,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -461,7 +476,71 @@ useEffect(() => {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Global Promotional Popup</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Configure a read-only popup modal that shows when users visit the site.
+              </p>
+              <label className="flex items-center gap-2 mb-4">
+                <input
+                  type="checkbox"
+                  checked={popupEnabled}
+                  onChange={(e) => setPopupEnabled(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm text-gray-700">Enable Popup Modal</span>
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Popup Title</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={popupColor}
+                      onChange={(e) => setPopupColor(e.target.value)}
+                      className="h-10 w-12 rounded cursor-pointer border border-gray-300"
+                      title="Popup Background Color"
+                    />
+                    <input
+                      type="text"
+                      value={popupTitle}
+                      onChange={(e) => setPopupTitle(e.target.value)}
+                      placeholder="e.g. 30% Off"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Popup Image</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        await uploadSiteImage(file, setPopupImageUrl);
+                      } catch (err) {
+                        setAnnouncementMessage(err?.message || 'Failed to upload image');
+                      }
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                  {popupImageUrl && <img src={popupImageUrl} alt="Popup Image" className="mt-2 h-20 rounded object-cover border" />}
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm text-gray-700 mb-1">Popup Message</label>
+                  <textarea
+                    value={popupMessage}
+                    onChange={(e) => setPopupMessage(e.target.value)}
+                    rows={2}
+                    placeholder="e.g. Your First Transfer Order..."
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mt-4">
               <button
                 onClick={saveAnnouncement}
                 disabled={announcementLoading}

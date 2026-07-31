@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,7 @@ export default function ProductDetailPage({ params }) {
   const [currentQuote, setCurrentQuote] = useState(null);
   const [quoteEnabled, setQuoteEnabled] = useState(true);
   const [quotePrefill, setQuotePrefill] = useState(null);
+  const [activeColorImage, setActiveColorImage] = useState(null);
 
   const [productFresh, setProductFresh] = useState(null);
 
@@ -113,7 +114,7 @@ export default function ProductDetailPage({ params }) {
   const outOfStock = product?.outOfStock === true;
 
   // Build media list (images + videos) safely even if product has not loaded yet
-  const media = (() => {
+  const media = useMemo(() => {
     const items = [];
 
     const imageList =
@@ -131,9 +132,17 @@ export default function ProductDetailPage({ params }) {
     }
 
     return items;
-  })();
+  }, [product?.galleryImages, product?.image, product?.videos]);
 
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  
+  useEffect(() => {
+    if (activeColorImage) {
+      const idx = media.findIndex((m) => m.type === 'image' && m.url === activeColorImage);
+      if (idx !== -1) setCurrentMediaIndex(idx);
+    }
+  }, [activeColorImage, media]);
+
   const currentMedia = media[currentMediaIndex] || { type: 'image', url: product?.image || '/placeholder.jpg' };
   const inWishlist = product ? isInWishlist(product.id) : false;
 
@@ -385,6 +394,7 @@ const canProceedToPayment = Boolean(
                    packageWidthIn={product.packageWidthIn}
                    localDeliveryEligible={product.localDeliveryEligible}
                    onAddToCart={handleAddToCart}
+                   onColorSelect={setActiveColorImage}
                  />
               )}
 

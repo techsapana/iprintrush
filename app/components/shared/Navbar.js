@@ -37,7 +37,7 @@ export function Navbar() {
   const [canScrollRight, setCanScrollRight] = useState(false);
   const { getItemCount } = useCart();
   const { getItemCount: getWishlistCount } = useWishlist();
-  const { categories, products } = useAdmin();
+  const { categories, products, loading } = useAdmin();
   const { isAuthenticated } = useAuth();
   const cartCount = getItemCount();
   const wishlistCount = getWishlistCount();
@@ -234,11 +234,12 @@ export function Navbar() {
                   iprint
                 </span>
               ) : (
-                <div className="h-12 md:h-16 flex items-center justify-center">
+                <div className="h-12 md:h-16 flex items-center justify-start w-[160px] md:w-[200px]">
                   <img
                     src={logoImageUrl || '/logo.png'}
                     alt="iPrintRush"
-                    className="h-full w-auto max-h-full object-contain hover:scale-105 transition-transform"
+                    className="h-full w-auto max-w-full object-contain hover:scale-105 transition-transform duration-300"
+                    style={{ transformOrigin: 'left center' }}
                   />
                 </div>
               )}
@@ -531,6 +532,15 @@ export function Navbar() {
                     </div>
                   );
                 })}
+
+              {/* Skeleton loaders while fetching categories to prevent layout shift */}
+              {loading && navbarStripCategories.length === 0 && (
+                <div className="flex gap-2 px-2 pointer-events-none items-center opacity-60">
+                  <div className="h-9 w-24 bg-white/20 animate-pulse rounded-full" />
+                  <div className="h-9 w-32 bg-white/20 animate-pulse rounded-full" />
+                  <div className="h-9 w-28 bg-white/20 animate-pulse rounded-full" />
+                </div>
+              )}
 
               {/* Divider between main nav + contact/FAQ */}
               <span className="flex-shrink-0 w-px h-5 bg-white/30 mx-2" />

@@ -32,6 +32,7 @@ export function QuoteBuilder({
   packageWidthIn = null,
   localDeliveryEligible = null,
   onAddToCart,
+  onColorSelect,
   isModal,
 }) {
   const [loading, setLoading] = useState(true);
@@ -193,7 +194,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
           if (draft?.payload) {
             const sanitized = sanitizeApparelDraft(draft.payload, json.config, json.productSettings);
             if (sanitized) {
-              applyQuotePrefill(sanitized, draft.summary);
+              applyQuotePrefill(sanitized, draft.summary, json.productSettings);
             } else {
               clearQuoteDraft(productId);
             }
@@ -214,9 +215,12 @@ const [availableMethods, setAvailableMethods] = useState([]);
     };
   }, [productId]);
 
-  const applyQuotePrefill = (p, summary) => {
+  const applyQuotePrefill = (p, summary, ps = productSettings) => {
     if (p.decorationOptionId) setDecorationId(p.decorationOptionId);
-    if (p.colorOptionId) setColorId(p.colorOptionId);
+    if (p.colorOptionId) {
+      setColorId(p.colorOptionId);
+      if (onColorSelect) onColorSelect(ps?.colorImages?.[p.colorOptionId] || null);
+    }
     if (p.turnaroundOptionId) setTurnaroundId(p.turnaroundOptionId);
     if (p.designerHelpOptionId) setDesignerHelpId(p.designerHelpOptionId);
     if (Array.isArray(p.printLocationIds)) setPrintLocationIds(p.printLocationIds);
@@ -295,9 +299,9 @@ const [availableMethods, setAvailableMethods] = useState([]);
 
   useEffect(() => {
     const p = prefillQuote?.payload;
-    if (!p || !config) return;
-    applyQuotePrefill(p, prefillQuote.summary);
-  }, [prefillQuote, config]);
+    if (!p || !config || !productSettings) return;
+    applyQuotePrefill(p, prefillQuote.summary, productSettings);
+  }, [prefillQuote, config, productSettings]);
 
   // Debounced autosave of the serializable quote payload (apparel mode only).
   // Gated on hydration so it never overwrites a draft with empty defaults.
@@ -586,6 +590,9 @@ const invalidateQuote = () => {
   const handleColorChange = (id) => {
     invalidateQuote();
     setColorId(id);
+    if (onColorSelect) {
+      onColorSelect(productSettings?.colorImages?.[id] || null);
+    }
     scheduleRecalculation();
   };
 

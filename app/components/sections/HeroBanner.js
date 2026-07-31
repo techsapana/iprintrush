@@ -27,35 +27,6 @@ export function HeroBanner() {
           <HeroBackgroundSlider />
         </div>
 
-        {/* Subtle overlay so content reads clearly over image */}
-        <div className="absolute inset-0 bg-black/35 pointer-events-none" />
-
-        {/* Buttons at bottom of hero banner */}
-        <div className="absolute bottom-0 left-0 right-0 pb-8 sm:pb-12">
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
-              {/* CTA Buttons */}
-              <div className="flex flex-wrap gap-2 sm:gap-4 justify-center animate-fadeInUp">
-                <Link href="/products">
-                  <button className="group relative px-5 py-2.5 sm:px-8 sm:py-4 bg-[#29b6f6] text-white font-bold text-sm sm:text-lg rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 overflow-hidden">
-                    <span className="relative z-10">Shop Now</span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#29b6f6] to-[#1c88c0] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  </button>
-                </Link>
-                <Link href="/about">
-                  <button className="px-5 py-2.5 sm:px-8 sm:py-4 bg-white text-[#29b6f6] font-bold text-sm sm:text-lg rounded-full border-2 border-white/40 hover:bg-white/90 hover:border-white/60 transition-all duration-300 hover:scale-105 shadow-md">
-                    Learn More
-                  </button>
-                </Link>
-                <Link href="/portfolio">
-                  <button className="px-5 py-2.5 sm:px-8 sm:py-4 bg-transparent text-white font-bold text-sm sm:text-lg rounded-full border-2 border-white/70 hover:bg-white/10 transition-all duration-300 hover:scale-105 shadow-md">
-                    View Portfolio
-                  </button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* ── WHITE CONTENT AREA ── */}
@@ -100,11 +71,26 @@ export function HeroBanner() {
 
 
           <p
-            className="text-base sm:text-lg md:text-xl text-gray-700 mb-8 sm:mb-10 max-w-3xl mx-auto font-medium leading-relaxed animate-fadeInUp"
+            className="text-base sm:text-lg md:text-xl text-gray-700 mb-6 sm:mb-8 max-w-3xl mx-auto font-medium leading-relaxed animate-fadeInUp"
             style={{ animationDelay: '0.2s' }}
           >
             Same-day printing solutions for your business. Fast turnaround, professional quality, competitive prices.
           </p>
+
+          {/* View Portfolio Button */}
+          <div className="mb-10 sm:mb-12 animate-fadeInUp" style={{ animationDelay: '0.22s' }}>
+            <Link href="/portfolio">
+              <button className="group relative px-6 py-3 sm:px-10 sm:py-4 bg-[#29b6f6] text-white font-bold text-base sm:text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
+                <span className="relative z-10 flex items-center gap-2 justify-center">
+                  View Our Portfolio
+                  <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-[#29b6f6] to-[#1c88c0] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              </button>
+            </Link>
+          </div>
 
           {/* Same-day products slider */}
           <div className="mt-2 sm:mt-4 animate-fadeInUp" style={{ animationDelay: '0.25s' }}>

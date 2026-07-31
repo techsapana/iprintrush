@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 import { AdminProvider } from './context/AdminContext';
 import { Navbar } from './components/shared/Navbar';
 import { Footer } from './components/shared/Footer';
+import { GlobalPopupModal } from './components/shared/GlobalPopupModal';
 
 export function RootLayoutClient({ children }) {
   const pathname = usePathname();
@@ -23,7 +24,7 @@ export function RootLayoutClient({ children }) {
               <main className="flex-1">{children}</main>
               {!isAdminRoute && !isPrintRoute && <Footer />}
             </div>
-            
+            {!isAdminRoute && !isPrintRoute && <GlobalPopupModal />}
           </AuthProvider>
         </WishlistProvider>
       </CartProvider>

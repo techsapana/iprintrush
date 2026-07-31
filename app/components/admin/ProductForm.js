@@ -136,6 +136,7 @@ const [formData, setFormData] = useState({
   const [quoteEnabled, setQuoteEnabled] = useState(true);
   const [useCustomQuantityTiers, setUseCustomQuantityTiers] = useState(true);
   const [selectedColors, setSelectedColors] = useState([]);
+  const [colorImages, setColorImages] = useState({});
   
   // Options with custom prices: { id: string, customPrice: number | null, pricingType?: string, percentageValue?: number | null }
   const [selectedDecorations, setSelectedDecorations] = useState([]);
@@ -454,6 +455,7 @@ setCustomizationMode('print_product');
           setQuoteEnabled(ps.enabled);
           setUseCustomQuantityTiers(true);
           setSelectedColors(ps.colorOptionIds || []);
+          setColorImages(ps.colorImages || {});
           setSelectedDecorations(
             (ps.decorationOptionIds || []).map((id) => ({
               id,
@@ -680,6 +682,18 @@ setCustomizationMode('print_product');
       } catch {
         // ignore
       }
+      
+      const oldImage = imagePreview || formData.image;
+      if (oldImage && oldImage !== '/placeholder.jpg' && oldImage !== url) {
+        setColorImages((prev) => {
+          const newMap = { ...prev };
+          Object.keys(newMap).forEach((colorId) => {
+            if (newMap[colorId] === oldImage) newMap[colorId] = null;
+          });
+          return newMap;
+        });
+      }
+
       setImagePreview(url);
       setFormData((prev) => ({ ...prev, image: url }));
     } catch (err) {
@@ -1062,6 +1076,7 @@ const productData = {
               enabled: quoteEnabled,
               useCustomQuantityTiers: true,
               colorOptionIds: selectedColors,
+              colorImages: colorImages,
               decorationOptionIds: selectedDecorations.map((d) => d.id),
               sizeOptionIds: selectedSizes.map((s) => s.id),
               printLocationOptionIds: selectedPrintLocations.map((p) => p.id),
@@ -1770,6 +1785,16 @@ multi-month discounts.
                        <button
                          type="button"
                          onClick={() => {
+                           const oldImage = imagePreview || formData.image;
+                           if (oldImage && oldImage !== '/placeholder.jpg') {
+                             setColorImages((prev) => {
+                               const newMap = { ...prev };
+                               Object.keys(newMap).forEach((colorId) => {
+                                 if (newMap[colorId] === oldImage) newMap[colorId] = null;
+                               });
+                               return newMap;
+                             });
+                           }
                            setImagePreview(null);
                            setFormData((prev) => ({ ...prev, image: '/placeholder.jpg' }));
                            dirtyMediaFields.current.add('image');
@@ -1852,6 +1877,15 @@ multi-month discounts.
                                 galleryImages: prev.galleryImages.filter((_, i) => i !== idx),
                               }));
                               setGalleryPreviews((prev) => prev.filter((_, i) => i !== idx));
+                              setColorImages((prev) => {
+                                const newMap = { ...prev };
+                                Object.keys(newMap).forEach((colorId) => {
+                                  if (newMap[colorId] === url) {
+                                    newMap[colorId] = null;
+                                  }
+                                });
+                                return newMap;
+                              });
                             }}
                             className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] hover:bg-red-600"
                           >
@@ -2392,24 +2426,53 @@ multi-month discounts.
             Select which colors are available for this product.
           </p>
           <div className="flex flex-wrap gap-4">
-            {quoteConfig.colors.filter((c) => c.enabled).map((color) => (
-              <button
-                key={color.id}
-                type="button"
-                onClick={() => toggleColor(color.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition ${
-                  selectedColors.includes(color.id)
-                    ? 'border-[#29b6f6] bg-[#29b6f6]/10'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div
-                  className="w-6 h-6 rounded-full border border-gray-300"
-                  style={{ backgroundColor: color.hex }}
-                />
-                <span className="text-sm font-medium">{color.name}</span>
-              </button>
-            ))}
+            {quoteConfig.colors.filter((c) => c.enabled).map((color) => {
+              const isSelected = selectedColors.includes(color.id);
+              return (
+                <div key={color.id} className={`flex flex-col gap-2 p-2 rounded-lg border-2 transition ${isSelected ? 'border-[#29b6f6]/30 bg-blue-50/50' : 'border-transparent'}`}>
+                  <button
+                    type="button"
+                    onClick={() => toggleColor(color.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition ${
+                      isSelected
+                        ? 'border-[#29b6f6] bg-[#29b6f6]/10'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <div
+                      className="w-6 h-6 rounded-full border border-gray-300"
+                      style={{ backgroundColor: color.hex }}
+                    />
+                    <span className="text-sm font-medium">{color.name}</span>
+                  </button>
+                  {isSelected && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-500 font-medium px-1">Link Image (Optional):</span>
+                      <div className="flex flex-wrap gap-1 px-1">
+                        {/* Deduplicate imagePreview and galleryPreviews */}
+                        {Array.from(new Set([imagePreview, ...galleryPreviews].filter(Boolean))).map((imgUrl, i) => (
+                          <img
+                            key={i}
+                            src={imgUrl}
+                            alt="product thumbnail"
+                            title="Click to link this image to this color"
+                            className={`w-8 h-8 object-cover rounded cursor-pointer border-2 transition-all ${
+                              colorImages[color.id] === imgUrl 
+                                ? 'border-[#29b6f6] opacity-100 ring-2 ring-[#29b6f6]/20' 
+                                : 'border-transparent opacity-60 hover:opacity-100 hover:border-gray-300'
+                            }`}
+                            onClick={() => setColorImages(prev => ({ 
+                              ...prev, 
+                              [color.id]: prev[color.id] === imgUrl ? null : imgUrl 
+                            }))}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
