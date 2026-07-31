@@ -11,6 +11,7 @@ import { Footer } from './components/shared/Footer';
 export function RootLayoutClient({ children }) {
   const pathname = usePathname();
   const isAdminRoute = pathname?.startsWith('/admin');
+  const isPrintRoute = pathname === '/quote/print';
 
   return (
     <AdminProvider>
@@ -18,9 +19,9 @@ export function RootLayoutClient({ children }) {
         <WishlistProvider>
           <AuthProvider>
             <div className="flex flex-col min-h-screen">
-              {!isAdminRoute && <Navbar />}
+              {!isAdminRoute && !isPrintRoute && <Navbar />}
               <main className="flex-1">{children}</main>
-              {!isAdminRoute && <Footer />}
+              {!isAdminRoute && !isPrintRoute && <Footer />}
             </div>
             
           </AuthProvider>

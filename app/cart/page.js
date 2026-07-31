@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { saveQuotePrefill } from '../lib/quotePrefill';
@@ -9,12 +10,127 @@ import { useSameDayEligibility } from '../hooks/useSameDayEligibility';
 import { SameDayNotice } from '../components/shared/SameDayNotice';
 import { useAuth } from '../hooks/useAuth';
 import { clearBuyNowItems, requireLoginForCheckout } from '../lib/checkoutFlow';
+import { buildQuoteCartEntries } from '../lib/cartHelpers';
+
+import { CartEditModal } from '../components/product/CartEditModal';
+function CartQuantityControl({ initialQuantity, onQuantityChange }) {
+  const [value, setValue] = useState(initialQuantity);
+  
+  useEffect(() => { setValue(initialQuantity); }, [initialQuantity]);
+
+  const handleBlur = () => {
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setValue(initialQuantity);
+    } else if (parsed !== initialQuantity) {
+      onQuantityChange(parsed);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleBlur();
+  };
+
+  const handleAdjust = (delta) => {
+    const parsed = parseInt(value, 10) || 1;
+    const newValue = Math.max(1, parsed + delta);
+    setValue(newValue);
+    onQuantityChange(newValue);
+  };
+
+  return (
+    <div className="flex items-center">
+      <button
+        type="button"
+        onClick={() => handleAdjust(-1)}
+        className="px-3 py-1 border border-gray-300 rounded-l hover:bg-gray-100 bg-white"
+      >
+        −
+      </button>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        className="w-16 px-2 py-1 border-t border-b border-gray-300 text-center focus:outline-none appearance-none"
+        style={{ MozAppearance: 'textfield' }}
+      />
+      <button
+        type="button"
+        onClick={() => handleAdjust(1)}
+        className="px-3 py-1 border border-gray-300 rounded-r hover:bg-gray-100 bg-white"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+function EditDropdown({ item, onSelect }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative inline-block text-right" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="text-sm text-[#29b6f6] hover:text-[#1e8fc4] font-medium transition-colors"
+      >
+        Edit Item
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+          <div className="py-1" role="menu" aria-orientation="vertical">
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+              role="menuitem"
+              onClick={() => {
+                setIsOpen(false);
+                onSelect(item, null);
+              }}
+            >
+              Start from Beginning
+            </button>
+            <div className="border-t border-gray-100"></div>
+            {Object.keys(item.options?.customizationsDisplay || {}).map((key) => (
+              <button
+                key={key}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                role="menuitem"
+                onClick={() => {
+                  setIsOpen(false);
+                  onSelect(item, key);
+                }}
+              >
+                Edit {key}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CartPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const {
     items,
+    addToCart,
     removeFromCart,
     updateQuantity,
     updateQuoteQuantity,
@@ -23,26 +139,17 @@ export default function CartPage() {
   } = useCart();
   const eligibility = useSameDayEligibility();
 
-  const handleEditItem = (item) => {
+  const [editingItem, setEditingItem] = useState(null);
+
+  const handleEditItem = (item, targetStepTitle = null) => {
     const payload = item.options?.quotePayload;
     if (!payload) {
       window.alert('This cart item cannot be edited (no saved customization).');
       return;
     }
-    saveQuotePrefill({
-      productId: item.id,
-      payload,
-      summary: item.options?.quoteSummary,
-      customizationsDisplay: item.options?.customizationsDisplay || {},
-      cartOptions: item.options,
-    });
-    const slug = item.slug;
-    if (slug) {
-      router.push(`/products/${encodeURIComponent(slug)}?edit=1`);
-      return;
-    }
-    router.push(`/products?editProduct=${encodeURIComponent(item.id)}`);
+    setEditingItem({ item, targetStepTitle });
   };
+
 
   const handleProceedToCheckout = () => {
     clearBuyNowItems();
@@ -94,9 +201,13 @@ export default function CartPage() {
                     item.options?.splitQuote === true ||
                     item.options?.customLineTotal != null;
 
+                  const isApparel = item.options?.quotePayload?.mode === 'apparel' || item.options?.quotePayload?.mode === 'custom_apparel';
+                  const hasMultipleSizes = isApparel && (item.options?.quotePayload?.quantities?.length || 0) > 1;
+
                   const canEditQuoteQuantity =
                     !!item.options?.quotePayload &&
-                    item.options?.splitQuote !== true;
+                    item.options?.splitQuote !== true &&
+                    !hasMultipleSizes;
 
                   return (
                     <div
@@ -129,14 +240,14 @@ export default function CartPage() {
                                   ([k]) => !/size\s*breakdown/i.test(String(k)),
                                 )
                                 .map(([k, v]) =>
-                                  v ? (
-                                    <div key={k}>
-                                      <span className="font-semibold">
-                                        {k}:
-                                      </span>{' '}
-                                      {v}
-                                    </div>
-                                  ) : null,
+                                    v ? (
+                                      <div key={k}>
+                                        <span className="font-semibold">
+                                          {k}:
+                                        </span>{' '}
+                                        {v}
+                                      </div>
+                                    ) : null,
                                 )}
                             </div>
                           )}
@@ -159,103 +270,29 @@ export default function CartPage() {
                           }
                         >
                           {!isQuoteItem ? (
-                            <>
-                              <button
-                                onClick={() => {
-                                  console.debug('[BranchA -]', {
-                                    product: item.name,
-                                    id: item.id,
-                                    quantity: item.quantity,
-                                  });
-                                  updateQuantity(
-                                    item.id,
-                                    Math.max(1, item.quantity - 1),
-                                    item.options,
-                                  );
-                                }}
-                                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
-                              >
-                                −
-                              </button>
-                              <span className="px-4 py-1 border border-gray-300 rounded">
-                                {item.quantity}
-                              </span>
-                              <button
-                                onClick={() => {
-                                  console.debug('[BranchA +]', {
-                                    product: item.name,
-                                    id: item.id,
-                                    quantity: item.quantity,
-                                  });
-                                  updateQuantity(
-                                    item.id,
-                                    item.quantity + 1,
-                                    item.options,
-                                  );
-                                }}
-                                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
-                              >
-                                +
-                              </button>
-                            </>
+                            <CartQuantityControl 
+                              initialQuantity={item.quantity} 
+                              onQuantityChange={(newQty) => updateQuantity(item.id, newQty, item.options, item.cartItemId)} 
+                            />
                           ) : canEditQuoteQuantity ? (
-                            <>
-                              <button
-                                onClick={() => {
-                                  console.debug('[CartClick]', {
-                                    productId: item.id,
-                                    name: item.name,
-                                    quantity: item.quantity,
-                                    mode: item.options?.quotePayload?.mode,
-                                    splitQuote: item.options?.splitQuote,
-                                  });
-                                  updateQuoteQuantity(
-                                    item.id,
-                                    Math.max(1, item.quantity - 1),
-                                    item.options,
-                                  );
-                                  console.debug('[CartClick] after updateQuoteQuantity');
-                                }}
-                                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
-                              >
-                                −
-                              </button>
-                              <span className="px-4 py-1 border border-gray-300 rounded">
-                                {item.quantity}
-                              </span>
-                              <button
-                                onClick={() => {
-                                  console.debug('[CartClick]', {
-                                    productId: item.id,
-                                    name: item.name,
-                                    quantity: item.quantity,
-                                    mode: item.options?.quotePayload?.mode,
-                                    splitQuote: item.options?.splitQuote,
-                                  });
-                                  updateQuoteQuantity(
-                                    item.id,
-                                    item.quantity + 1,
-                                    item.options,
-                                  );
-                                  console.debug('[CartClick] after updateQuoteQuantity');
-                                }}
-                                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100"
-                              >
-                                +
-                              </button>
-                            </>
+                            <CartQuantityControl 
+                              initialQuantity={item.quantity} 
+                              onQuantityChange={(newQty) => updateQuoteQuantity(item.id, newQty, item.options, item.cartItemId)} 
+                            />
                           ) : (
                             <div className="flex items-center gap-2">
                               <span className="px-4 py-1 border border-gray-300 rounded bg-gray-50">
                                 {item.quantity}
                               </span>
 
-                              <span
-                                className="text-xs text-gray-500"
-                                title="Edit product to change quantity"
+                              <button
+                                type="button"
+                                onClick={() => handleEditItem(item, null)}
+                                className="text-xs text-[#29b6f6] hover:text-[#1e8fc4] underline ml-2 font-medium"
+                                title="Edit item to change quantities"
                               >
-                                Edit product to change quantity
-                              </span>
+                                Edit quantities
+                              </button>
                             </div>
                           )}
                         </div>
@@ -279,17 +316,11 @@ export default function CartPage() {
                         })()}
                         <section className="flex flex-col items-end gap-2 mt-4">
                           {item.options?.quotePayload ? (
-                            <button
-                              type="button"
-                              onClick={() => handleEditItem(item)}
-                              className="text-sm text-[#29b6f6] hover:text-[#1e8fc4] font-medium"
-                            >
-                              Edit
-                            </button>
+                            <EditDropdown item={item} onSelect={handleEditItem} />
                           ) : null}
                           <button
                             onClick={() =>
-                              removeFromCart(item.id, item.options)
+                              removeFromCart(item.id, item.options, item.cartItemId)
                             }
                             className="text-sm text-red-600 hover:text-red-800 font-medium"
                           >
@@ -372,6 +403,31 @@ export default function CartPage() {
           </div>
         </div>
       </div>
+
+      {editingItem && (
+        <CartEditModal
+          item={editingItem.item}
+          targetStep={editingItem.targetStepTitle}
+          onClose={() => setEditingItem(null)}
+          onSave={(currentQuote) => {
+            if (currentQuote && currentQuote.summary) {
+              // The original item could be a single item or part of a split group
+              const originalItem = editingItem.item;
+              const splitGroupId = originalItem.options?.splitGroupId;
+              
+              // Remove the old item(s). If it was a split group, removeFromCart automatically removes all in the group.
+              removeFromCart(originalItem.id, originalItem.options, originalItem.cartItemId);
+              
+              // Add the new entries
+              const entries = buildQuoteCartEntries(currentQuote, { id: originalItem.id });
+              entries.forEach(options => {
+                addToCart({ id: originalItem.id, name: originalItem.name, image: originalItem.image, slug: originalItem.slug }, options);
+              });
+            }
+            setEditingItem(null);
+          }}
+        />
+      )}
     </div>
   );
 }

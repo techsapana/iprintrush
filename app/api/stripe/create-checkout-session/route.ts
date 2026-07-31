@@ -418,6 +418,8 @@ export async function POST(req: NextRequest) {
               mode: 'split_quote',
               quotePayload: quotePayloadForRecalc,
               quoteSummary: serverSummaryForSplit,
+              splitGroupId: item.splitGroupId || null,
+              splitSizeLabel: item.splitSizeLabel || null,
             });
             resolvedUnitPrice = item.quantity > 0 ? splitMerchandise / item.quantity : 0;
             quoteMerchandiseCents += toCents(splitMerchandise);
@@ -434,6 +436,8 @@ export async function POST(req: NextRequest) {
               mode: item.quotePayload.mode || 'apparel',
               quotePayload: quotePayloadForRecalc,
               quoteSummary: serverSummary || null,
+              splitGroupId: item.splitGroupId || null,
+              splitSizeLabel: item.splitSizeLabel || null,
             });
             resolvedUnitPrice = item.quantity > 0 ? merchandise / item.quantity : 0;
             quoteMerchandiseCents += toCents(merchandise);
@@ -491,9 +495,12 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // Append size/split label to the stored item name so admin can distinguish
+        const storedName = sizeLabel ? `${productName} - ${sizeLabel}` : productName;
+
         orderItemRows.push({
           productId: item.id,
-          name: productName,
+          name: storedName,
           qty: item.quantity,
           unitPrice: item.quantity > 0 ? itemMerchandise / item.quantity : 0,
           lineTotal: itemMerchandise,

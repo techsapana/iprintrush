@@ -513,6 +513,16 @@ export default function AdminOrderDetailPage() {
               </div>
             </div>
           </div>
+          {/* Shipping row - only show if shipping was charged */}
+          {order.shippingAmount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">
+                Shipping{order.shippingServiceName ? ` (${order.shippingServiceName})` : ''}
+                {order.shippingCarrier ? ` via ${order.shippingCarrier}` : ''}
+              </span>
+              <span>${order.shippingAmount.toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between pt-2 border-t mt-2 text-base font-semibold">
             <span>Total</span>
             <span>${order.amountTotal.toFixed(2)}</span>
@@ -716,6 +726,21 @@ export default function AdminOrderDetailPage() {
                                   </li>
                                 ))}
                               </ul>
+                            </div>
+                          )}
+                          {/* Custom Size Note */}
+                          {item.customSizeNote && (
+                            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
+                              <span className="font-semibold text-amber-700">📐 Custom Size Note:</span>{' '}
+                              <span className="text-amber-900">{item.customSizeNote}</span>
+                            </div>
+                          )}
+                          {/* Split Group Badge */}
+                          {item.customization.splitGroupId && (
+                            <div className="mt-2 text-xs text-indigo-600">
+                              <span className="inline-flex items-center gap-1 bg-indigo-50 border border-indigo-200 rounded px-2 py-0.5">
+                                🔗 Split Group: {item.customization.splitSizeLabel || 'Size variant'}
+                              </span>
                             </div>
                           )}
                         </div>

@@ -40,8 +40,8 @@ export function buildSizeBreakdownForSummary(
     return [];
   }
   
-  // If only one entry or mixed (print product style)
-  if (quantityBreakdown.length === 1 || quantityBreakdown.some(q => q.label === 'Total')) {
+  // If it's a generic total or explicitly labeled as 'Total'
+  if (quantityBreakdown.some(q => q.label === 'Total' || q.key === 'total')) {
     return [{ sizeLabel: 'Total', quantity: totalQuantity }];
   }
   

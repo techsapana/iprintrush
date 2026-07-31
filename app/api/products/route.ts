@@ -112,8 +112,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (category && category !== 'all') {
-      sql += ' AND c.slug = ?';
-      params.push(category);
+      sql += ' AND (c.slug = ? OR p.category_id = ?)';
+      params.push(category, category);
     }
 
     sql += ' GROUP BY p.id ORDER BY p.created_at DESC';

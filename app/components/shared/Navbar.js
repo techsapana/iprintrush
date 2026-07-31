@@ -56,14 +56,20 @@ export function Navbar() {
   const [announcementEnabled, setAnnouncementEnabled] = useState(true);
   const [searchSuggestions, setSearchSuggestions] = useState([]);
 
-  const isTouchDevice =
-    typeof window !== 'undefined' &&
-    (('ontouchstart' in window) || (navigator && navigator.maxTouchPoints > 0));
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [supportsHover, setSupportsHover] = useState(false);
 
-  const supportsHover =
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(hover: hover)').matches;
+  useEffect(() => {
+    setIsTouchDevice(
+      typeof window !== 'undefined' &&
+      (('ontouchstart' in window) || (navigator && navigator.maxTouchPoints > 0))
+    );
+    setSupportsHover(
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(hover: hover)').matches
+    );
+  }, []);
 
   const openDropdownAt = (e, id) => {
     if (!supportsHover) return;

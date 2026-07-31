@@ -140,6 +140,14 @@ function ProductsContent() {
             return true;
           }
           if (categoryObj && p.category === categoryObj.name) return true;
+          
+          // Robust fallback: if categorySlug is missing, try matching the slugified category name or categoryId
+          if (p.category && typeof p.category === 'string') {
+            const pCatSlug = p.category.toLowerCase().replace(/[\\s_]+/g, '-');
+            if (pCatSlug === selectedCategory) return true;
+          }
+          if (p.categoryId === selectedCategory) return true;
+          
           return false;
         });
       }

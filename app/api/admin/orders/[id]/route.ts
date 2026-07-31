@@ -58,6 +58,9 @@ export async function GET(
         internal_notes,
         rush_flag,
         shipping_review_required,
+        shipping_amount,
+        shipping_carrier,
+        shipping_service_name,
         stripe_checkout_session_id,
         created_at,
         paid_at
@@ -72,7 +75,8 @@ export async function GET(
 
     const items = await query(
       `SELECT id, product_id, name, unit_price, quantity, line_total, customization_json, artwork_files_json,
-              requirement_files_json, requirement_status, requirement_uploaded_at, requirement_reviewed_at, requirement_review_notes
+              requirement_files_json, requirement_status, requirement_uploaded_at, requirement_reviewed_at, requirement_review_notes,
+              custom_size_note
        FROM order_items
        WHERE order_id = ?
        ORDER BY id`,
@@ -133,6 +137,9 @@ export async function GET(
         internalNotes: (order as any).internal_notes || null,
         rush: Boolean((order as any).rush_flag),
         shippingReviewRequired: Boolean((order as any).shipping_review_required),
+        shippingAmount: parseFloat((order as any).shipping_amount || 0),
+        shippingCarrier: (order as any).shipping_carrier || null,
+        shippingServiceName: (order as any).shipping_service_name || null,
         createdAt: (order as any).created_at,
         paidAt: (order as any).paid_at,
       },
@@ -186,6 +193,7 @@ export async function GET(
           requirementUploadedAt: i.requirement_uploaded_at || null,
           requirementReviewedAt: i.requirement_reviewed_at || null,
           requirementReviewNotes: i.requirement_review_notes || '',
+          customSizeNote: i.custom_size_note || '',
         };
       }),
     });

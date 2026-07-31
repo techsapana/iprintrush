@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
@@ -49,6 +50,8 @@ export function DynamicQuoteBuilder({
   weightLb = null,
   packageWidthIn = null,
   localDeliveryEligible = null,
+  onAddToCart,
+  isModal = false,
 }) {
    const [loading, setLoading] = useState(true);
    const [schema, setSchema] = useState(null);
@@ -57,6 +60,8 @@ export function DynamicQuoteBuilder({
    const [dimensionConfig, setDimensionConfig] = useState(null);
    const [allowCustomDimensions, setAllowCustomDimensions] = useState(false);
    const [step, setStep] = useState(0);
+  const searchParams = useSearchParams();
+  const targetStepNavigatedRef = useRef(false);
   const customizationSectionRef = useRef(null);
   const skipStepScrollRef = useRef(true);
   const [error, setError] = useState('');
@@ -189,7 +194,28 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
         if (prefillQuote?.summary) {
           setQuoteSummary(prefillQuote.summary);
           setHasCalculated(true);
-          setStep((json.schema?.groups || []).length + 2);
+          // If a targetStep is provided (e.g. "Edit Color"), jump there instead of summary
+          const targetStepName = prefillQuote?.targetStep;
+          const allTitles = [
+            ...(json.schema?.groups || []).map((g, i) => {
+              const p = (json.pools || []).find(pl => pl.key === g.poolKey);
+              return `Step ${i + 1}: ${p?.name || g.label || g.poolKey}`;
+            }),
+            `Step ${(json.schema?.groups || []).length + 1}: Upload Artwork`,
+            `Step ${(json.schema?.groups || []).length + 2}: Delivery Option`,
+            `Step ${(json.schema?.groups || []).length + 3}: Quote Summary`,
+          ];
+          if (targetStepName) {
+            const matchIdx = allTitles.findIndex(t => t.toLowerCase().includes(targetStepName.toLowerCase()));
+            if (matchIdx !== -1) {
+              setStep(matchIdx);
+              targetStepNavigatedRef.current = true;
+            } else {
+              setStep((json.schema?.groups || []).length + 2);
+            }
+          } else {
+            setStep((json.schema?.groups || []).length + 2);
+          }
         }
 
         // Restore product draft (independent of the Edit-Product prefill flow).
@@ -225,6 +251,7 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
     }
     if (p.deliveryMethod) setDeliveryMethod(p.deliveryMethod);
     if (p.artworkReady) setArtworkReadyChoice('ready');
+    else if (p.artworkReady === false) setArtworkReadyChoice('not_ready');
     if (Array.isArray(p.tempArtworkFiles)) setTempArtworkFiles(p.tempArtworkFiles);
     if (Array.isArray(p.artworkFiles)) {
       setArtworkFiles(p.artworkFiles);
@@ -311,19 +338,37 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
   const poolMap = useMemo(() => new Map(pools.map((p) => [p.key, p])), [pools]);
 
   const stepTitles = useMemo(() => {
-    const g = activeGroups.length;
-    const titles = [
-      ...activeGroups.map((gr, index) => {
-        const pool = poolMap.get(gr.poolKey);
-        const title = pool?.name || gr.label;
-        return `Step ${index + 1}: ${title}`;
-      }),
+    if (!schema?.groups) return [];
+    
+    const titles = activeGroups.map((g, index) => {
+      const pool = pools.find(p => p.key === g.poolKey);
+      const title = pool?.name || g.label || g.poolKey;
+      return `Step ${index + 1}: ${title}`;
+    });
+    const g = titles.length;
+    return [
+      ...titles,
       `Step ${g + 1}: Upload Artwork`,
       `Step ${g + 2}: Delivery Option`,
       `Step ${g + 3}: Quote Summary`,
     ];
-    return titles;
-  }, [activeGroups, poolMap]);
+  }, [schema, pools, activeGroups]);
+
+  // Deep linking to specific step
+  useEffect(() => {
+    if (targetStepNavigatedRef.current || stepTitles.length === 0) return;
+    const target = searchParams?.get('targetStep');
+    if (!target) return;
+    
+    const matchIndex = stepTitles.findIndex(title => title.toLowerCase().includes(target.toLowerCase()));
+    if (matchIndex !== -1) {
+      setStep(matchIndex);
+      targetStepNavigatedRef.current = true;
+      if (customizationSectionRef.current) {
+        scrollCustomizationSectionIntoView(customizationSectionRef);
+      }
+    }
+  }, [stepTitles, searchParams]);
 
   const quantityPoolKey = useMemo(() => {
     // Prefer active schema groups so we only use pools visible for this product.
@@ -585,7 +630,7 @@ const handleDeliveryMethodChange = (method) => {
       setHasCalculated(false);
       return;
     }
-    if (artworkReadyChoice === 'ready' && tempArtworkFiles.length === 0) {
+    if (artworkReadyChoice === 'ready' && tempArtworkFiles.length === 0 && artworkFiles.length === 0) {
       setError('Please upload at least one artwork file, or choose “I don’t have my artwork ready”.');
       setHasCalculated(false);
       return;
@@ -787,24 +832,6 @@ const handleDeliveryMethodChange = (method) => {
         customSizeNote,
       };
 
-      console.log('[DBG][FRONTEND_PAYLOAD]', {
-        productId,
-        widthIn,
-        heightIn,
-        shouldUseCustomDimensions,
-        hasPresetPrintSize,
-        selectedPrintSizeId: printSizePoolKey ? selections[printSizePoolKey] : null,
-        selectedPrintSizeValue: (() => {
-          if (!printSizePoolKey) return null;
-          const pool = (pools || []).find(p => p.key === printSizePoolKey);
-          const selId = selections[printSizePoolKey];
-          const opt = pool?.options?.find(o => o.id === selId);
-          return opt?.value ?? null;
-        })(),
-        dimensionSelections,
-        payloadSelectionsKeys: Object.keys(payload.selections),
-      });
-
       const res = await fetch('/api/quote/calculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -987,30 +1014,55 @@ const handleDeliveryMethodChange = (method) => {
         <div className="space-y-3">
           <div className="flex items-center gap-4">
             <label className="text-sm font-medium text-gray-700">Quantity:</label>
-            <input
-              type="number"
-              min={inputMin}
-              max={inputMax}
-              value={typeof value === 'number' && value > 0 ? value : ''}
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (raw === '') {
-                  handleSelectionChange(group.poolKey, '');
-                  return;
-                }
-                const parsed = parseInt(raw, 10);
-                if (!Number.isFinite(parsed)) return;
-                const newValue = Math.min(inputMax, parsed);
-                handleSelectionChange(group.poolKey, newValue);
-              }}
-              onBlur={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (!Number.isFinite(val) || val < inputMin) {
-                  handleSelectionChange(group.poolKey, inputMin);
-                }
-              }}
-              className="w-28 px-4 py-2 border border-gray-300 rounded-lg text-lg font-medium"
-            />
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  const current = typeof value === 'number' ? value : inputMin;
+                  const next = Math.max(inputMin, current - 1);
+                  handleSelectionChange(group.poolKey, next);
+                }}
+                className="h-10 w-10 flex items-center justify-center rounded-l-lg border border-gray-300 text-gray-700 hover:bg-gray-100 bg-gray-50 font-bold text-lg transition-colors border-r-0"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min={inputMin}
+                max={inputMax}
+                value={typeof value === 'number' && value > 0 ? value : ''}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    handleSelectionChange(group.poolKey, '');
+                    return;
+                  }
+                  const parsed = parseInt(raw, 10);
+                  if (!Number.isFinite(parsed)) return;
+                  const newValue = Math.min(inputMax, parsed);
+                  handleSelectionChange(group.poolKey, newValue);
+                }}
+                onBlur={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!Number.isFinite(val) || val < inputMin) {
+                    handleSelectionChange(group.poolKey, inputMin);
+                  }
+                }}
+                className="w-24 h-10 px-2 py-2 border border-gray-300 text-center text-lg font-medium focus:outline-none focus:ring-2 focus:ring-[#29b6f6] focus:border-transparent z-10 relative appearance-none"
+                style={{ MozAppearance: 'textfield' }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const current = typeof value === 'number' ? value : inputMin;
+                  const next = Math.min(inputMax, current + 1);
+                  handleSelectionChange(group.poolKey, next);
+                }}
+                className="h-10 w-10 flex items-center justify-center rounded-r-lg border border-gray-300 text-gray-700 hover:bg-gray-100 bg-gray-50 font-bold text-lg transition-colors border-l-0"
+              >
+                +
+              </button>
+            </div>
           </div>
           
 {selectedTier && selectedTier.discountType !== 'NONE' && (
@@ -1030,7 +1082,7 @@ const handleDeliveryMethodChange = (method) => {
     const poolKey = pool?.key || group?.poolKey || '';
     const isPrintSizePool = poolKey === 'print_sizes';
     const optionCount = pool.options?.length ?? 0;
-    const useDropdown = isPrintSizePool && optionCount > 6;
+    const useDropdown = optionCount > 5;
     const customDimensionEntered = (() => {
       const w = parseFloat(widthIn);
       const h = parseFloat(heightIn);
@@ -1059,7 +1111,7 @@ const handleDeliveryMethodChange = (method) => {
             }}
 >
             <SelectTrigger className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-left focus:ring-2 focus:ring-[#29b6f6]">
-              <SelectValue placeholder="Choose Print Size" />
+              <SelectValue placeholder={`Choose ${pool.name || group.label || 'an option'}`} />
             </SelectTrigger>
             <SelectContent>
               {pool.options?.map((opt) => (
@@ -1346,7 +1398,7 @@ const renderDimensionStep = (group, pool, value) => {
       quoteForInvoice.selections['Delivery'] = getShippingMethodLabel(deliveryMethod);
       quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
       const encoded = btoa(encodeURIComponent(JSON.stringify(quoteForInvoice)));
-      window.location.href = `/quote/print?data=${encoded}`;
+      window.open(`/quote/print?data=${encoded}`, '_blank');
     };
 
     const handleShareQuote = async () => {
@@ -1767,9 +1819,9 @@ return (
     <section ref={customizationSectionRef} className="mt-6 sm:mt-10">
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 sm:p-6 md:p-8">
         <div className="mb-4 sm:mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Customize & Get Instant Quote</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{isModal ? `Edit ${productName}` : 'Customize & Get Instant Quote'}</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Configure your {productName} and generate a detailed quote.
+            {isModal ? 'Click any step below to jump directly to it.' : `Configure your ${productName} and generate a detailed quote.`}
           </p>
           <div className="mt-4 flex items-center gap-2">
             <div className="text-sm font-medium text-gray-700">
@@ -1782,6 +1834,29 @@ return (
               />
             </div>
           </div>
+          {/* Clickable step pills in edit/modal mode */}
+          {prefillQuote && stepTitles.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {stepTitles.map((title, i) => {
+                const label = title.replace(/^Step \d+: /, '');
+                const isActive = i === step;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setStep(i)}
+                    className={`text-xs px-3 py-1.5 rounded-full border transition-all font-medium ${
+                      isActive
+                        ? 'bg-[#29b6f6] text-white border-[#29b6f6] shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-[#29b6f6] hover:text-[#29b6f6]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -1807,6 +1882,49 @@ return (
               )}
             </div>
             <div className="flex gap-3 w-full sm:w-auto">
+              {/* Review & Save — visible when !hasCalculated in modal */}
+              {isModal && onAddToCart && !hasCalculated && (
+                 <Button
+                   type="button"
+                   className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
+                   onClick={() => {
+                     setStep(stepTitles.length - 1);
+                     handleCalculate();
+                   }}
+                   disabled={calculating || !canGoNext()}
+                 >
+                   {calculating ? 'Calculating...' : 'Review & Save'}
+                 </Button>
+              )}
+              {/* Save Changes — visible when hasCalculated in modal */}
+              {isModal && onAddToCart && hasCalculated && (
+                 <Button
+                   type="button"
+                   className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
+                   onClick={() => onAddToCart()}
+                   disabled={calculating}
+                 >
+                   Save Changes
+                 </Button>
+              )}
+              {/* Save & Update Cart — on non-summary steps when editing from product page (not modal) */}
+              {!isModal && prefillQuote && step < stepTitles.length - 1 && onAddToCart && (
+                 <Button
+                   type="button"
+                   className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
+                   onClick={() => {
+                     if (!hasCalculated) {
+                       setStep(stepTitles.length - 1);
+                       handleCalculate();
+                     } else {
+                       onAddToCart();
+                     }
+                   }}
+                   disabled={calculating || (!hasCalculated && !canGoNext())}
+                 >
+                   {calculating ? 'Calculating...' : hasCalculated ? 'Save & Update Cart' : 'Review & Save'}
+                 </Button>
+              )}
               {step < stepTitles.length - 1 && (
                 <Button
                   type="button"
@@ -1817,7 +1935,7 @@ return (
                   Next Step
                 </Button>
               )}
-              {!hasCalculated && step === stepTitles.length - 1 && (
+              {!hasCalculated && step === stepTitles.length - 1 && (!isModal || !onAddToCart) && (
                 <Button
                   type="button"
                   className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white w-full sm:w-auto"

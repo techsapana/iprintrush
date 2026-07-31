@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { DynamicQuoteBuilder } from './DynamicQuoteBuilder';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
 import { buildInvoiceSharePayload, buildInvoiceText } from '../../lib/invoiceBuilder';
 import { ShippingSelector, getShippingDisplayLabel } from '../shared/ShippingSelector';
+import { SizeSelector } from '../shared/SizeSelector';
 import { saveQuoteDraft, readQuoteDraft, clearQuoteDraft } from '../../lib/quoteDraft';
 
 function debounce(fn, delay) {
@@ -29,12 +31,16 @@ export function QuoteBuilder({
   weightLb = null,
   packageWidthIn = null,
   localDeliveryEligible = null,
+  onAddToCart,
+  isModal,
 }) {
   const [loading, setLoading] = useState(true);
   const [configMode, setConfigMode] = useState(null);
   const [config, setConfig] = useState(null);
   const [productSettings, setProductSettings] = useState(null);
   const [step, setStep] = useState(0);
+  const searchParams = useSearchParams();
+  const targetStepNavigatedRef = useRef(false);
   const customizationSectionRef = useRef(null);
   const skipStepScrollRef = useRef(true);
   const [error, setError] = useState('');
@@ -130,6 +136,22 @@ const [availableMethods, setAvailableMethods] = useState([]);
     [isCustomApparels],
   );
 
+  // Deep linking to specific step
+  useEffect(() => {
+    if (targetStepNavigatedRef.current || stepTitles.length === 0) return;
+    const target = prefillQuote?.targetStep || searchParams?.get('targetStep');
+    if (!target) return;
+    
+    const matchIndex = stepTitles.findIndex(title => title.toLowerCase().includes(target.toLowerCase()));
+    if (matchIndex !== -1) {
+      setStep(matchIndex);
+      targetStepNavigatedRef.current = true;
+      if (customizationSectionRef.current) {
+        scrollCustomizationSectionIntoView(customizationSectionRef);
+      }
+    }
+  }, [stepTitles, searchParams, prefillQuote]);
+
   const deliveryStepIndex = isCustomApparels ? 8 : 7;
 
    useEffect(() => {
@@ -208,7 +230,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
       setQuantities(next);
     }
     if (p.artworkReady) setArtworkReadyChoice('ready');
-    else if (p.artworkReady === false) setArtworkReadyChoice('later');
+    else if (p.artworkReady === false) setArtworkReadyChoice('not_ready');
     if (Array.isArray(p.tempArtworkFiles)) setTempArtworkFiles(p.tempArtworkFiles);
     // Restore artworkFiles and customSizeNote
     if (Array.isArray(p.artworkFiles)) setArtworkFiles(p.artworkFiles);
@@ -314,7 +336,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
   const availableSizes = useMemo(() => {
     if (!config || !productSettings) return [];
     return config.sizes
-      .filter((s) => productSettings.sizeOptionIds.includes(s.id))
+      .filter((s) => (productSettings.sizeOptionIds || []).includes(s.id))
       .map((s) => ({
         ...s,
         // Use custom price if available, otherwise use global
@@ -449,10 +471,12 @@ const [availableMethods, setAvailableMethods] = useState([]);
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.error || 'Failed to recalculate quote');
+        let errMsg = 'Failed to recalculate quote';
+        try { const errJson = await res.json(); errMsg = errJson.error || errMsg; } catch {}
+        throw new Error(errMsg);
       }
+      const json = await res.json();
       if (requestId !== latestCalcRequestIdRef.current) return false;
       setQuoteSummary(json);
       setQuantities(newQuantities);
@@ -494,13 +518,14 @@ const [availableMethods, setAvailableMethods] = useState([]);
       }
       return false;
     } finally {
-      setCalculating(false);
+      if (requestId === latestCalcRequestIdRef.current) {
+        setCalculating(false);
+      }
     }
 };
 
 const invalidateQuote = () => {
     if (!hasCalculated) return;
-    setQuoteSummary(null);
     setHasCalculated(false);
     setZipCheckStatus('idle');
     setZipCheckResult(null);
@@ -508,11 +533,11 @@ const invalidateQuote = () => {
     setOversizedDetails(null);
   };
 
-   const scheduleRecalculation = debounce(() => {
+   const scheduleRecalculation = useCallback(debounce(() => {
     // Read fresh value from ref to avoid stale closure
     if (!hasCalculatedRef.current && !hasEverCalculatedRef.current) return;
     handleCalculateRef.current();
-  }, 300);
+  }, 300), []);
 
   // Handler for changing quantity in the summary step - triggers recalculation
   const handleSummaryQtyChange = async (sizeId, delta) => {
@@ -709,8 +734,6 @@ const handleDeliveryMethodChange = (method) => {
   };
 
   const isReadyForCalculation = () => {
-    const finalStepIndex = stepTitles.length - 2; // Delivery step index
-    if (step < finalStepIndex) return false;
     if (isCustomApparels && !fabricChoice) return false;
     if (!decorationId) return false;
     if (!colorId) return false;
@@ -765,14 +788,16 @@ const handleDeliveryMethodChange = (method) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.error || 'Failed to calculate quote');
+        let errMsg = 'Failed to calculate quote';
+        try { const errJson = await res.json(); errMsg = errJson.error || errMsg; } catch {}
+        throw new Error(errMsg);
       }
+      const json = await res.json();
       if (requestId !== latestCalcRequestIdRef.current) return;
       setQuoteSummary(json);
-      setStep(stepTitles.length - 1);
       setHasCalculated(true);
+      if (step >= stepTitles.length - 2) setStep(stepTitles.length - 1);
       if (onQuoteReady && json) {
         const customizationsDisplay = config
           ? {
@@ -809,7 +834,9 @@ const handleDeliveryMethodChange = (method) => {
         setError(err.message || 'Failed to calculate quote');
       }
     } finally {
-      setCalculating(false);
+      if (requestId === latestCalcRequestIdRef.current) {
+        setCalculating(false);
+      }
     }
 };
 
@@ -832,9 +859,11 @@ const handleDeliveryMethodChange = (method) => {
         maxQuantity={quantityMax}
         prefillQuote={prefillQuote}
         onQuoteReady={onQuoteReady}
+        onAddToCart={onAddToCart}
         weightLb={weightLb}
         packageWidthIn={packageWidthIn}
         localDeliveryEligible={localDeliveryEligible}
+        isModal={isModal}
       />
     );
   }
@@ -873,7 +902,7 @@ const handleDeliveryMethodChange = (method) => {
 
   const renderDecorationStep = () => {
     const options = config.decorations.filter((d) =>
-      productSettings.decorationOptionIds.includes(d.id),
+      (productSettings.decorationOptionIds || []).includes(d.id),
     );
     return (
       <div className="space-y-4">
@@ -908,7 +937,7 @@ const handleDeliveryMethodChange = (method) => {
 
   const renderColorStep = () => {
     const options = config.colors.filter((c) =>
-      productSettings.colorOptionIds.includes(c.id),
+      (productSettings.colorOptionIds || []).includes(c.id),
     );
     return (
       <div className="space-y-4">
@@ -937,86 +966,34 @@ const handleDeliveryMethodChange = (method) => {
     );
   };
 
-const renderSizesStep = () => {
-    const adultSizes = availableSizes.filter(
-      (size) => !String(size.id).toLowerCase().startsWith('youth-'),
-    );
-    const youthSizes = availableSizes.filter((size) =>
-      String(size.id).toLowerCase().startsWith('youth-'),
-    );
-
-const renderSizeGrid = (sizes) => (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {sizes.map((size) => {
-          const qty = quantities[size.id] || 0;
-
-          return (
-            <div
-          key={size.id}
-          className="flex flex-col items-center rounded-xl border border-gray-200 bg-white px-3 py-3"
-            >
-              <div className="text-base font-semibold text-gray-900">
-                {size.label}
-              </div>
-
-              {/* Size surcharge is garment-dependent - only show when NOT using own fabric */}
-              {!useMyCloth && typeof size.priceAddon === 'number' && size.priceAddon !== 0 && (
-                <div className="text-xs text-gray-500">
-                  +${size.priceAddon.toFixed(2)} each
-                </div>
-              )}
-
-              <div className="mt-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleSizeQtyChange(size.id, -1)}
-                  className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100"
-                >
-                  −
-                </button>
-
-                <input
-                  type="number"
-                  min="0"
-                  value={qty}
-                  onChange={(e) => handleSizeQtyInput(size.id, e.target.value)}
-                  className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => handleSizeQtyChange(size.id, 1)}
-                  className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
+  const renderSizesStep = () => {
+    const sizesForSelector = availableSizes.map(s => ({
+      ...s,
+      priceAddon: useMyCloth ? 0 : s.priceAddon
+    }));
 
     return (
       <div className="space-y-6">
-        <h3 className="text-lg font-semibold text-gray-900">Step 4 – Select Sizes & Quantities</h3>
+        <SizeSelector
+          sizes={sizesForSelector}
+          quantities={quantities}
+          minQuantity={quantityMin}
+          maxQuantity={quantityMax}
+          stepNumber={isCustomApparels ? 4 : 3}
+          onQuantityChange={(sizeId, delta, absoluteValue = null) => {
+            if (absoluteValue !== null) {
+              handleSizeQtyInput(sizeId, absoluteValue);
+            } else {
+              handleSizeQtyChange(sizeId, delta);
+            }
+          }}
+        />
+        
         {(minOrderValueProp != null || maxOrderValueProp != null) && (
           <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             {minOrderValueProp != null && <span>Minimum order value: ${minOrderValueProp}. </span>}
             {maxOrderValueProp != null && <span>Maximum order value: ${maxOrderValueProp}.</span>}
           </p>
-        )}
-        {adultSizes.length > 0 && (
-          <div>
-            <div className="text-sm font-medium text-gray-700 mb-2">Adult Sizes</div>
-            {renderSizeGrid(adultSizes)}
-          </div>
-        )}
-        {youthSizes.length > 0 && (
-          <div>
-            <div className="text-sm font-medium text-gray-700 mb-2">Youth Sizes</div>
-            {renderSizeGrid(youthSizes)}
-          </div>
         )}
       </div>
     );
@@ -1024,7 +1001,7 @@ const renderSizeGrid = (sizes) => (
 
   const renderPrintLocationsStep = () => {
     const options = config.printLocations.filter((p) =>
-      productSettings.printLocationOptionIds.includes(p.id),
+      (productSettings.printLocationOptionIds || []).includes(p.id),
     );
     return (
       <div className="space-y-4">
@@ -1059,7 +1036,7 @@ const renderSizeGrid = (sizes) => (
 
   const renderTurnaroundStep = () => {
     const options = config.turnarounds.filter((t) =>
-      productSettings.turnaroundOptionIds.includes(t.id),
+      (productSettings.turnaroundOptionIds || []).includes(t.id),
     );
     return (
       <div className="space-y-4">
@@ -1100,7 +1077,7 @@ const renderSizeGrid = (sizes) => (
 
   const renderDesignerHelpStep = () => {
     const options = config.designerHelp.filter((d) =>
-      productSettings.designerHelpOptionIds.includes(d.id),
+      (productSettings.designerHelpOptionIds || []).includes(d.id),
     );
     return (
       <div className="space-y-4">
@@ -1267,7 +1244,7 @@ const renderDeliveryStep = () => {
       };
       const quoteForInvoice = { ...quoteSummary, ...customizationsDisplay, deliveryMethod, productName };
       const encoded = btoa(encodeURIComponent(JSON.stringify(quoteForInvoice)));
-      window.location.href = `/quote/print?data=${encoded}`;
+      window.open(`/quote/print?data=${encoded}`, '_blank');
     };
 
     const handleShareQuote = async () => {
@@ -1778,9 +1755,9 @@ case 7:
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-6 md:p-8">
         <div className="mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Customize &amp; Get Instant Quote</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{isModal ? `Edit ${productName}` : 'Customize & Get Instant Quote'}</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Follow the steps below to configure your {productName} and generate a detailed quote.
+              {isModal ? 'Click any step below to jump directly to it.' : `Follow the steps below to configure your ${productName} and generate a detailed quote.`}
             </p>
             <div className="mt-4 flex items-center gap-2">
               <div className="text-sm font-medium text-gray-700">
@@ -1793,6 +1770,29 @@ case 7:
                 />
               </div>
             </div>
+            {/* Clickable step pills in edit/modal mode */}
+            {prefillQuote && stepTitles.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {stepTitles.map((title, i) => {
+                  const label = title.replace(/^Step \d+: /, '');
+                  const isActive = i === step;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setStep(i)}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-all font-medium ${
+                        isActive
+                          ? 'bg-[#29b6f6] text-white border-[#29b6f6] shadow-sm'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-[#29b6f6] hover:text-[#29b6f6]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1819,6 +1819,49 @@ case 7:
               )}
             </div>
             <div className="flex gap-3 w-full sm:w-auto">
+              {/* Review & Save — visible when !hasCalculated in modal */}
+              {isModal && onAddToCart && !hasCalculated && (
+                 <Button
+                   type="button"
+                   className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
+                   onClick={() => {
+                     setStep(stepTitles.length - 1);
+                     handleCalculate();
+                   }}
+                   disabled={calculating || !isStepValid()}
+                 >
+                   {calculating ? 'Calculating...' : 'Review & Save'}
+                 </Button>
+              )}
+              {/* Save Changes — visible when hasCalculated in modal */}
+              {isModal && onAddToCart && hasCalculated && (
+                 <Button
+                   type="button"
+                   className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
+                   onClick={() => onAddToCart()}
+                   disabled={calculating}
+                 >
+                   Save Changes
+                 </Button>
+              )}
+              {/* Save & Update Cart — on non-summary steps when editing from product page (not modal) */}
+              {!isModal && prefillQuote && step < stepTitles.length - 1 && onAddToCart && (
+                 <Button
+                   type="button"
+                   className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
+                   onClick={() => {
+                     if (!hasCalculated) {
+                       setStep(stepTitles.length - 1);
+                       handleCalculate();
+                     } else {
+                       onAddToCart();
+                     }
+                   }}
+                   disabled={calculating || (!hasCalculated && !isStepValid())}
+                 >
+                   {calculating ? 'Calculating...' : hasCalculated ? 'Save & Update Cart' : 'Review & Save'}
+                 </Button>
+              )}
               {showNextStep && (
                 <Button
                   type="button"
@@ -1829,7 +1872,7 @@ case 7:
                   Next Step
                 </Button>
               )}
-              {!hasCalculated && step === stepTitles.length - 1 && (
+              {!hasCalculated && step === stepTitles.length - 1 && (!isModal || !onAddToCart) && (
                 <Button
                   type="button"
                   className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white w-full sm:w-auto"

@@ -162,25 +162,33 @@ export function CartProvider({ children }) {
 
       return [
         ...prevItems,
-        { ...product, options, quantity: options.quantity || 1 },
+        { ...product, options, quantity: options.quantity || 1, cartItemId: Date.now().toString() + Math.random().toString(36).substr(2, 9) },
       ];
     });
   }, []);
 
-  const removeFromCart = useCallback((productId, options = {}) => {
-    setItems((prevItems) =>
-      prevItems.filter(
-        (item) =>
-          !(
-            item.id === productId &&
-            JSON.stringify(item.options) === JSON.stringify(options)
-          ),
-      ),
-    );
+  const removeFromCart = useCallback((productId, options = {}, cartItemId = null) => {
+    setItems((prevItems) => {
+      // If the item being removed belongs to a split group, remove ALL items in that group
+      const splitGroupId = options?.splitGroupId;
+      if (splitGroupId) {
+        return prevItems.filter((item) => item.options?.splitGroupId !== splitGroupId);
+      }
+
+      return prevItems.filter((item) => {
+        if (cartItemId && item.cartItemId) {
+          return item.cartItemId !== cartItemId;
+        }
+        return !(
+          item.id === productId &&
+          JSON.stringify(item.options) === JSON.stringify(options)
+        );
+      });
+    });
   }, []);
 
   const updateQuantity = useCallback(
-    (productId, quantity, options = {}) => {
+    (productId, quantity, options = {}, cartItemId = null) => {
       const isQuoteItem =
         options?.quotePayload ||
         options?.splitQuote === true ||
@@ -196,12 +204,12 @@ export function CartProvider({ children }) {
       }
 
       setItems((prevItems) =>
-        prevItems.map((item) =>
-          item.id === productId &&
-          JSON.stringify(item.options) === JSON.stringify(options)
-            ? { ...item, quantity }
-            : item,
-        ),
+        prevItems.map((item) => {
+          const isMatch = cartItemId 
+            ? item.cartItemId === cartItemId 
+            : item.id === productId && JSON.stringify(item.options) === JSON.stringify(options);
+          return isMatch ? { ...item, quantity } : item;
+        }),
       );
     },
     [removeFromCart],
@@ -213,13 +221,11 @@ export function CartProvider({ children }) {
   // quoteSummary + customizationsDisplay. Split quotes and items without a
   // quotePayload are ignored (handled by the existing Edit Product flow).
   const updateQuoteQuantity = useCallback(
-    async (productId, newTotal, options = {}) => {
+    async (productId, newTotal, options = {}, cartItemId = null) => {
       const requested = Math.max(1, Math.floor(Number(newTotal) || 1));
 
       const matched = itemsRef.current.find(
-        (it) =>
-          it.id === productId &&
-          JSON.stringify(it.options) === JSON.stringify(options),
+        (it) => cartItemId ? it.cartItemId === cartItemId : (it.id === productId && JSON.stringify(it.options) === JSON.stringify(options))
       );
       const currentOptions = matched?.options || {};
       const payload = currentOptions.quotePayload;
@@ -317,10 +323,11 @@ export function CartProvider({ children }) {
         });
         setItems((prevItems) =>
           prevItems.map((it) => {
-            if (
-              it.id !== productId ||
-              JSON.stringify(it.options) !== JSON.stringify(options)
-            ) {
+            const isMatch = cartItemId 
+              ? it.cartItemId === cartItemId 
+              : it.id === productId && JSON.stringify(it.options) === JSON.stringify(options);
+            
+            if (!isMatch) {
               return it;
             }
             return {
