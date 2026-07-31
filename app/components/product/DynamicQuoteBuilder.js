@@ -175,6 +175,7 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
         }
         if (prefillPayload?.deliveryMethod) setDeliveryMethod(prefillPayload.deliveryMethod);
         if (prefillPayload?.artworkReady) setArtworkReadyChoice('ready');
+        else if (prefillPayload?.artworkReady === false) setArtworkReadyChoice('not_ready');
         if (Array.isArray(prefillPayload?.tempArtworkFiles)) {
           setTempArtworkFiles(prefillPayload.tempArtworkFiles);
         }
@@ -194,28 +195,7 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
         if (prefillQuote?.summary) {
           setQuoteSummary(prefillQuote.summary);
           setHasCalculated(true);
-          // If a targetStep is provided (e.g. "Edit Color"), jump there instead of summary
-          const targetStepName = prefillQuote?.targetStep;
-          const allTitles = [
-            ...(json.schema?.groups || []).map((g, i) => {
-              const p = (json.pools || []).find(pl => pl.key === g.poolKey);
-              return `Step ${i + 1}: ${p?.name || g.label || g.poolKey}`;
-            }),
-            `Step ${(json.schema?.groups || []).length + 1}: Upload Artwork`,
-            `Step ${(json.schema?.groups || []).length + 2}: Delivery Option`,
-            `Step ${(json.schema?.groups || []).length + 3}: Quote Summary`,
-          ];
-          if (targetStepName) {
-            const matchIdx = allTitles.findIndex(t => t.toLowerCase().includes(targetStepName.toLowerCase()));
-            if (matchIdx !== -1) {
-              setStep(matchIdx);
-              targetStepNavigatedRef.current = true;
-            } else {
-              setStep((json.schema?.groups || []).length + 2);
-            }
-          } else {
-            setStep((json.schema?.groups || []).length + 2);
-          }
+          // Let the main step-sync effect handle jumping to targetStep
         }
 
         // Restore product draft (independent of the Edit-Product prefill flow).
@@ -357,7 +337,7 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
   // Deep linking to specific step
   useEffect(() => {
     if (targetStepNavigatedRef.current || stepTitles.length === 0) return;
-    const target = searchParams?.get('targetStep');
+    const target = prefillQuote?.targetStep || searchParams?.get('targetStep');
     if (!target) return;
     
     const matchIndex = stepTitles.findIndex(title => title.toLowerCase().includes(target.toLowerCase()));
@@ -368,7 +348,7 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
         scrollCustomizationSectionIntoView(customizationSectionRef);
       }
     }
-  }, [stepTitles, searchParams]);
+  }, [stepTitles, searchParams, prefillQuote]);
 
   const quantityPoolKey = useMemo(() => {
     // Prefer active schema groups so we only use pools visible for this product.
