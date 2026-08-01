@@ -94,19 +94,19 @@ export async function GET(req: NextRequest) {
     );
     // 7. customer_users (missing columns from earlier migrations)
     await safeExecute(
-      "ALTER TABLE customer_users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NULL AFTER email",
+      "ALTER TABLE customer_users ADD COLUMN phone VARCHAR(30) NULL AFTER email",
       "Add phone to customer_users"
     );
     await safeExecute(
-      "ALTER TABLE customer_users ADD COLUMN IF NOT EXISTS preferences JSON NULL",
+      "ALTER TABLE customer_users ADD COLUMN preferences JSON NULL",
       "Add preferences to customer_users"
     );
     await safeExecute(
-      "ALTER TABLE customer_users ADD COLUMN IF NOT EXISTS saved_items JSON NULL",
+      "ALTER TABLE customer_users ADD COLUMN saved_items JSON NULL",
       "Add saved_items to customer_users"
     );
     await safeExecute(
-      "ALTER TABLE customer_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "ALTER TABLE customer_users ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
       "Add updated_at to customer_users"
     );
 
