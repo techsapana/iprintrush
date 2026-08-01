@@ -65,8 +65,8 @@ export function verifyCustomerToken(token: string | null | undefined): CustomerT
   return verify(token);
 }
 
-export function getCustomerFromCookies() {
-  const store = cookies();
+export async function getCustomerFromCookies() {
+  const store = await cookies();
   const token = store.get(CUSTOMER_TOKEN_COOKIE)?.value;
   const payload = verifyCustomerToken(token);
   if (!payload) return null;
