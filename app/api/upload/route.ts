@@ -23,30 +23,31 @@ export async function POST(request: NextRequest) {
 
     // Validate file type
     const allowedTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'video/mp4',
-      'video/webm',
-      'video/ogg',
-      'video/quicktime',
-      'application/pdf',
-      'text/plain',
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'image/tiff', 'image/vnd.adobe.photoshop', // TIF, PSD
+      'application/pdf', 'application/postscript', // PDF, AI/EPS
+      'application/illustrator',
+      'application/zip', 'application/x-zip-compressed', // ZIP
+      // Also keep previous video types just in case
+      'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'text/plain'
     ];
-    if (!allowedTypes.includes(file.type)) {
+    
+    // Add extension check since MIME types for AI/PSD can be flaky
+    const fileExt = (file.name || '').split('.').pop().toLowerCase();
+    const allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'psd', 'tif', 'tiff', 'ai', 'eps', 'zip', 'mp4', 'webm', 'ogg', 'mov', 'txt'];
+
+    if (!allowedTypes.includes(file.type) && !allowedExts.includes(fileExt)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Only images (JPEG/PNG/GIF/WebP), videos (MP4/WebM/OGG/MOV), PDF, and TXT are allowed.' },
+        { error: 'Invalid file type. Accepted formats: JPG, PNG, PDF, PSD, TIF, AI, EPS, and ZIP.' },
         { status: 400 }
       );
     }
 
-    // Validate file size (max 50MB for videos, 5MB for others)
-    const isVideo = file.type.startsWith('video/');
-    const maxSize = isVideo ? 50 * 1024 * 1024 : 5 * 1024 * 1024;
+    // Validate file size (max 100MB)
+    const maxSize = 100 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: `File too large. Maximum size is ${isVideo ? '50MB' : '5MB'} for ${isVideo ? 'videos' : 'images'}.` },
+        { error: 'File too large. Maximum size is 100MB per file.' },
         { status: 400 }
       );
     }

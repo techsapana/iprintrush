@@ -54,6 +54,7 @@ export function QuoteBuilder({
   const [customSizeNote, setCustomSizeNote] = useState('');
   const [artworkUploading, setArtworkUploading] = useState(false);
   const [artworkError, setArtworkError] = useState('');
+  const [artworkLink, setArtworkLink] = useState('');
   const [artworkConfirmed, setArtworkConfirmed] = useState(false);
    const [showEmailForm, setShowEmailForm] = useState(false);
   const [emailTo, setEmailTo] = useState('');
@@ -142,8 +143,17 @@ const [availableMethods, setAvailableMethods] = useState([]);
     if (targetStepNavigatedRef.current || stepTitles.length === 0) return;
     const target = prefillQuote?.targetStep || searchParams?.get('targetStep');
     if (!target) return;
-    
-    const matchIndex = stepTitles.findIndex(title => title.toLowerCase().includes(target.toLowerCase()));
+    const targetLower = target.toLowerCase();
+    const matchIndex = stepTitles.findIndex(title => {
+      const titleLower = title.toLowerCase();
+      if (titleLower.includes(targetLower)) return true;
+      if (targetLower.includes(titleLower)) return true;
+      // Handle known mismatches from cartHelpers / customizationsDisplay keys
+      if (targetLower.includes('size') && titleLower.includes('size')) return true;
+      if (targetLower.includes('delivery') && titleLower.includes('delivery')) return true;
+      if (targetLower.includes('artwork') && titleLower.includes('artwork')) return true;
+      return false;
+    });
     if (matchIndex !== -1) {
       setStep(matchIndex);
       targetStepNavigatedRef.current = true;
@@ -235,6 +245,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
     }
     if (p.artworkReady) setArtworkReadyChoice('ready');
     else if (p.artworkReady === false) setArtworkReadyChoice('not_ready');
+    if (p.artworkLink) setArtworkLink(p.artworkLink);
     if (Array.isArray(p.tempArtworkFiles)) setTempArtworkFiles(p.tempArtworkFiles);
     // Restore artworkFiles and customSizeNote
     if (Array.isArray(p.artworkFiles)) setArtworkFiles(p.artworkFiles);
@@ -291,6 +302,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
     isCustomApparels,
     useMyCloth: fabricChoice === 'own',
     artworkReady: artworkReadyChoice === 'ready',
+    artworkLink,
     tempArtworkFiles,
     artworkFiles,
     customSizeNote,
@@ -751,7 +763,7 @@ const handleDeliveryMethodChange = (method) => {
     if (quantityMax != null && totalQuantity > quantityMax) return false;
     if (!deliveryMethod) return false;
     if (!artworkReadyChoice) return false;
-    if (artworkReadyChoice === 'ready' && tempArtworkFiles.length === 0 && artworkFiles.length === 0) return false;
+    if (artworkReadyChoice === 'ready' && tempArtworkFiles.length === 0 && artworkFiles.length === 0 && !artworkLink?.trim()) return false;
     return true;
   };
 
@@ -834,7 +846,21 @@ const handleDeliveryMethodChange = (method) => {
               Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
             }
           : {};
-        onQuoteReady({ mode: 'apparel', payload, summary: json, customizationsDisplay });
+        onQuoteReady({ 
+          mode: 'apparel', 
+          payload: {
+            ...payload,
+            customizationsDisplay: {
+              ...payload.customizationsDisplay,
+              ...(artworkLink ? { 'Artwork Link': artworkLink } : {}),
+            }
+          }, 
+          summary: json, 
+          customizationsDisplay: {
+            ...customizationsDisplay,
+            ...(artworkLink ? { 'Artwork Link': artworkLink } : {}),
+          }
+        });
       }
     } catch (err) {
       if (requestId === latestCalcRequestIdRef.current) {
@@ -1580,54 +1606,75 @@ const renderDeliveryStep = () => {
           </div>
         )}
         {artworkReadyChoice === 'ready' && (
-          <div className="space-y-2">
-            <label className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
-              <span>{artworkUploading ? 'Uploading...' : 'Upload artwork image'}</span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                className="hidden"
-                disabled={artworkUploading}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  try {
-                    setArtworkUploading(true);
-                    setArtworkError('');
-                    const fd = new FormData();
-                    fd.append('file', file);
-                    const res = await fetch('/api/artwork/temp-upload', { method: 'POST', body: fd });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok) throw new Error(data.error || 'Upload failed');
-                    if (data?.tempId) setTempArtworkFiles((prev) => [...prev, data.tempId]);
-                  } catch (err) {
-                    setArtworkError(err.message || 'Failed to upload artwork');
-                  } finally {
-                    setArtworkUploading(false);
-                    if (e.target) e.target.value = '';
-                  }
-                }}
-              />
-            </label>
-            {artworkError && (
-              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                {artworkError}
-              </div>
-            )}
-            {tempArtworkFiles.length > 0 && (
-              <div className="text-xs text-gray-600">{tempArtworkFiles.length} artwork file(s) uploaded.</div>
-            )}
-            {artworkReadyChoice === 'ready' && (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && (
-              <label className="flex items-center gap-2 text-sm text-gray-700 mt-2">
+          <div className="space-y-4">
+            <div className="text-sm text-gray-600 bg-blue-50 border border-blue-100 p-3 rounded-lg">
+              <p><strong>Maximum file size:</strong> 100 MB per file and 300 MB per order.</p>
+              <p className="mt-1"><strong>Accepted formats:</strong> JPG, JPEG, PNG, PDF, PSD, TIF, TIFF, AI, EPS, and ZIP.</p>
+            </div>
+            <div className="space-y-2">
+              <label className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">
+                <span>{artworkUploading ? 'Uploading...' : 'Choose File'}</span>
                 <input
-                  type="checkbox"
-                  checked={artworkConfirmed}
-                  onChange={(e) => setArtworkConfirmed(e.target.checked)}
-                  className="rounded border-gray-300 text-[#29b6f6] focus:ring-[#29b6f6]"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf,.psd,.tif,.tiff,.ai,.eps,.zip,image/jpeg,image/png,application/pdf,application/zip,image/tiff,application/postscript,image/vnd.adobe.photoshop"
+                  className="hidden"
+                  disabled={artworkUploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      setArtworkUploading(true);
+                      setArtworkError('');
+                      const fd = new FormData();
+                      fd.append('file', file);
+                      const res = await fetch('/api/artwork/temp-upload', { method: 'POST', body: fd });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) throw new Error(data.error || 'Upload failed');
+                      if (data?.tempId) setTempArtworkFiles((prev) => [...prev, data.tempId]);
+                    } catch (err) {
+                      setArtworkError(err.message || 'Failed to upload artwork');
+                    } finally {
+                      setArtworkUploading(false);
+                      if (e.target) e.target.value = '';
+                    }
+                  }}
                 />
-                I confirm this is the correct artwork file.
               </label>
-            )}
+              {artworkError && (
+                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {artworkError}
+                </div>
+              )}
+              {tempArtworkFiles.length > 0 && (
+                <div className="text-sm font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                  ✓ {tempArtworkFiles.length} artwork file(s) uploaded successfully.
+                </div>
+              )}
+              {artworkReadyChoice === 'ready' && (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && (
+                <label className="flex items-center gap-2 text-sm text-gray-700 mt-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={artworkConfirmed}
+                    onChange={(e) => setArtworkConfirmed(e.target.checked)}
+                    className="rounded border-gray-300 text-[#29b6f6] focus:ring-[#29b6f6] w-4 h-4 cursor-pointer"
+                  />
+                  I confirm this is the correct artwork file.
+                </label>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-gray-100">
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                For larger files (over 100MB), provide a cloud link:
+              </label>
+              <input
+                type="text"
+                placeholder="Google Drive, Dropbox, or WeTransfer link..."
+                value={artworkLink}
+                onChange={(e) => setArtworkLink(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#29b6f6] focus:border-transparent outline-none"
+              />
+            </div>
           </div>
         )}
       </div>

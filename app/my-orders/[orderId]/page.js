@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../../hooks/useAuth';
+import OrderChat from '@/app/components/order/OrderChat';
 
 export default function OrderDetailPage() {
   const { user, isAuthenticated } = useAuth();
@@ -388,6 +389,10 @@ export default function OrderDetailPage() {
                 </div>
               </div>
             )}
+
+            <div className="border-t pt-4">
+              <OrderChat orderId={order.id} role="customer" />
+            </div>
 
             <div className="border-t pt-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Items</h3>

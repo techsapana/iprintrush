@@ -134,6 +134,7 @@ export default function CartPage() {
     removeFromCart,
     updateQuantity,
     updateQuoteQuantity,
+    updateSplitQuoteQuantity,
     getTotal,
     clearCart,
   } = useCart();
@@ -278,6 +279,11 @@ export default function CartPage() {
                             <CartQuantityControl 
                               initialQuantity={item.quantity} 
                               onQuantityChange={(newQty) => updateQuoteQuantity(item.id, newQty, item.options, item.cartItemId)} 
+                            />
+                          ) : item.options?.splitQuote === true ? (
+                            <CartQuantityControl
+                              initialQuantity={item.quantity}
+                              onQuantityChange={(newQty) => updateSplitQuoteQuantity(item.cartItemId, newQty)}
                             />
                           ) : (
                             <div className="flex items-center gap-2">

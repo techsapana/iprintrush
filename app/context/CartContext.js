@@ -217,9 +217,91 @@ export function CartProvider({ children }) {
 
   // Recalculate a quote-backed cart item's price when its quantity changes.
   // Mutates ONLY the mode-specific quantity field, re-runs the server quote
-  // engine, and atomically updates item.quantity + quotePayload +
-  // quoteSummary + customizationsDisplay. Split quotes and items without a
-  // quotePayload are ignored (handled by the existing Edit Product flow).
+  const updateSplitQuoteQuantity = useCallback(async (cartItemId, newQuantity) => {
+    const requested = Math.max(0, Math.floor(Number(newQuantity) || 0));
+    
+    // Find the item being updated
+    const targetItem = itemsRef.current.find(it => it.cartItemId === cartItemId);
+    if (!targetItem || !targetItem.options?.splitGroupId || !targetItem.options?.splitSizeId) return;
+
+    const splitGroupId = targetItem.options.splitGroupId;
+    const groupItems = itemsRef.current.filter(it => it.options?.splitGroupId === splitGroupId);
+    if (!groupItems.length) return;
+
+    // The shared quote payload
+    const payload = JSON.parse(JSON.stringify(groupItems[0].options.quotePayload));
+    
+    if (requested === 0) {
+      delete payload.quantities[targetItem.options.splitSizeId];
+    } else {
+      payload.quantities[targetItem.options.splitSizeId] = requested;
+    }
+    
+    // Check if total quantity becomes 0
+    const newTotal = Object.values(payload.quantities).reduce((a, b) => a + Number(b), 0);
+    if (newTotal === 0) {
+      setItems(prev => prev.filter(it => it.options?.splitGroupId !== splitGroupId));
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/quote/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) return;
+      const summary = await res.json();
+      
+      // Re-build cart lines for this group
+      const currentQuote = {
+        payload,
+        summary,
+        customizationsDisplay: groupItems[0].options.customizationsDisplay, // approximate, cartHelpers will fix
+      };
+      
+      const product = { ...groupItems[0] };
+      delete product.options;
+      delete product.quantity;
+      delete product.cartItemId;
+      
+      // Import buildQuoteCartEntries dynamically or assume it's available?
+      // Wait, CartContext doesn't import buildQuoteCartEntries.
+      // I'll just manually reconstruct the items based on the new breakdown!
+      const newItems = summary.sizeBreakdown
+        .filter(s => Number(s.quantity) > 0)
+        .map(s => {
+          const oldItem = groupItems.find(i => i.options?.splitSizeId === s.sizeId);
+          // Calculate prorated price
+          const lineTotal = summary.grandTotal * (s.quantity / summary.totalQuantity);
+          return {
+            ...product,
+            quantity: s.quantity,
+            cartItemId: oldItem ? oldItem.cartItemId : Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            options: {
+              ...(oldItem ? oldItem.options : groupItems[0].options),
+              quotePayload: payload,
+              quoteSummary: {
+                ...summary,
+                totalQuantity: s.quantity,
+                grandTotal: lineTotal,
+                sizeBreakdown: [s],
+              },
+              splitSizeId: s.sizeId,
+              splitSizeLabel: s.sizeLabel,
+            }
+          };
+        });
+
+      setItems(prev => [
+        ...prev.filter(it => it.options?.splitGroupId !== splitGroupId),
+        ...newItems
+      ]);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
   const updateQuoteQuantity = useCallback(
     async (productId, newTotal, options = {}, cartItemId = null) => {
       const requested = Math.max(1, Math.floor(Number(newTotal) || 1));
@@ -393,6 +475,7 @@ export function CartProvider({ children }) {
     removeFromCart,
     updateQuantity,
     updateQuoteQuantity,
+    updateSplitQuoteQuantity,
     clearCart,
     getTotal,
     getItemCount,

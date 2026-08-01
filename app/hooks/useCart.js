@@ -83,6 +83,8 @@ export function useCart() {
     addToCart,
     removeFromCart,
     updateQuantity,
+    updateQuoteQuantity,
+    updateSplitQuoteQuantity,
     clearCart,
     getTotal,
     getItemCount

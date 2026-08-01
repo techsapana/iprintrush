@@ -75,6 +75,7 @@ export function buildQuoteCartEntries(currentQuote, product) {
         artworkFiles: currentQuote.payload?.artworkFiles || [],
         customSizeNote: currentQuote.payload?.customSizeNote || '',
         splitQuote: true,
+        splitSizeId: s.sizeId,
         splitSizeLabel: s.sizeLabel || 'Selected size',
         splitGroupId,
       };

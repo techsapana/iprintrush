@@ -482,6 +482,7 @@ export function calculateQuote(
     .map((q) => {
       const size = sizeMap.get(q.sizeId);
       return {
+        sizeId: q.sizeId,
         sizeLabel: size?.label ?? 'Unknown',
         quantity: q.quantity,
       };
@@ -1080,6 +1081,7 @@ export function calculateUnifiedQuote(
 
   // Build size breakdown from normalized request
   const sizeBreakdown = quantityBreakdown.map(q => ({
+    sizeId: q.sizeId,
     sizeLabel: q.label,
     quantity: q.quantity,
   }));

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAdmin } from '../../../hooks/useAdmin';
 import Link from 'next/link';
+import OrderChat from '@/app/components/order/OrderChat';
 
 export default function AdminOrderDetailPage() {
    const router = useRouter();
@@ -320,6 +321,9 @@ export default function AdminOrderDetailPage() {
             <div className="text-xs text-gray-400">Saving changes…</div>
           )}
         </div>
+
+        {/* Order Messaging & Proofs */}
+        <OrderChat orderId={order.id} role="admin" />
 
         {/* Customer */}
         <div className="bg-white rounded-lg shadow p-6 space-y-4">

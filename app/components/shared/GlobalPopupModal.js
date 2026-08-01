@@ -15,16 +15,16 @@ export function GlobalPopupModal() {
         
         if (json.popupEnabled) {
           setData(json);
-          // Check if dismissed recently (within last 24 hours) - DISABLED FOR TESTING
-          // const lastDismissed = localStorage.getItem('iprintrush_popup_dismissed');
-          // const now = new Date().getTime();
+          // Check if dismissed recently (within last 24 hours)
+          const lastDismissed = localStorage.getItem('iprintrush_popup_dismissed');
+          const now = new Date().getTime();
           
-          // if (!lastDismissed || now - parseInt(lastDismissed) > 24 * 60 * 60 * 1000) {
+          if (!lastDismissed || now - parseInt(lastDismissed) > 24 * 60 * 60 * 1000) {
             // Add a small delay so it doesn't pop up instantly on page load
             setTimeout(() => {
               setIsOpen(true);
             }, 1000);
-          // }
+          }
         }
       } catch (err) {
         console.error('Failed to load popup settings', err);
