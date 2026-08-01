@@ -28,10 +28,11 @@ async function checkAccess(request: Request, orderId: string) {
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const access = await checkAccess(request, params.id);
+    const { id } = await params;
+    const access = await checkAccess(request, id);
     if (!access) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -41,7 +42,7 @@ export async function GET(
        FROM order_messages 
        WHERE order_id = ? 
        ORDER BY created_at ASC`,
-      [params.id]
+      [id]
     );
 
     return NextResponse.json({ messages });
@@ -53,10 +54,11 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const access = await checkAccess(request, params.id);
+    const { id } = await params;
+    const access = await checkAccess(request, id);
     if (!access) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -71,12 +73,12 @@ export async function POST(
     await query(
       `INSERT INTO order_messages (order_id, sender_type, message, attachment_url, attachment_name)
        VALUES (?, ?, ?, ?, ?)`,
-      [params.id, access.role, message || '', attachmentUrl || null, attachmentName || null]
+      [id, access.role, message || '', attachmentUrl || null, attachmentName || null]
     );
 
     // If Admin sends a message, notify the customer
     if (access.role === 'admin') {
-      const rows = await query(`SELECT customer_email, customer_name, order_number FROM orders WHERE id = ?`, [params.id]);
+      const rows = await query(`SELECT customer_email, customer_name, order_number FROM orders WHERE id = ?`, [id]);
       const order = (rows as any[])?.[0];
       if (order && order.customer_email) {
         try {
