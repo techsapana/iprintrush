@@ -72,6 +72,12 @@ export async function GET(req: NextRequest) {
       "Add enabled to quantity_tiers"
     );
 
+    // 5. product_color_options
+    await safeExecute(
+      "ALTER TABLE product_color_options ADD COLUMN image_url VARCHAR(255) DEFAULT NULL",
+      "Add image_url to product_color_options"
+    );
+
     return NextResponse.json({
       success: true,
       message: 'Migration completed.',
