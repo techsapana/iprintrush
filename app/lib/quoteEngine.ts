@@ -1081,7 +1081,7 @@ export function calculateUnifiedQuote(
 
   // Build size breakdown from normalized request
   const sizeBreakdown = quantityBreakdown.map(q => ({
-    sizeId: q.sizeId,
+    sizeId: q.key,
     sizeLabel: q.label,
     quantity: q.quantity,
   }));

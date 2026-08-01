@@ -54,6 +54,8 @@ export function DynamicQuoteBuilder({
   isModal = false,
 }) {
    const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [calcError, setCalcError] = useState('');
    const [schema, setSchema] = useState(null);
    const [pools, setPools] = useState([]);
    const [shipping, setShipping] = useState(null);
@@ -64,7 +66,6 @@ export function DynamicQuoteBuilder({
   const targetStepNavigatedRef = useRef(false);
   const customizationSectionRef = useRef(null);
   const skipStepScrollRef = useRef(true);
-  const [error, setError] = useState('');
   const [quoteSummary, setQuoteSummary] = useState(null);
   const [calculating, setCalculating] = useState(false);
   const [selections, setSelections] = useState({});
@@ -85,6 +86,7 @@ const artworkFileRef = useRef(null);
   const [artworkReadyChoice, setArtworkReadyChoice] = useState('');
   const [tempArtworkFiles, setTempArtworkFiles] = useState([]);
   const [totalArtworkSize, setTotalArtworkSize] = useState(0);
+  const [uploadedArtworkDetails, setUploadedArtworkDetails] = useState([]);
   const [artworkFiles, setArtworkFiles] = useState([]);
   const [customSizeNote, setCustomSizeNote] = useState('');
   const [artworkUploading, setArtworkUploading] = useState(false);
@@ -216,7 +218,9 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
         }
         hydratedRef.current = true;
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Failed to load configuration');
+        if (!cancelled) {
+          setCalcError(err.message || 'Failed to calculate quote');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -606,47 +610,46 @@ const handleDeliveryMethodChange = (method) => {
       const poolName = String(pool?.name || '').toLowerCase();
       const poolKeyLower = String(g.poolKey || pool?.key || '').toLowerCase();
       const isPrintSizePool =
-        poolKeyLower === 'print_sizes' ||
-        poolKeyLower.includes('print_sizes') ||
-        poolName === 'print size' ||
-        poolName.includes('print size');
+        poolKeyLower.includes('size') || poolName.includes('size');
       if (isPrintSizePool) return g.poolKey;
     }
     return null;
   };
 
   const handleCalculate = async () => {
-    setError('');
+    invalidateQuote();
+    setCalcError('');
     setQuoteSummary(null);
 
     if (!artworkReadyChoice) {
-      setError('Please indicate whether your artwork is ready.');
-      setHasCalculated(false);
+      setCalcError('Please indicate whether your artwork is ready.');
       return;
     }
-    if (artworkReadyChoice === 'ready') {
-      if (tempArtworkFiles.length === 0 && artworkFiles.length === 0 && !artworkLink.trim()) {
-        setError('Please upload at least one artwork file, or choose “I don’t have my artwork ready”.');
-        setHasCalculated(false);
-        return;
-      }
+    if (artworkReadyChoice === 'ready' && artworkFiles.length === 0 && tempArtworkFiles.length === 0 && !artworkLink?.trim()) {
+      setCalcError('Please upload at least one artwork file or provide a cloud link.');
+      return;
     }
 
-    const qtyPool = quantityPoolKey ? poolMap.get(quantityPoolKey) : null;
-    const qty = quantityPoolKey ? selections[quantityPoolKey] : null;
-    if (!qtyPool || typeof qty !== 'number' || qty <= 0) {
-      setError('Please enter a valid quantity.');
-      setHasCalculated(false);
+    const quantityPools = activeGroups.filter(g => normalizeSelectionType(poolMap.get(g.poolKey).selectionType) === 'quantity');
+    let totalQty = 0;
+    for (const group of quantityPools) {
+      const qty = Number(selections[group.poolKey]);
+      if (isNaN(qty) || qty < 0) {
+        setCalcError('Please enter a valid quantity.');
+        return;
+      }
+      totalQty += qty;
+    }
+    if (totalQty === 0) {
+      setCalcError('Please enter a valid quantity.');
       return;
     }
-    if (productMin != null && qty < productMin) {
-      setError(`Quantity must be at least ${productMin}.`);
-      setHasCalculated(false);
+    if (productMin != null && totalQty < productMin) {
+      setCalcError(`Quantity must be at least ${productMin}.`);
       return;
     }
-    if (productMax != null && qty > productMax) {
-      setError(`Quantity may not exceed ${productMax}.`);
-      setHasCalculated(false);
+    if (productMax != null && totalQty > productMax) {
+      setCalcError(`Quantity may not exceed ${productMax}.`);
       return;
     }
 
@@ -679,28 +682,23 @@ const handleDeliveryMethodChange = (method) => {
       const w = parseFloat(widthIn);
       const h = parseFloat(heightIn);
       if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
-        setError('Please enter a valid width and height in inches.');
-        setHasCalculated(false);
+        setCalcError('Please enter a valid width and height in inches.');
         return;
       }
       if (dimensionConfig.minWidthIn != null && w < dimensionConfig.minWidthIn) {
-        setError(`Width must be at least ${dimensionConfig.minWidthIn}"`);
-        setHasCalculated(false);
+        setCalcError(`Width must be at least ${dimensionConfig.minWidthIn}"`);
         return;
       }
       if (dimensionConfig.maxWidthIn != null && w > dimensionConfig.maxWidthIn) {
-        setError(`Width must be at most ${dimensionConfig.maxWidthIn}"`);
-        setHasCalculated(false);
+        setCalcError(`Width must be at most ${dimensionConfig.maxWidthIn}"`);
         return;
       }
       if (dimensionConfig.minHeightIn != null && h < dimensionConfig.minHeightIn) {
-        setError(`Height must be at least ${dimensionConfig.minHeightIn}"`);
-        setHasCalculated(false);
+        setCalcError(`Height must be at least ${dimensionConfig.minHeightIn}"`);
         return;
       }
       if (dimensionConfig.maxHeightIn != null && h > dimensionConfig.maxHeightIn) {
-        setError(`Height must be at most ${dimensionConfig.maxHeightIn}"`);
-        setHasCalculated(false);
+        setCalcError(`Height must be at most ${dimensionConfig.maxHeightIn}"`);
         return;
       }
     }
@@ -719,13 +717,8 @@ const handleDeliveryMethodChange = (method) => {
       const poolName = String(pool?.name || '').toLowerCase();
       const poolKeyLower = String(g.poolKey || pool?.key || '').toLowerCase();
       const isPrintSizePool =
-        poolKeyLower === 'print_sizes' ||
-        poolKeyLower.includes('print_sizes') ||
-        poolName === 'print size' ||
-        poolName.includes('print size');
+        poolKeyLower.includes('size') || poolName.includes('size');
 
-      // Signs & Banners: if user didn't click a preset print size, allow custom width/height
-      // but show "No print size found" only if BOTH preset and custom dimensions are missing.
       if (isPrintSizePool) {
         if (isEmpty) {
           const w = parseFloat(widthIn);
@@ -733,26 +726,22 @@ const handleDeliveryMethodChange = (method) => {
           const hasValidDimensions =
             Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0;
           if (!hasValidDimensions) {
-            setError('No print size found.');
-            setHasCalculated(false);
+            setCalcError('No print size found.');
             return;
           }
         }
-        // either preset selected or dimensions provided — OK
         continue;
       }
 
       if (isEmpty) {
-        setError(`Please select ${pool?.name || g.label}.`);
-        setHasCalculated(false);
+        setCalcError(`Please select ${pool?.name || g.label}.`);
         return;
       }
     }
 
     // Check if delivery method is selected
     if (!deliveryMethod) {
-      setError('Please select a delivery method.');
-      setHasCalculated(false);
+      setCalcError('Please select a delivery method.');
       return;
     }
 
@@ -902,7 +891,7 @@ const handleDeliveryMethodChange = (method) => {
       }
     } catch (err) {
       if (requestId === latestCalcRequestIdRef.current) {
-        setError(err.message || 'Failed to calculate quote');
+        setCalcError(err.message || 'Failed to calculate quote');
       }
     } finally {
       setCalculating(false);
@@ -948,10 +937,7 @@ const handleDeliveryMethodChange = (method) => {
     const poolName = String(pool?.name || '').toLowerCase();
     const poolKey = String(pool?.key || '').toLowerCase();
     const isPrintSizeStep =
-      poolName.includes('print size') ||
-      groupPoolKey === 'print_sizes' ||
-      poolKey.includes('print_size') ||
-      poolKey.includes('print_sizes');
+      poolName.includes('size') || groupPoolKey.includes('size') || poolKey.includes('size');
     const normalizedType = normalizeSelectionType(pool.selectionType);
     const shouldShowInlineDimensions =
       isPrintSizeStep && normalizedType !== 'dimension';
@@ -1092,7 +1078,9 @@ const handleDeliveryMethodChange = (method) => {
 
   const renderSingleSelectStep = (group, pool, value) => {
     const poolKey = pool?.key || group?.poolKey || '';
-    const isPrintSizePool = poolKey === 'print_sizes';
+    const poolName = String(pool?.name || '').toLowerCase();
+    const poolKeyLower = String(poolKey).toLowerCase();
+    const isPrintSizePool = poolKeyLower.includes('size') || poolName.includes('size');
     const optionCount = pool.options?.length ?? 0;
     const useDropdown = optionCount > 5;
     const customDimensionEntered = (() => {
@@ -1358,7 +1346,7 @@ const renderDimensionStep = (group, pool, value) => {
     const handleEmailQuote = () => {
       const to = emailTo.trim();
       if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-        setError('Please enter a valid email address.');
+        setCalcError('Please enter a valid email address.');
         return;
       }
       const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
@@ -1371,7 +1359,7 @@ const renderDimensionStep = (group, pool, value) => {
       const cc = countryCode.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
       const num = phoneNumber.replace(/\D/g, '');
       if (!cc || !num) {
-        setError('Please enter both country code and phone number.');
+        setCalcError('Please enter both country code and phone number.');
         return;
       }
       const fullNumber = `${cc.startsWith('+') ? cc.slice(1) : cc}${num}`;
@@ -1461,7 +1449,7 @@ const renderDimensionStep = (group, pool, value) => {
           setShareFeedback('Quote copied to clipboard');
           setTimeout(() => setShareFeedback(''), 3000);
         } catch {
-          setError('Unable to share quote. Please try again.');
+          setCalcError('Unable to share quote. Please try again.');
         }
       }
     };
@@ -1618,6 +1606,7 @@ const renderDimensionStep = (group, pool, value) => {
               handleArtworkReadyChange('not_ready');
               setTempArtworkFiles([]);
               setTotalArtworkSize(0);
+              setUploadedArtworkDetails([]);
             }}
           />
           Upload file later
@@ -1663,6 +1652,7 @@ const renderDimensionStep = (group, pool, value) => {
                       if (data?.tempId) {
                         setTempArtworkFiles((prev) => [...prev, data.tempId]);
                         setTotalArtworkSize((prev) => prev + file.size);
+                        setUploadedArtworkDetails((prev) => [...prev, { id: data.tempId, name: file.name, size: file.size }]);
                       }
                     } catch (err) {
                       setArtworkError(err.message || 'Failed to upload artwork');
@@ -1678,11 +1668,31 @@ const renderDimensionStep = (group, pool, value) => {
                   {artworkError}
                 </div>
               )}
-              {tempArtworkFiles.length > 0 && (
-                <div className="text-sm font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+              {uploadedArtworkDetails.length > 0 ? (
+                <div className="space-y-2 mt-3">
+                  <div className="text-sm font-medium text-gray-700">Uploaded Files:</div>
+                  {uploadedArtworkDetails.map((fileInfo) => (
+                    <div key={fileInfo.id} className="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-sm text-emerald-700">
+                      <span className="truncate max-w-[80%]">{fileInfo.name}</span>
+                      <button
+                        onClick={() => {
+                          setTempArtworkFiles(prev => prev.filter(id => id !== fileInfo.id));
+                          setUploadedArtworkDetails(prev => prev.filter(f => f.id !== fileInfo.id));
+                          setTotalArtworkSize(prev => Math.max(0, prev - fileInfo.size));
+                        }}
+                        className="text-emerald-600 hover:text-emerald-800 font-bold ml-2 px-2 py-0.5 rounded hover:bg-emerald-200 transition-colors"
+                        title="Remove file"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : tempArtworkFiles.length > 0 ? (
+                <div className="text-sm font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 mt-3">
                   ✓ {tempArtworkFiles.length} artwork file(s) uploaded successfully.
                 </div>
-              )}
+              ) : null}
               {artworkReadyChoice === 'ready' && (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && (
                 <label className="flex items-center gap-2 text-sm text-gray-700 mt-2 cursor-pointer">
                   <input
@@ -1782,8 +1792,9 @@ return (
 
       const poolName = String(pool?.name || '').toLowerCase();
       const poolKeyLower = String(pool?.key || '').toLowerCase();
+      const groupPoolKey = String(currentGroup?.poolKey || '').toLowerCase();
       const isPrintSizePool =
-        poolName.includes('print size') || poolKeyLower.includes('print_sizes');
+        poolName.includes('size') || poolKeyLower.includes('size') || groupPoolKey.includes('size');
 
       const selectionType = normalizeSelectionType(pool.selectionType);
       if (selectionType === 'quantity') {
@@ -1900,9 +1911,9 @@ return (
         </div>
 
         <div className="space-y-6">
-          {error && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {error}
+          {calcError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {calcError}
             </div>
           )}
 

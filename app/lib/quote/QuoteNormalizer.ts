@@ -120,21 +120,34 @@ export function normalizePrintProductPayload(
   payload: FrontendPrintProductPayload,
   pools: CustomizationPool[]
 ): UnifiedQuoteRequest {
-  // Find the quantity pool key
-  const quantityPoolKey = findQuantityPoolKey(pools);
-  const totalQuantity = quantityPoolKey
-    ? Number(payload.selections?.[quantityPoolKey] ?? 0)
-    : 0;
-
   const quantityBreakdown: UnifiedQuoteRequest['quantityBreakdown'] = [];
 
-  if (totalQuantity > 0) {
-    // For print products, we have a single quantity entry
-    quantityBreakdown.push({
-      key: quantityPoolKey || 'quantity',
-      label: 'Total',
-      quantity: totalQuantity,
-    });
+  const quantityPools = pools.filter(p => String(p.selectionType || '').toLowerCase() === 'quantity');
+
+  if (quantityPools.length > 0) {
+    for (const pool of quantityPools) {
+      const qty = Number(payload.selections?.[pool.key] ?? 0);
+      if (qty > 0) {
+        quantityBreakdown.push({
+          key: pool.key,
+          label: pool.name || pool.label || 'Quantity',
+          quantity: qty,
+        });
+      }
+    }
+  } else {
+    // Fallback if no quantity pools found but there might be a field named 'quantity'
+    const fallbackKey = findQuantityPoolKey(pools);
+    if (fallbackKey) {
+       const qty = Number(payload.selections?.[fallbackKey] ?? 0);
+       if (qty > 0) {
+         quantityBreakdown.push({
+           key: fallbackKey,
+           label: 'Total',
+           quantity: qty,
+         });
+       }
+    }
   }
 
   // For dimension-based products, include width/height in selections

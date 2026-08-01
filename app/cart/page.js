@@ -203,7 +203,7 @@ export default function CartPage() {
                     item.options?.customLineTotal != null;
 
                   const isApparel = item.options?.quotePayload?.mode === 'apparel' || item.options?.quotePayload?.mode === 'custom_apparel';
-                  const hasMultipleSizes = isApparel && (item.options?.quotePayload?.quantities?.length || 0) > 1;
+                  const hasMultipleSizes = (item.options?.quoteSummary?.sizeBreakdown?.length || 0) > 1;
 
                   const canEditQuoteQuantity =
                     !!item.options?.quotePayload &&

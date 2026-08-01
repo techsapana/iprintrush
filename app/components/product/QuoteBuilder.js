@@ -45,12 +45,14 @@ export function QuoteBuilder({
   const customizationSectionRef = useRef(null);
   const skipStepScrollRef = useRef(true);
   const [error, setError] = useState('');
+  const [calcError, setCalcError] = useState('');
   const [quoteSummary, setQuoteSummary] = useState(null);
   const [calculating, setCalculating] = useState(false);
   const [hasCalculated, setHasCalculated] = useState(false);
   const [artworkReadyChoice, setArtworkReadyChoice] = useState('');
   const [tempArtworkFiles, setTempArtworkFiles] = useState([]);
   const [totalArtworkSize, setTotalArtworkSize] = useState(0);
+  const [uploadedArtworkDetails, setUploadedArtworkDetails] = useState([]);
   const [artworkFiles, setArtworkFiles] = useState([]);
   const [customSizeNote, setCustomSizeNote] = useState('');
   const [artworkUploading, setArtworkUploading] = useState(false);
@@ -214,7 +216,8 @@ const [availableMethods, setAvailableMethods] = useState([]);
         hydratedRef.current = true;
       } catch (err) {
         if (!cancelled) {
-          setError(err.message || 'Failed to load quote configuration');
+          setCalcError(err.message || 'Failed to load quote configuration');
+          setQuoteSummary(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -445,20 +448,20 @@ const [availableMethods, setAvailableMethods] = useState([]);
     // Check if total quantity is still valid
     const newTotal = Object.values(newQuantities).reduce((sum, v) => sum + (v || 0), 0);
     if (newTotal <= 0) {
-      setError('Total quantity must be at least 1.');
+      setCalcError('Total quantity must be at least 1.');
       return false;
     }
     if (quantityMin != null && newTotal < quantityMin) {
-      setError(`Total quantity must be at least ${quantityMin}.`);
+      setCalcError(`Total quantity must be at least ${quantityMin}.`);
       return false;
     }
     if (quantityMax != null && newTotal > quantityMax) {
-      setError(`Total quantity may not exceed ${quantityMax}.`);
+      setCalcError(`Total quantity may not exceed ${quantityMax}.`);
       return false;
     }
 
     // Recalculate the quote
-    setError('');
+    setCalcError('');
     const requestId = ++latestCalcRequestIdRef.current;
     try {
       setCalculating(true);
@@ -531,7 +534,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
       return true;
     } catch (err) {
       if (requestId === latestCalcRequestIdRef.current) {
-        setError(err.message || 'Failed to recalculate quote');
+        setCalcError(err.message || 'Failed to recalculate quote');
       }
       return false;
     } finally {
@@ -753,27 +756,34 @@ const handleDeliveryMethodChange = (method) => {
     scheduleRecalculation();
   };
 
+  const getMissingCustomizationError = () => {
+    if (isCustomApparels && !fabricChoice) return 'Please select a Fabric Availability option.';
+    if (!decorationId) return 'Please select a Decoration Type.';
+    if (!colorId) return 'Please select a Color.';
+    if (totalQuantity <= 0) return 'Total quantity must be at least 1.';
+    if (quantityMin != null && totalQuantity < quantityMin) return `Total quantity must be at least ${quantityMin}.`;
+    if (quantityMax != null && totalQuantity > quantityMax) return `Total quantity may not exceed ${quantityMax}.`;
+    if (!turnaroundId) return 'Please select a Turnaround Time.';
+    if (!designerHelpId) return 'Please select a Designer Help option.';
+    if (!deliveryMethod) return 'Please select a Delivery Method.';
+    if (!artworkReadyChoice) return 'Please select an Artwork option.';
+    if (artworkReadyChoice === 'ready' && tempArtworkFiles.length === 0 && artworkFiles.length === 0 && !artworkLink?.trim()) {
+      return 'Please upload at least one artwork file or provide a cloud link.';
+    }
+    return null;
+  };
+
   const isReadyForCalculation = () => {
-    if (isCustomApparels && !fabricChoice) return false;
-    if (!decorationId) return false;
-    if (!colorId) return false;
-    if (totalQuantity <= 0) return false;
-    if (!turnaroundId) return false;
-    if (!designerHelpId) return false;
-    if (quantityMin != null && totalQuantity < quantityMin) return false;
-    if (quantityMax != null && totalQuantity > quantityMax) return false;
-    if (!deliveryMethod) return false;
-    if (!artworkReadyChoice) return false;
-    if (artworkReadyChoice === 'ready' && tempArtworkFiles.length === 0 && artworkFiles.length === 0 && !artworkLink?.trim()) return false;
-    return true;
+    return getMissingCustomizationError() === null;
   };
 
  const handleCalculate = async () => {
     invalidateQuote();
-    setError('');
+    setCalcError('');
 
-    if (!isReadyForCalculation()) {
-      setError('Please complete all customization steps before calculating your price.');
+    const missingError = getMissingCustomizationError();
+    if (missingError) {
+      setCalcError(missingError);
       return;
     }
 
@@ -865,7 +875,7 @@ const handleDeliveryMethodChange = (method) => {
       }
     } catch (err) {
       if (requestId === latestCalcRequestIdRef.current) {
-        setError(err.message || 'Failed to calculate quote');
+        setCalcError(err.message || 'Failed to calculate quote');
       }
     } finally {
       if (requestId === latestCalcRequestIdRef.current) {
@@ -1246,7 +1256,7 @@ const renderDeliveryStep = () => {
     const handleEmailQuote = () => {
       const to = emailTo.trim();
       if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-        setError('Please enter a valid email address.');
+        setCalcError('Please enter a valid email address.');
         return;
       }
       const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
@@ -1259,7 +1269,7 @@ const renderDeliveryStep = () => {
       const cc = countryCode.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
       const num = phoneNumber.replace(/\D/g, '');
       if (!cc || !num) {
-        setError('Please enter both country code and phone number.');
+        setCalcError('Please enter both country code and phone number.');
         return;
       }
       const fullNumber = `${cc.startsWith('+') ? cc.slice(1) : cc}${num}`;
@@ -1269,7 +1279,7 @@ const renderDeliveryStep = () => {
 
     const handlePrintQuote = () => {
       if (!quoteSummary) {
-        setError('No quote data to print');
+        setCalcError('No quote data to print');
         return;
       }
       const customizationsDisplay = {
@@ -1325,7 +1335,7 @@ const renderDeliveryStep = () => {
           setShareFeedback('Quote copied to clipboard');
           setTimeout(() => setShareFeedback(''), 3000);
         } catch {
-          setError('Unable to share quote. Please try again.');
+          setCalcError('Unable to share quote. Please try again.');
         }
       }
     };
@@ -1607,6 +1617,7 @@ const renderDeliveryStep = () => {
                 handleArtworkReadyChange('not_ready');
                 setTempArtworkFiles([]);
                 setTotalArtworkSize(0);
+                setUploadedArtworkDetails([]);
               }}
             />
             Upload file later
@@ -1657,6 +1668,7 @@ const renderDeliveryStep = () => {
                       if (data?.tempId) {
                         setTempArtworkFiles((prev) => [...prev, data.tempId]);
                         setTotalArtworkSize((prev) => prev + file.size);
+                        setUploadedArtworkDetails((prev) => [...prev, { id: data.tempId, name: file.name, size: file.size }]);
                       }
                     } catch (err) {
                       setArtworkError(err.message || 'Failed to upload artwork');
@@ -1672,11 +1684,31 @@ const renderDeliveryStep = () => {
                   {artworkError}
                 </div>
               )}
-              {tempArtworkFiles.length > 0 && (
-                <div className="text-sm font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+              {uploadedArtworkDetails.length > 0 ? (
+                <div className="space-y-2 mt-3">
+                  <div className="text-sm font-medium text-gray-700">Uploaded Files:</div>
+                  {uploadedArtworkDetails.map((fileInfo) => (
+                    <div key={fileInfo.id} className="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-sm text-emerald-700">
+                      <span className="truncate max-w-[80%]">{fileInfo.name}</span>
+                      <button
+                        onClick={() => {
+                          setTempArtworkFiles(prev => prev.filter(id => id !== fileInfo.id));
+                          setUploadedArtworkDetails(prev => prev.filter(f => f.id !== fileInfo.id));
+                          setTotalArtworkSize(prev => Math.max(0, prev - fileInfo.size));
+                        }}
+                        className="text-emerald-600 hover:text-emerald-800 font-bold ml-2 px-2 py-0.5 rounded hover:bg-emerald-200 transition-colors"
+                        title="Remove file"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : tempArtworkFiles.length > 0 ? (
+                <div className="text-sm font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 mt-3">
                   ✓ {tempArtworkFiles.length} artwork file(s) uploaded successfully.
                 </div>
-              )}
+              ) : null}
               {artworkReadyChoice === 'ready' && (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && (
                 <label className="flex items-center gap-2 text-sm text-gray-700 mt-2 cursor-pointer">
                   <input
@@ -1878,9 +1910,9 @@ case 7:
         </div>
 
         <div className="space-y-6">
-          {error && (
+          {calcError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
+              {calcError}
             </div>
           )}
 

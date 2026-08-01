@@ -231,14 +231,39 @@ export function CartProvider({ children }) {
     // The shared quote payload
     const payload = JSON.parse(JSON.stringify(groupItems[0].options.quotePayload));
     
-    if (requested === 0) {
-      delete payload.quantities[targetItem.options.splitSizeId];
+    if (payload.mode === 'print_product') {
+      if (!payload.selections) payload.selections = {};
+      if (requested === 0) {
+        delete payload.selections[targetItem.options.splitSizeId];
+      } else {
+        payload.selections[targetItem.options.splitSizeId] = requested;
+      }
     } else {
-      payload.quantities[targetItem.options.splitSizeId] = requested;
+      if (requested === 0) {
+        payload.quantities = (payload.quantities || []).filter(q => String(q.sizeId) !== String(targetItem.options.splitSizeId));
+      } else {
+        const qIndex = (payload.quantities || []).findIndex(q => String(q.sizeId) === String(targetItem.options.splitSizeId));
+        if (qIndex >= 0) {
+          payload.quantities[qIndex].quantity = requested;
+        } else {
+          payload.quantities = payload.quantities || [];
+          payload.quantities.push({ sizeId: targetItem.options.splitSizeId, quantity: requested });
+        }
+      }
     }
     
     // Check if total quantity becomes 0
-    const newTotal = Object.values(payload.quantities).reduce((a, b) => a + Number(b), 0);
+    let newTotal = 0;
+    if (payload.mode === 'print_product') {
+      // For print product, sum up all values in selections that correspond to split items
+      newTotal = groupItems.reduce((acc, it) => {
+        const key = it.options.splitSizeId;
+        return acc + Number(payload.selections[key] || 0);
+      }, 0);
+    } else {
+      newTotal = (payload.quantities || []).reduce((a, b) => a + Number(b.quantity || 0), 0);
+    }
+    
     if (newTotal === 0) {
       setItems(prev => prev.filter(it => it.options?.splitGroupId !== splitGroupId));
       return;

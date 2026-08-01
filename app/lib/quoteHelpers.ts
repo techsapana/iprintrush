@@ -146,7 +146,7 @@ export async function getConfigWithCustomPrices(productId: string): Promise<Quot
       enabled: true,
     })),
     sizes: sizes.map((s: any) => ({
-      id: s.id,
+      id: String(s.id),
       label: s.label,
       priceAddon: customPrices.sizes[s.id] ?? parseFloat(s.price_addon),
       baseEnabled: true,

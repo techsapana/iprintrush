@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/app/lib/db';
 import { getAdminFromCookies } from '@/app/lib/adminAuth';
-import { getCustomerFromRequest } from '@/app/lib/customerAuth';
+import { getCustomerFromCookies } from '@/app/lib/customerAuth';
 import { sendEmail } from '@/app/lib/mailer';
 
 export const runtime = 'nodejs';
@@ -13,7 +13,7 @@ async function checkAccess(request: Request, orderId: string) {
   if (admin) return { role: 'admin' as const, email: admin.email };
 
   // 2. Check if customer
-  const customer = await getCustomerFromRequest(request);
+  const customer = await getCustomerFromCookies();
   if (customer) {
     // Verify customer owns this order
     const rows = await query(`SELECT id, customer_email FROM orders WHERE id = ?`, [orderId]);
