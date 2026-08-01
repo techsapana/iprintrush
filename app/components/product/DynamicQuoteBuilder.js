@@ -84,6 +84,7 @@ const artworkFileRef = useRef(null);
 
   const [artworkReadyChoice, setArtworkReadyChoice] = useState('');
   const [tempArtworkFiles, setTempArtworkFiles] = useState([]);
+  const [totalArtworkSize, setTotalArtworkSize] = useState(0);
   const [artworkFiles, setArtworkFiles] = useState([]);
   const [customSizeNote, setCustomSizeNote] = useState('');
   const [artworkUploading, setArtworkUploading] = useState(false);
@@ -1613,7 +1614,11 @@ const renderDimensionStep = (group, pool, value) => {
             type="radio"
             name="dq-artwork-ready"
             checked={artworkReadyChoice === 'not_ready'}
-            onChange={() => handleArtworkReadyChange('not_ready')}
+            onChange={() => {
+              handleArtworkReadyChange('not_ready');
+              setTempArtworkFiles([]);
+              setTotalArtworkSize(0);
+            }}
           />
           Upload file later
         </label>
@@ -1635,6 +1640,18 @@ const renderDimensionStep = (group, pool, value) => {
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+
+                    if (file.size > 102 * 1024 * 1024) {
+                      setArtworkError('Artwork file must be <= 100MB. For larger files, please provide a cloud link.');
+                      if (e.target) e.target.value = '';
+                      return;
+                    }
+                    if (totalArtworkSize + file.size > 300 * 1024 * 1024) {
+                      setArtworkError('Total artwork size cannot exceed 300MB per order.');
+                      if (e.target) e.target.value = '';
+                      return;
+                    }
+
                     try {
                       setArtworkUploading(true);
                       setArtworkError('');
@@ -1643,7 +1660,10 @@ const renderDimensionStep = (group, pool, value) => {
                       const res = await fetch('/api/artwork/temp-upload', { method: 'POST', body: fd });
                       const data = await res.json().catch(() => ({}));
                       if (!res.ok) throw new Error(data.error || 'Upload failed');
-                      if (data?.tempId) setTempArtworkFiles((prev) => [...prev, data.tempId]);
+                      if (data?.tempId) {
+                        setTempArtworkFiles((prev) => [...prev, data.tempId]);
+                        setTotalArtworkSize((prev) => prev + file.size);
+                      }
                     } catch (err) {
                       setArtworkError(err.message || 'Failed to upload artwork');
                     } finally {
