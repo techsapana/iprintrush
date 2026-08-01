@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/app/lib/db';
-import { verifyAdminToken } from '@/app/lib/adminAuth';
+import { getAdminFromCookies } from '@/app/lib/adminAuth';
 import { getCustomerFromRequest } from '@/app/lib/customerAuth';
 import { sendEmail } from '@/app/lib/mailer';
 
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 async function checkAccess(request: Request, orderId: string) {
   // 1. Check if admin
-  const admin = await verifyAdminToken(request);
+  const admin = await getAdminFromCookies();
   if (admin) return { role: 'admin' as const, email: admin.email };
 
   // 2. Check if customer
