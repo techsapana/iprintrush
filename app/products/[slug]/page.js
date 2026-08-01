@@ -125,6 +125,10 @@ export default function ProductDetailPage({ params }) {
       items.push({ type: 'image', url });
     }
 
+    if (activeColorImage && !items.some(m => m.type === 'image' && m.url === activeColorImage)) {
+      items.push({ type: 'image', url: activeColorImage });
+    }
+
     const videoList = Array.isArray(product?.videos) ? product.videos : [];
     for (const v of videoList) {
       if (!v?.url) continue;
@@ -132,7 +136,7 @@ export default function ProductDetailPage({ params }) {
     }
 
     return items;
-  }, [product?.galleryImages, product?.image, product?.videos]);
+  }, [product?.galleryImages, product?.image, product?.videos, activeColorImage]);
 
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   
@@ -140,6 +144,8 @@ export default function ProductDetailPage({ params }) {
     if (activeColorImage) {
       const idx = media.findIndex((m) => m.type === 'image' && m.url === activeColorImage);
       if (idx !== -1) setCurrentMediaIndex(idx);
+    } else {
+      setCurrentMediaIndex(0);
     }
   }, [activeColorImage, media]);
 

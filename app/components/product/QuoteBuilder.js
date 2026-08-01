@@ -883,6 +883,16 @@ const handleDeliveryMethodChange = (method) => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="mt-10 p-6 bg-red-50 rounded-xl border border-red-200">
+        <h3 className="text-lg font-semibold text-red-700 mb-2">Error Loading Quote Configuration</h3>
+        <p className="text-sm text-red-600">{error}</p>
+        <p className="text-sm text-red-500 mt-2">Please contact support or try again later.</p>
+      </div>
+    );
+  }
+
   if (configMode === 'print_product') {
     return (
       <DynamicQuoteBuilder
