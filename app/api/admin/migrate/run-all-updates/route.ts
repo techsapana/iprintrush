@@ -92,6 +92,23 @@ export async function GET(req: NextRequest) {
       )`,
       "Create order_messages table"
     );
+    // 7. customer_users (missing columns from earlier migrations)
+    await safeExecute(
+      "ALTER TABLE customer_users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NULL AFTER email",
+      "Add phone to customer_users"
+    );
+    await safeExecute(
+      "ALTER TABLE customer_users ADD COLUMN IF NOT EXISTS preferences JSON NULL",
+      "Add preferences to customer_users"
+    );
+    await safeExecute(
+      "ALTER TABLE customer_users ADD COLUMN IF NOT EXISTS saved_items JSON NULL",
+      "Add saved_items to customer_users"
+    );
+    await safeExecute(
+      "ALTER TABLE customer_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "Add updated_at to customer_users"
+    );
 
     return NextResponse.json({
       success: true,
