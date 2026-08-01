@@ -39,9 +39,9 @@ export async function POST(request: NextRequest) {
       await mkdir(TEMP_DIR, { recursive: true });
     }
 
-    const ext = path.extname(file.name || '') || '.jpg';
+    const fileExt = ext || '.jpg';
     const tempId = crypto.randomUUID();
-    const safeName = `${tempId}${ext.toLowerCase()}`;
+    const safeName = `${tempId}${fileExt}`;
     const targetPath = path.join(TEMP_DIR, safeName);
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(targetPath, buffer);
