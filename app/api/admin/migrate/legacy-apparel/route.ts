@@ -78,6 +78,21 @@ export async function GET(req: NextRequest) {
       "Add image_url to product_color_options"
     );
 
+    // 6. order_messages (for OrderChat)
+    await safeExecute(
+      `CREATE TABLE IF NOT EXISTS order_messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT NOT NULL,
+        sender_type ENUM('customer', 'admin', 'system') NOT NULL,
+        message TEXT,
+        attachment_url VARCHAR(255),
+        attachment_name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+      )`,
+      "Create order_messages table"
+    );
+
     return NextResponse.json({
       success: true,
       message: 'Migration completed.',
