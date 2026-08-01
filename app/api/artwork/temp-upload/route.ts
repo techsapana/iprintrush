@@ -18,13 +18,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No artwork file provided' }, { status: 400 });
     }
 
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'Only image files are allowed' }, { status: 400 });
+    const ext = path.extname(file.name || '').toLowerCase();
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.psd', '.tif', '.tiff', '.ai', '.eps', '.zip'];
+    const allowedTypes = [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'application/pdf', 'image/vnd.adobe.photoshop', 'image/tiff',
+      'application/postscript', 'application/illustrator',
+      'application/zip', 'application/x-zip-compressed'
+    ];
+
+    if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
+      return NextResponse.json({ error: 'Invalid file format. Accepted formats: JPG, PNG, PDF, PSD, TIF, AI, EPS, ZIP.' }, { status: 400 });
     }
 
-    if (file.size > 20 * 1024 * 1024) {
-      return NextResponse.json({ error: 'Artwork file must be <= 20MB' }, { status: 400 });
+    if (file.size > 100 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Artwork file must be <= 100MB. For larger files, please provide a cloud link.' }, { status: 400 });
     }
 
     if (!existsSync(TEMP_DIR)) {
