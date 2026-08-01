@@ -110,7 +110,7 @@ export async function POST(
        FROM order_messages 
        WHERE order_id = ? 
        ORDER BY created_at DESC LIMIT 1`,
-      [params.id]
+      [id]
     );
 
     return NextResponse.json({ message: (newMsgRows as any[])[0] });
