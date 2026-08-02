@@ -9,6 +9,7 @@ function QuotePrintContent() {
   const [quoteData, setQuoteData] = useState(null);
   const [error, setError] = useState('');
   const [productInfo, setProductInfo] = useState({ productName: 'Quote' });
+  const [logoUrl, setLogoUrl] = useState('');
 
   useEffect(() => {
     const encoded = searchParams.get('data');
@@ -25,16 +26,33 @@ function QuotePrintContent() {
     } else {
       setError('No quote data provided');
     }
+
+    // Fetch logo
+    const fetchLogo = async () => {
+      try {
+        const res = await fetch('/api/site-settings/announcement');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.logoImageUrl) {
+            setLogoUrl(data.logoImageUrl);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch logo', err);
+      }
+    };
+    fetchLogo();
   }, [searchParams]);
 
   useEffect(() => {
     if (quoteData && !error) {
+      // Small delay to ensure logo renders before print dialog
       const timer = setTimeout(() => {
         window.print();
-      }, 500);
+      }, 800);
       return () => clearTimeout(timer);
     }
-  }, [quoteData, error]);
+  }, [quoteData, error, logoUrl]);
 
   if (error) {
     return (
@@ -58,7 +76,7 @@ function QuotePrintContent() {
   }
 
   return (
-    <div dangerouslySetInnerHTML={{ __html: buildInvoiceHTML(quoteData, productInfo) }} />
+    <div dangerouslySetInnerHTML={{ __html: buildInvoiceHTML(quoteData, productInfo, logoUrl) }} />
   );
 }
 

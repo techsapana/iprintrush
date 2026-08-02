@@ -227,6 +227,12 @@ export default function AdminOrderDetailPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center flex-wrap gap-4">
           <h1 className="text-2xl font-bold text-gray-900">Order {order.orderNumber}</h1>
           <div className="flex items-center gap-3">
+            <Link
+              href={`/admin/orders/${order.id}/invoice`}
+              className="text-xs px-3 py-1.5 rounded-md bg-green-100 text-green-700 hover:bg-green-200 font-medium"
+            >
+              Print Invoice
+            </Link>
             <button
               type="button"
               onClick={handleDeleteOrder}
@@ -268,7 +274,7 @@ export default function AdminOrderDetailPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-gray-500">Placed</span>
               <div className="font-medium">{formatDate(order.createdAt)}</div>
@@ -288,6 +294,19 @@ export default function AdminOrderDetailPage() {
                   value={order.estimatedCompletionAt || ''}
                   onChange={(e) =>
                     handleUpdate({ estimatedCompletionAt: e.target.value || null })
+                  }
+                />
+              </div>
+            </div>
+            <div>
+              <span className="text-gray-500">Expected Delivery</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-2 py-1 text-xs"
+                  value={order.estimatedDeliveryDate ? order.estimatedDeliveryDate.split('T')[0] : ''}
+                  onChange={(e) =>
+                    handleUpdate({ estimatedDeliveryDate: e.target.value ? `${e.target.value}T12:00:00.000Z` : null })
                   }
                 />
               </div>

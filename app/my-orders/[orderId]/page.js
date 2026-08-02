@@ -307,14 +307,22 @@ export default function OrderDetailPage() {
               Order #{order?.orderNumber} • Signed in as <span className="font-medium">{user.email}</span>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleDeleteOrder}
-            disabled={deletingOrder}
-            className="text-xs px-3 py-1.5 rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-60"
-          >
-            {deletingOrder ? 'Deleting...' : 'Delete order'}
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/my-orders/${order?.id}/invoice`}
+              className="text-xs px-3 py-1.5 rounded-md bg-green-100 text-green-700 hover:bg-green-200 font-medium"
+            >
+              Print Invoice
+            </Link>
+            <button
+              type="button"
+              onClick={handleDeleteOrder}
+              disabled={deletingOrder}
+              className="text-xs px-3 py-1.5 rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-60"
+            >
+              {deletingOrder ? 'Deleting...' : 'Delete order'}
+            </button>
+          </div>
         </div>
 
         {(updateError) && (
@@ -331,12 +339,17 @@ export default function OrderDetailPage() {
                 <div className="text-xs text-gray-400">
                   Placed on {formatDate(order.createdAt)}
                 </div>
-                {order.workflowStatus === 'shipped' && order.trackingNumber ? (
+                {order.trackingNumber ? (
                   <div className="text-xs text-gray-500 mt-1">
-                    Tracking Number: <span className="font-semibold">{order.trackingNumber}</span>
+                    Tracking Number: <span className="font-semibold text-[#29b6f6]">{order.trackingNumber}</span>
                   </div>
                 ) : (
-                  <div className="text-xs text-gray-500 mt-1">Tracking Number: Pending shipment</div>
+                  <div className="text-xs text-gray-400 mt-1">Tracking Number: Pending shipment</div>
+                )}
+                {order.estimatedDeliveryDate && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Expected Delivery: <span className="font-semibold">{formatDate(order.estimatedDeliveryDate)}</span>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-3">

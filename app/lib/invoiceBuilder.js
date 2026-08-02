@@ -29,7 +29,7 @@ const getLineItemType = (item) => {
   return 'normal';
 };
 
-const buildInvoiceHTML = (quoteSummary, productInfo) => {
+const buildInvoiceHTML = (quoteSummary, productInfo, logoUrl = null) => {
   if (!quoteSummary) return '<div>No quote data available</div>';
 
   const {
@@ -84,9 +84,18 @@ const buildInvoiceHTML = (quoteSummary, productInfo) => {
 </head>
 <body>
   <div class="invoice-container">
-    <div class="invoice-header">
-      <h1 class="invoice-title">Quote Summary</h1>
-      <div class="invoice-meta">Product: ${productName}</div>
+    <div class="invoice-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        ${logoUrl 
+          ? `<img src="${logoUrl}" alt="Logo" style="max-height: 50px; margin-bottom: 5px; max-width: 250px; object-fit: contain;" />` 
+          : `<h1 class="invoice-title" style="color: #29b6f6; text-transform: uppercase; margin-bottom: 2px;">iPrintRush</h1>`
+        }
+        <div class="invoice-meta">www.iprintrush.com</div>
+      </div>
+      <div style="text-align: right;">
+        <h2 class="invoice-title" style="font-size: 20px; color: #111827;">Quote Summary</h2>
+        <div class="invoice-meta">Product: ${productName}</div>
+      </div>
     </div>
 
     <div class="invoice-section">

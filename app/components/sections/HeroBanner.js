@@ -79,16 +79,17 @@ export function HeroBanner() {
 
           {/* View Portfolio Button */}
           <div className="mb-10 sm:mb-12 animate-fadeInUp" style={{ animationDelay: '0.22s' }}>
-            <Link href="/portfolio">
-              <button className="group relative px-6 py-3 sm:px-10 sm:py-4 bg-[#29b6f6] text-white font-bold text-base sm:text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
-                <span className="relative z-10 flex items-center gap-2 justify-center">
-                  View Our Portfolio
-                  <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-[#29b6f6] to-[#1c88c0] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              </button>
+            <Link 
+              href="/portfolio" 
+              className="inline-block group relative px-6 py-3 sm:px-10 sm:py-4 bg-[#29b6f6] text-white font-bold text-base sm:text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden"
+            >
+              <span className="relative z-10 flex items-center gap-2 justify-center">
+                View Our Portfolio
+                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-[#29b6f6] to-[#1c88c0] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </Link>
           </div>
 

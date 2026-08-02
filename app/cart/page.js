@@ -9,7 +9,7 @@ import { useCart } from '../hooks/useCart';
 import { useSameDayEligibility } from '../hooks/useSameDayEligibility';
 import { SameDayNotice } from '../components/shared/SameDayNotice';
 import { useAuth } from '../hooks/useAuth';
-import { clearBuyNowItems, requireLoginForCheckout } from '../lib/checkoutFlow';
+import { clearBuyNowItems, requireLoginForCheckout, computeLineTotal } from '../lib/checkoutFlow';
 import { buildQuoteCartEntries } from '../lib/cartHelpers';
 
 import { CartEditModal } from '../components/product/CartEditModal';
@@ -141,6 +141,18 @@ export default function CartPage() {
   const eligibility = useSameDayEligibility();
 
   const [editingItem, setEditingItem] = useState(null);
+  const [taxRatePercent, setTaxRatePercent] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/site-settings/announcement')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.taxRatePercent != null) {
+          setTaxRatePercent(Number(data.taxRatePercent));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleEditItem = (item, targetStepTitle = null) => {
     const payload = item.options?.quotePayload;
@@ -181,10 +193,17 @@ export default function CartPage() {
     );
   }
 
-  const total = getTotal();
-  const subtotal = total;
-  const tax = subtotal * 0.1; // 10% tax estimate
-  const finalTotal = subtotal + tax;
+  const subtotal = getTotal();
+  const subtotalCents = Math.round((subtotal || 0) * 100);
+  
+  const taxRatePercentNum = Number(taxRatePercent) || 0;
+  const taxRate = taxRatePercentNum / 100;
+  const taxCents = Math.round(subtotalCents * taxRate);
+  
+  const totalCents = subtotalCents + taxCents;
+
+  const tax = taxCents / 100;
+  const finalTotal = totalCents / 100;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -307,13 +326,7 @@ export default function CartPage() {
                       {/* Price */}
                       <div className="text-right">
                         {(() => {
-                          const lineTotal =
-                            item.options?.customLineTotal != null
-                              ? Number(item.options.customLineTotal)
-                              : item.options?.quoteSummary?.grandTotal != null
-                                ? Number(item.options.quoteSummary.grandTotal)
-                                : Number(item.price || 0) *
-                                  Number(item.quantity || 1);
+                          const lineTotal = computeLineTotal(item);
                           return (
                             <p className="text-xl font-bold text-[#29b6f6]">
                               ${(lineTotal || 0).toFixed(2)}

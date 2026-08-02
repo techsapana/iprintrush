@@ -15,6 +15,12 @@ const MIME_TYPES: Record<string, string> = {
   '.webm': 'video/webm',
   '.ogg': 'video/ogg',
   '.mov': 'video/quicktime',
+  '.pdf': 'application/pdf',
+  '.txt': 'text/plain',
+  '.zip': 'application/zip',
+  '.psd': 'image/vnd.adobe.photoshop',
+  '.ai': 'application/postscript',
+  '.eps': 'application/postscript',
 };
 
 async function resolveUploadPath(params: { path: string[] }) {

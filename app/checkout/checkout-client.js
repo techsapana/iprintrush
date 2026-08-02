@@ -437,16 +437,28 @@ const handleApplyCoupon = (e) => {
     isAuthenticated
   });
   const subtotal = computeItemsMerchandiseSubtotal(checkoutItems);
-  const discount = appliedCoupon
-    ? (subtotal || 0) * ((couponLookup[appliedCoupon] || 0) / 100)
+  
+  const subtotalCents = Math.round((subtotal || 0) * 100);
+  const discountCents = appliedCoupon
+    ? Math.round(subtotalCents * ((couponLookup[appliedCoupon] || 0) / 100))
     : 0;
-  const taxableBase = Math.max(0, (subtotal || 0) - discount);
+  const taxableBaseCents = Math.max(0, subtotalCents - discountCents);
+  
   const shippingAmount =
     selectedMethod && selectedMethod !== 'pickup'
       ? Number(shippingMethods.find((m) => m.type === selectedMethod)?.cost || 0)
       : 0;
-  const taxAmount = (taxableBase + shippingAmount) * ((Number(taxRatePercent) || 0) / 100);
-  const finalTotal = taxableBase + shippingAmount + taxAmount;
+  const shippingCents = Math.round(shippingAmount * 100);
+  
+  const taxRatePercentNum = Number(taxRatePercent) || 0;
+  const taxRate = taxRatePercentNum / 100;
+  const taxCents = Math.round((taxableBaseCents + shippingCents) * taxRate);
+  
+  const totalCents = taxableBaseCents + shippingCents + taxCents;
+
+  const discount = discountCents / 100;
+  const taxAmount = taxCents / 100;
+  const finalTotal = totalCents / 100;
   const canProceed =
     fileUploadMode === 'later' ||
     (fileUploadMode === 'now' && uploadedFile && isFinalConfirmed);

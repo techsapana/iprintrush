@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
            shipping_address_json,
            delivery_method,
            tracking_number,
+           estimated_delivery_date,
            created_at,
            paid_at
          FROM orders
@@ -162,6 +163,7 @@ export async function GET(request: NextRequest) {
           customerPhone: o.customer_phone || '',
           deliveryMethod: o.delivery_method || 'pickup',
           trackingNumber: o.tracking_number || '',
+          estimatedDeliveryDate: o.estimated_delivery_date || null,
           billingAddress,
           shippingAddress,
           createdAt: o.created_at,
@@ -189,6 +191,7 @@ export async function GET(request: NextRequest) {
          shipping_address_json,
          delivery_method,
          tracking_number,
+         estimated_delivery_date,
          created_at,
          paid_at
        FROM orders
@@ -312,6 +315,7 @@ export async function GET(request: NextRequest) {
           customerPhone: o.customer_phone || '',
           deliveryMethod: o.delivery_method || 'pickup',
           trackingNumber: o.tracking_number || '',
+          estimatedDeliveryDate: o.estimated_delivery_date || null,
           billingAddress,
           shippingAddress,
           createdAt: o.created_at,

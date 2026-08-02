@@ -324,7 +324,7 @@ if (!existingProductId) {
            body.sameDayEligible ? 1 : 0,
            body.outOfStock ? 1 : 0,
            body.featured ? 1 : 0,
-           body.allow_custom_dimensions ? 1 : 0,
+           (body.allowCustomDimensions ?? body.allow_custom_dimensions) ? 1 : 0,
            body.shippingEnabled !== false,
            body.localDeliveryEligible ? 1 : 0,
            body.shippingCategory || 'standard',
@@ -441,9 +441,9 @@ if (!existingProductId) {
          updates.push('featured = ?');
          values.push(body.featured ? 1 : 0);
        }
-if (body.allow_custom_dimensions !== undefined) {
+        if (body.allowCustomDimensions !== undefined || body.allow_custom_dimensions !== undefined) {
           updates.push('allow_custom_dimensions = ?');
-          values.push(body.allow_custom_dimensions ? 1 : 0);
+          values.push((body.allowCustomDimensions ?? body.allow_custom_dimensions) ? 1 : 0);
         }
         if (body.shippingEnabled !== undefined) {
           updates.push('shipping_enabled = ?');

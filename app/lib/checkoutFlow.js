@@ -66,20 +66,22 @@ export function computeItemShippingTierSubtotal(item) {
 
 export function computeItemsShippingTierSubtotal(items) {
   if (!Array.isArray(items)) return 0;
-  return items.reduce((sum, item) => sum + computeItemShippingTierSubtotal(item), 0);
+  const cents = items.reduce((sum, item) => sum + Math.round(computeItemShippingTierSubtotal(item) * 100), 0);
+  return cents / 100;
 }
 
 export function computeItemMerchandiseSubtotal(item) {
-  return computeItemShippingTierSubtotal(item);
+  return computeLineTotal(item);
 }
 
 export function computeItemsMerchandiseSubtotal(items) {
-  return computeItemsShippingTierSubtotal(items);
+  return computeItemsSubtotal(items);
 }
 
 export function computeItemsSubtotal(items) {
   if (!Array.isArray(items)) return 0;
-  return items.reduce((sum, item) => sum + computeLineTotal(item), 0);
+  const cents = items.reduce((sum, item) => sum + Math.round(computeLineTotal(item) * 100), 0);
+  return cents / 100;
 }
 
 export function saveBuyNowItems(items) {

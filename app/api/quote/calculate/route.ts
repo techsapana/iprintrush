@@ -27,22 +27,22 @@ export async function POST(req: NextRequest) {
 
     // Handle mailbox mode separately (no unification needed - different domain)
     if (payload.mode === 'mailbox') {
-      return handleMailboxQuote(payload);
+      return await handleMailboxQuote(payload);
     }
 
     // Simple product mode
     if (payload.mode === 'simple') {
-      return handleSimpleQuote(payload);
+      return await handleSimpleQuote(payload);
     }
 
     // Apparel mode
     if (!payload.mode || payload.mode === 'apparel') {
-      return handleApparelQuote(payload);
+      return await handleApparelQuote(payload);
     }
 
     // Print product mode
     if (payload.mode === 'print_product' && payload.selections) {
-      return handlePrintProductQuote(payload);
+      return await handlePrintProductQuote(payload);
     }
 
     console.error('[Q] early-return invalid-mode', payload?.mode, 'hasSel=' + !!payload?.selections);

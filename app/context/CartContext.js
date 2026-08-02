@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useState, useCallback, useEffect, useRef } from 'react';
+import { computeItemsSubtotal } from '../lib/checkoutFlow';
 
 export const CartContext = createContext(null);
 
@@ -476,18 +477,7 @@ export function CartProvider({ children }) {
   }, []);
 
   const getTotal = useCallback(() => {
-    return items.reduce((total, item) => {
-      if (item.options?.customLineTotal != null) {
-        return total + Number(item.options.customLineTotal || 0);
-      }
-      if (item.options?.quoteSummary?.grandTotal != null) {
-        return total + Number(item.options.quoteSummary.grandTotal || 0);
-      }
-      const qty = Number(item.quantity || 1);
-      const basePrice = item.price || 0;
-      const optionsPrice = item.options?.extraPrice || 0;
-      return total + (basePrice + optionsPrice) * qty;
-    }, 0);
+    return computeItemsSubtotal(items);
   }, [items]);
 
   const getItemCount = useCallback(() => {

@@ -54,6 +54,7 @@ export async function GET(
         production_start_at,
         production_complete_at,
         estimated_completion_at,
+        estimated_delivery_date,
         assigned_staff,
         internal_notes,
         rush_flag,
@@ -133,6 +134,7 @@ export async function GET(
         productionStartAt: (order as any).production_start_at,
         productionCompleteAt: (order as any).production_complete_at,
         estimatedCompletionAt: (order as any).estimated_completion_at,
+        estimatedDeliveryDate: (order as any).estimated_delivery_date,
         assignedStaff: (order as any).assigned_staff || null,
         internalNotes: (order as any).internal_notes || null,
         rush: Boolean((order as any).rush_flag),
@@ -266,6 +268,10 @@ export async function PATCH(
     if (body.estimatedCompletionAt !== undefined) {
       fields.push('estimated_completion_at = ?');
       values.push(body.estimatedCompletionAt || null);
+    }
+    if (body.estimatedDeliveryDate !== undefined) {
+      fields.push('estimated_delivery_date = ?');
+      values.push(body.estimatedDeliveryDate || null);
     }
     if (body.assignedStaff !== undefined) {
       fields.push('assigned_staff = ?');
