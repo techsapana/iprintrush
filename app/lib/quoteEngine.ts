@@ -752,6 +752,13 @@ export function calculateDynamicQuote(
     const pool = poolMap.get(poolKey);
     if (!pool || !pool.options) continue;
 
+    const selectedPrintSizeId = printSizePool ? selections[printSizePool.key] : null;
+    const resolvedPrintSizeId = Array.isArray(selectedPrintSizeId) ? selectedPrintSizeId[0] : selectedPrintSizeId;
+    let resolvedPrintSizeOption =
+      printSizePool && resolvedPrintSizeId
+        ? printSizePool.options?.find((o) => o.id === resolvedPrintSizeId)
+        : null;
+
     const ids = Array.isArray(sel) ? sel : sel ? [sel] : [];
     for (const id of ids) {
       if (typeof id !== 'string') continue;

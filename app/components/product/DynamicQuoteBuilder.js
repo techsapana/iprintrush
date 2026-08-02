@@ -804,7 +804,8 @@ const handleDeliveryMethodChange = (method) => {
       });
       const selectedPrintSizeId = selections[printSizePool?.key];
       if (printSizePool && selectedPrintSizeId != null) {
-        const selectedOption = printSizePool.options?.find((o) => o.id === selectedPrintSizeId);
+        const resolvedId = Array.isArray(selectedPrintSizeId) ? selectedPrintSizeId[0] : selectedPrintSizeId;
+        const selectedOption = printSizePool.options?.find((o) => o.id === resolvedId);
         const dimSource = selectedOption?.value || selectedOption?.label;
         if (dimSource) {
           const dims = parseDimensionsFromValue(dimSource);
