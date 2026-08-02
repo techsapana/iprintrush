@@ -800,7 +800,7 @@ const handleDeliveryMethodChange = (method) => {
       const printSizePool = (pools || []).find((p) => {
         const key = String(p.key || '').toLowerCase();
         const name = String(p.name || '').toLowerCase();
-        return key === 'print_sizes' || key.includes('print_sizes') || name === 'print size' || name.includes('print size');
+        return key.includes('size') || name.includes('size');
       });
       const selectedPrintSizeId = selections[printSizePool?.key];
       if (printSizePool && selectedPrintSizeId != null) {

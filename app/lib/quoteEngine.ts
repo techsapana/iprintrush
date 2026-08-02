@@ -280,10 +280,8 @@ function isPrintSizePool(pool: { key?: string; name?: string } | null | undefine
   const key = String(pool.key || '').toLowerCase();
   const name = String(pool.name || '').toLowerCase();
   return (
-    key === 'print_sizes' ||
-    key.includes('print_sizes') ||
-    name === 'print size' ||
-    name.includes('print size')
+    key.includes('size') ||
+    name.includes('size')
   );
 }
 
