@@ -298,8 +298,9 @@ export function CartProvider({ children }) {
         .filter(s => Number(s.quantity) > 0)
         .map(s => {
           const oldItem = groupItems.find(i => i.options?.splitSizeId === s.sizeId);
-          // Calculate prorated price
           const lineTotal = summary.grandTotal * (s.quantity / summary.totalQuantity);
+          const merchandiseLineTotal = summary.merchandiseSubtotal * (s.quantity / summary.totalQuantity);
+          const shippingTierLineTotal = summary.shippingTierSubtotal ? (summary.shippingTierSubtotal * (s.quantity / summary.totalQuantity)) : 0;
           return {
             ...product,
             quantity: s.quantity,
@@ -311,6 +312,9 @@ export function CartProvider({ children }) {
                 ...summary,
                 totalQuantity: s.quantity,
                 grandTotal: lineTotal,
+                merchandiseSubtotal: merchandiseLineTotal,
+                shippingTierSubtotal: shippingTierLineTotal,
+                unitPrice: s.quantity > 0 ? lineTotal / s.quantity : 0,
                 sizeBreakdown: [s],
               },
               splitSizeId: s.sizeId,
