@@ -1100,7 +1100,7 @@ export function calculateUnifiedQuote(
     sizeBreakdown,
     lineItems: finalLineItems,
     subtotal,
-    merchandiseSubtotal: garmentSubtotal,
+    merchandiseSubtotal: subtotal,
     shipping,
     grandTotal,
     shippingTierSubtotal: subtotal,
