@@ -59,7 +59,9 @@ export default function OrderDetailPage() {
 
   const formatDate = (d) => {
     if (!d) return '—';
-    return new Date(d).toLocaleString(undefined, {
+    const parsed = new Date(d);
+    if (Number.isNaN(parsed.getTime())) return d;
+    return parsed.toLocaleString(undefined, {
       dateStyle: 'medium',
       timeStyle: 'short',
     });
@@ -339,18 +341,29 @@ export default function OrderDetailPage() {
                 <div className="text-xs text-gray-400">
                   Placed on {formatDate(order.createdAt)}
                 </div>
-                {order.trackingNumber ? (
-                  <div className="text-xs text-gray-500 mt-1">
-                    Tracking Number: <span className="font-semibold text-[#29b6f6]">{order.trackingNumber}</span>
-                  </div>
-                ) : (
-                  <div className="text-xs text-gray-400 mt-1">Tracking Number: Pending shipment</div>
-                )}
                 {order.estimatedDeliveryDate && (
                   <div className="text-xs text-gray-500 mt-1">
-                    Expected Delivery: <span className="font-semibold">{formatDate(order.estimatedDeliveryDate)}</span>
+                    Expected Delivery: <span className="font-semibold">{order.estimatedDeliveryDate}</span>
                   </div>
                 )}
+                {order.trackingNumber ? (
+                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                    <span>Tracking:</span>
+                    <span className="font-semibold text-gray-800">{order.trackingNumber}</span>
+                    {order.shippingCarrier && <span className="text-gray-400 capitalize">via {order.shippingCarrier}</span>}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-400 mt-1">Tracking: Pending shipment</div>
+                )}
+                <div className="text-xs text-gray-500 mt-1 capitalize flex items-center gap-1">
+                  <span>Payment:</span>
+                  <span className="font-medium text-gray-700">{order.paymentMethod ? order.paymentMethod.replace(/_/g, ' ') : (order.paidAt ? 'Credit Card' : 'Pending')}</span>
+                  {order.paidAt ? (
+                    <span className="text-green-600 bg-green-50 px-1.5 rounded-sm font-medium">Paid</span>
+                  ) : (
+                    <span className="text-amber-600 bg-amber-50 px-1.5 rounded-sm font-medium">Unpaid</span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 {workflowBadge(order.workflowStatus)}
@@ -424,17 +437,40 @@ export default function OrderDetailPage() {
                       </div>
                     </div>
 
-                    {item.customization && item.customization.customizationsDisplay && 
-                     Object.keys(item.customization.customizationsDisplay).length > 0 && (
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <strong>Customizations:</strong>
-                        {Object.entries(item.customization.customizationsDisplay).map(([k, v]) =>
-                          v ? (
+                    {(() => {
+                      const cust = item.customization || {};
+                      const displaySource = cust.customizationsDisplay || cust;
+                      const hiddenKeys = ['quotePayload', 'quoteSummary', 'mode', 'splitGroupId', 'splitSizeLabel', 'customizationsDisplay', 'artworkFiles', 'tempArtworkFiles', 'artworkReady', 'customSizeNote', 'splitQuote', 'customLineTotal', 'extraPrice', 'merchandiseSubtotal', 'shippingTierSubtotal', 'lineItems', 'quantity', 'id', 'price', 'name'];
+                      
+                      const entries = Object.entries(displaySource).filter(([k, v]) => {
+                        return !hiddenKeys.includes(k) && !/size\s*breakdown/i.test(String(k)) && v;
+                      });
+
+                      if (entries.length === 0) return null;
+
+                      return (
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <strong>Customizations:</strong>
+                          {entries.map(([k, v]) => (
                             <div key={k}>
-                              <span className="font-semibold">{k}:</span> {v}
+                              <span className="font-semibold capitalize">{k.replace(/([A-Z])/g, ' $1').trim()}:</span> {String(v)}
                             </div>
-                          ) : null
-                        )}
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    {item.customization && item.customization.lineItems && item.customization.lineItems.length > 0 && (
+                      <div className="text-sm text-gray-600 mt-4">
+                        <strong className="uppercase text-xs text-gray-500 mb-2 block">Quote Breakdown</strong>
+                        <ul className="space-y-1">
+                          {item.customization.lineItems.map((line, i) => (
+                            <li key={i} className="flex justify-between w-full sm:w-2/3 md:w-1/2">
+                              <span>{line.label}</span>
+                              <span>${Number(line.amount || 0).toFixed(2)}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
 

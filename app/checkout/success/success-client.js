@@ -4,24 +4,31 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { useCart } from '@/app/hooks/useCart';
 
 export default function SuccessClient() {
   const params = useSearchParams();
   const sessionId = params.get('session_id');
+  const paymentIntent = params.get('payment_intent');
   const [order, setOrder] = useState(null);
+  const { clearCart } = useCart();
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId && !paymentIntent) return;
     (async () => {
       try {
-        const res = await fetch(`/api/stripe/order?session_id=${encodeURIComponent(sessionId)}`);
+        const queryStr = sessionId ? `session_id=${encodeURIComponent(sessionId)}` : `payment_intent=${encodeURIComponent(paymentIntent)}`;
+        const res = await fetch(`/api/stripe/order?${queryStr}`);
         const data = await res.json();
-        if (res.ok) setOrder(data.order);
+        if (res.ok) {
+          setOrder(data.order);
+          clearCart(); // Clear the cart when the order is confirmed successfully
+        }
       } catch {
         // ignore
       }
     })();
-  }, [sessionId]);
+  }, [sessionId, paymentIntent, clearCart]);
 
   return (
     <div className="min-h-screen bg-gray-50">

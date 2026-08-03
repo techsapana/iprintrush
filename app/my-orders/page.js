@@ -55,7 +55,9 @@ export default function MyOrdersPage() {
 
   const formatDate = (d) => {
     if (!d) return '—';
-    return new Date(d).toLocaleString(undefined, {
+    const parsed = new Date(d);
+    if (Number.isNaN(parsed.getTime())) return d;
+    return parsed.toLocaleString(undefined, {
       dateStyle: 'medium',
       timeStyle: 'short',
     });
@@ -296,9 +298,16 @@ export default function MyOrdersPage() {
                     <div className="text-xs text-gray-500 mt-1">
                       Status: {workflowLabel(order.workflowStatus)}
                     </div>
-                    {order.workflowStatus === 'shipped' && order.trackingNumber ? (
+                    {order.estimatedDeliveryDate && (
                       <div className="text-xs text-gray-500 mt-1">
-                        Tracking: <span className="font-semibold">{order.trackingNumber}</span>
+                        Expected Delivery: <span className="font-semibold">{order.estimatedDeliveryDate}</span>
+                      </div>
+                    )}
+                    {order.trackingNumber ? (
+                      <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                        <span>Tracking:</span>
+                        <span className="font-semibold text-gray-800">{order.trackingNumber}</span>
+                        {order.shippingCarrier && <span className="text-gray-400 capitalize">via {order.shippingCarrier}</span>}
                       </div>
                     ) : (
                       <div className="text-xs text-gray-500 mt-1">Tracking: Pending shipment</div>
@@ -311,12 +320,33 @@ export default function MyOrdersPage() {
                           : `${order.shippingAddress.city || ''}${order.shippingAddress.state ? `, ${order.shippingAddress.state}` : ''} ${order.shippingAddress.zip || ''}`.trim()}
                       </div>
                     )}
+                    <div className="text-xs text-gray-500 mt-1 capitalize flex items-center gap-1">
+                      <span>Payment:</span>
+                      <span className="font-medium text-gray-700">{order.paymentMethod ? order.paymentMethod.replace(/_/g, ' ') : (order.paidAt ? 'Credit Card' : 'Pending')}</span>
+                      {order.paidAt ? (
+                        <span className="text-green-600 bg-green-50 px-1.5 rounded-sm font-medium">Paid</span>
+                      ) : (
+                        <span className="text-amber-600 bg-amber-50 px-1.5 rounded-sm font-medium">Unpaid</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-end gap-3 sm:flex-row sm:items-center">
                     {workflowBadge(order.workflowStatus)}
                     <div className="text-sm font-semibold text-gray-900">
                       ${order.amountTotal.toFixed(2)}
                     </div>
+                    <Link
+                      href={`/my-orders/${order.id}`}
+                      className="text-xs px-2.5 py-1.5 rounded-md bg-[#29b6f6] text-white hover:bg-[#1e8fc4]"
+                    >
+                      View Details & Chat
+                    </Link>
+                    <Link
+                      href={`/my-orders/${order.id}/invoice`}
+                      className="text-xs px-2.5 py-1.5 rounded-md bg-green-100 text-green-700 hover:bg-green-200"
+                    >
+                      Print Invoice
+                    </Link>
                     <button
                       type="button"
                       onClick={() => handleDeleteOrder(order.id)}

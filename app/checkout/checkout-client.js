@@ -17,9 +17,54 @@ import {
   computeLineTotal,
   requireLoginForCheckout,
 } from '../lib/checkoutFlow';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 const inputClass =
   'w-full border border-gray-300 rounded-md px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]';
+
+function StripePaymentForm({ clientSecret, amount, onCancel }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setIsProcessing(true);
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/checkout/success`,
+      },
+    });
+
+    if (error) {
+      setMessage(error.message);
+    }
+    setIsProcessing(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <h3 className="text-xl font-bold text-gray-900 mb-4">Payment Details</h3>
+      <PaymentElement />
+      {message && <div className="text-sm text-red-600 mt-2">{message}</div>}
+      <div className="flex gap-4 mt-6">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isProcessing}>
+          Back
+        </Button>
+        <Button type="submit" disabled={!stripe || isProcessing} className="flex-1 bg-[#29b6f6] hover:bg-[#1e8fc4] text-white text-lg h-12">
+          {isProcessing ? 'Processing...' : `Pay $${amount.toFixed(2)}`}
+        </Button>
+      </div>
+    </form>
+  );
+}
 
 const fileModeButtonClass = (active) =>
   active
@@ -32,7 +77,13 @@ export default function CheckoutClient() {
   const searchParams = useSearchParams();
   const isBuyNow = searchParams.get('mode') === 'buyNow';
   const { items: cartItems } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated && user?.email) {
+      setFormData((prev) => ({ ...prev, email: user.email }));
+    }
+  }, [isAuthenticated, user]);
 
   const [sessionReady, setSessionReady] = useState(false);
   const [buyNowItems, setBuyNowItems] = useState([]);
@@ -61,15 +112,21 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [zipCheckStatus, setZipCheckStatus] = useState('idle');
   const [zipCheckResult, setZipCheckResult] = useState(null);
-  const [fileUploadMode, setFileUploadMode] = useState('later');
-  const [uploadedFile, setUploadedFile] = useState(null);
-  const [uploadedPreview, setUploadedPreview] = useState(null);
-  const [isFinalConfirmed, setIsFinalConfirmed] = useState(false);
+  const [selectedCartIds, setSelectedCartIds] = useState([]);
+  const [clientSecret, setClientSecret] = useState('');
 
   const checkoutItems = useMemo(() => {
-    const source = isBuyNow ? buyNowItems : cartItems;
-    return Array.isArray(source) ? source : [];
-  }, [isBuyNow, buyNowItems, cartItems]);
+    if (isBuyNow) {
+      return Array.isArray(buyNowItems) ? buyNowItems : [];
+    }
+    
+    // Only include cart items that were selected in the cart page
+    if (selectedCartIds.length > 0) {
+      return cartItems.filter(item => selectedCartIds.includes(item.cartItemId));
+    }
+    
+    return Array.isArray(cartItems) ? cartItems : [];
+  }, [isBuyNow, buyNowItems, cartItems, selectedCartIds]);
 
   const getItemSizeLabel = useCallback((item) => {
     const customizations = item?.options?.customizationsDisplay || {};
@@ -106,23 +163,6 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     }));
   };
 
-  const handleDesignFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadedFile(file);
-    setUploadedPreview(file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
-    setIsFinalConfirmed(false);
-    if (e.target) e.target.value = '';
-  };
-
-  const handleUploadLater = () => {
-    setFileUploadMode('later');
-    setUploadedFile(null);
-    setUploadedPreview(null);
-    setIsFinalConfirmed(false);
-  };
-
-
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -138,16 +178,18 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (uploadedPreview) {
-        URL.revokeObjectURL(uploadedPreview);
-      }
-    };
-  }, [uploadedPreview]);
-
-  useEffect(() => {
     if (isBuyNow) {
       setBuyNowItems(readBuyNowItems());
+    } else {
+      const stored = localStorage.getItem('checkoutItems');
+      if (stored) {
+        try {
+          const ids = JSON.parse(stored);
+          if (Array.isArray(ids)) {
+            setSelectedCartIds(ids);
+          }
+        } catch(e){}
+      }
     }
     setSessionReady(true);
   }, [isBuyNow]);
@@ -345,7 +387,7 @@ const handleApplyCoupon = (e) => {
     setCouponMessage(`Coupon "${code}" applied.`);
   };
 
-  const handleStripeCheckout = async (e) => {
+  const handleContinueToPayment = async (e) => {
     e.preventDefault();
     setPayError('');
     if (!isAuthenticated) {
@@ -384,45 +426,46 @@ const handleApplyCoupon = (e) => {
       setPayError('Please enter a complete shipping address for shipping review.');
       return;
     }
+    
+    // We can't access finalTotal directly from state because it's calculated on render,
+    // so we re-calculate or just rely on the form submit triggering AFTER render.
+    // In React, variables calculated in the component body are captured in the closure of this function!
+    // But wait, to be perfectly safe we can calculate them again or pass them.
+    // We will just let the backend recalculate? No, our backend takes the finalized totals.
+    
+    // It's safe to use the closure variables because they are updated on every render.
+    
     setIsPaying(true);
     try {
-      const res = await fetch('/api/stripe/create-checkout-session', {
+      const res = await fetch('/api/stripe/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: checkoutItems.map((i) => ({
-            id: i.id,
-            quantity: i.quantity,
-            quotePayload: i.options?.quotePayload,
-            customizationsDisplay: i.options?.customizationsDisplay,
-            splitQuote: i.options?.splitQuote === true,
-            splitGroupId: i.options?.splitGroupId,
-            splitSizeLabel: i.options?.splitSizeLabel,
-            artworkReady: i.options?.artworkReady === true,
-            tempArtworkFiles: i.options?.tempArtworkFiles || [],
-            artworkFiles: i.options?.artworkFiles || [],
-            customSizeNote: i.options?.customSizeNote || '',
-          })),
-          customer: {
-            ...formData,
-            selectedMethod:
-              formData.deliveryMethod === 'shipping'
-                ? selectedMethod
-                : undefined,
-            shippingMethodsData:
-              formData.deliveryMethod === 'shipping'
-                ? shippingMethods.find((m) => m.type === selectedMethod) || null
-                : undefined,
-          },
+          items: checkoutItems.map((i) => {
+            const itemTotal = computeLineTotal(i);
+            return {
+              id: i.id,
+              name: i.name || 'Custom Product',
+              price: itemTotal / Math.max(1, i.quantity || 1),
+              quantity: i.quantity,
+              options: i.options,
+            };
+          }),
+          formData,
+          shippingMethod: selectedMethod,
+          shippingAmount,
+          taxAmount,
+          discountAmount: discount,
+          finalTotal,
           couponCode: appliedCoupon || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Payment initialization failed');
-      if (!data?.url) throw new Error('Missing Stripe redirect URL');
-      if (isBuyNow) clearBuyNowItems();
-      clearAllQuoteDrafts();
-      window.location.href = data.url;
+      if (!data?.clientSecret) throw new Error('Missing client secret');
+      
+      setClientSecret(data.clientSecret);
+      setIsPaying(false);
     } catch (err) {
       setPayError(err?.message || 'Payment initialization failed');
       setIsPaying(false);
@@ -459,9 +502,6 @@ const handleApplyCoupon = (e) => {
   const discount = discountCents / 100;
   const taxAmount = taxCents / 100;
   const finalTotal = totalCents / 100;
-  const canProceed =
-    fileUploadMode === 'later' ||
-    (fileUploadMode === 'now' && uploadedFile && isFinalConfirmed);
 
   const needsShippingAddress =
     selectedMethod === 'standard_shipping' ||
@@ -518,7 +558,7 @@ const handleApplyCoupon = (e) => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <form onSubmit={handleStripeCheckout} className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-8">
             <SameDayNotice />
 
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -549,7 +589,18 @@ const handleApplyCoupon = (e) => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input type="email" name="email" value={formData.email} onChange={handleInputChange} required className={inputClass} />
+                    <input 
+                      type="email" 
+                      name="email" 
+                      value={formData.email} 
+                      onChange={handleInputChange} 
+                      required 
+                      className={`${inputClass} ${isAuthenticated ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                      readOnly={isAuthenticated}
+                    />
+                    {isAuthenticated && (
+                      <p className="text-xs text-gray-500 mt-1">Locked to your logged-in account.</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
@@ -595,81 +646,6 @@ const handleApplyCoupon = (e) => {
 
 
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Upload Your Design (Optional but recommended)</h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Upload your final design now, or continue and upload it later from dashboard.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <Button
-                  type="button"
-                  onClick={() => setFileUploadMode('now')}
-                  className={`w-full sm:w-auto ${fileModeButtonClass(fileUploadMode === 'now')}`}
-                >
-                  Upload Now
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleUploadLater}
-                  className={`w-full sm:w-auto ${fileModeButtonClass(fileUploadMode === 'later')}`}
-                >
-                  Upload Later
-                </Button>
-              </div>
-
-              {fileUploadMode === 'later' && (
-                <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-                  You can upload your file later from dashboard.
-                </p>
-              )}
-
-              {fileUploadMode === 'now' && (
-                <div className="space-y-3">
-                  <label className="block text-sm font-medium text-gray-700">Design file</label>
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={handleDesignFileChange}
-                    className={inputClass}
-                  />
-
-                  {uploadedFile && (
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                      {uploadedPreview ? (
-                        <img
-                          src={uploadedPreview}
-                          alt="Uploaded design preview"
-                          className="max-h-64 rounded-md border border-gray-200 bg-white object-contain mb-3"
-                        />
-                      ) : (
-                        <div className="rounded-md border border-gray-200 bg-white px-4 py-3 mb-3">
-                          <p className="text-sm font-medium text-gray-900">PDF preview unavailable</p>
-                          <p className="text-xs text-gray-600 mt-1">File selected: {uploadedFile.name}</p>
-                        </div>
-                      )}
-                      {!uploadedPreview && (
-                        <p className="text-xs text-gray-600">
-                          Selected file: {uploadedFile.name} ({Math.round(uploadedFile.size / 1024)} KB)
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {uploadedFile && (
-                    <label className="flex items-start gap-3 text-sm text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={isFinalConfirmed}
-                        onChange={(e) => setIsFinalConfirmed(e.target.checked)}
-                        className="mt-1"
-                      />
-                      <span>Yes, this is my final design and I confirm it is correct</span>
-                    </label>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">Order notes (optional)</label>
               <textarea
                 name="notes"
@@ -685,14 +661,27 @@ const handleApplyCoupon = (e) => {
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">{payError}</div>
             )}
 
-            <Button
-              type="submit"
-              disabled={isPaying || !canProceed}
-              className="w-full bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-semibold py-4 text-lg rounded-lg disabled:opacity-60"
-            >
-              {isPaying ? 'Redirecting to secure payment...' : 'Checkout'}
-            </Button>
-          </form>
+            {!clientSecret ? (
+              <Button
+                type="button"
+                onClick={handleContinueToPayment}
+                disabled={isPaying}
+                className="w-full bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-semibold py-4 text-lg rounded-lg disabled:opacity-60"
+              >
+                {isPaying ? 'Processing...' : 'Continue to Payment'}
+              </Button>
+            ) : (
+              <div className="pt-4 border-t border-gray-200">
+                <Elements stripe={stripePromise} options={{ clientSecret }}>
+                  <StripePaymentForm 
+                    clientSecret={clientSecret} 
+                    amount={finalTotal} 
+                    onCancel={() => setClientSecret('')} 
+                  />
+                </Elements>
+              </div>
+            )}
+          </div>
 
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-20">

@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
            amount_subtotal,
            amount_tax,
            amount_total,
+           shipping_amount,
+           discount_amount,
+           coupon_code,
            customer_name,
            customer_email,
            customer_phone,
@@ -45,7 +48,7 @@ export async function GET(request: NextRequest) {
            created_at,
            paid_at
          FROM orders
-         WHERE customer_email = ? AND id = ?
+         WHERE customer_email = ? AND id = ? AND customer_hidden = 0
          LIMIT 1`,
         [email, orderId]
       );
@@ -158,6 +161,9 @@ export async function GET(request: NextRequest) {
           amountSubtotal: parseFloat(o.amount_subtotal || 0),
           amountTax: parseFloat(o.amount_tax || 0),
           amountTotal: parseFloat(o.amount_total || 0),
+          shippingAmount: parseFloat(o.shipping_amount || 0),
+          discountAmount: parseFloat(o.discount_amount || 0),
+          couponCode: o.coupon_code || null,
           customerName: o.customer_name || '',
           customerEmail: o.customer_email || '',
           customerPhone: o.customer_phone || '',
@@ -192,10 +198,13 @@ export async function GET(request: NextRequest) {
          delivery_method,
          tracking_number,
          estimated_delivery_date,
+         shipping_carrier,
+         shipping_service,
+         payment_method,
          created_at,
          paid_at
        FROM orders
-       WHERE customer_email = ?
+       WHERE customer_email = ? AND customer_hidden = 0
        ORDER BY created_at DESC`,
       [email]
     );
@@ -316,6 +325,9 @@ export async function GET(request: NextRequest) {
           deliveryMethod: o.delivery_method || 'pickup',
           trackingNumber: o.tracking_number || '',
           estimatedDeliveryDate: o.estimated_delivery_date || null,
+          shippingCarrier: o.shipping_carrier || null,
+          shippingService: o.shipping_service || null,
+          paymentMethod: o.payment_method || null,
           billingAddress,
           shippingAddress,
           createdAt: o.created_at,
@@ -358,38 +370,9 @@ export async function DELETE(request: NextRequest) {
     if (orders[0].customer_email !== customer.email) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    // Artwork files are retained on the server for the admin when an order is soft-deleted by a customer
 
-    const items: any[] = (await query(
-      'SELECT artwork_files_json FROM order_items WHERE order_id = ?',
-      [orderId]
-    )) as any[];
-    const uploadsRoot = path.join(process.cwd(), 'uploads');
-    for (const item of items) {
-      let files: string[] = [];
-      if (item?.artwork_files_json) {
-        try {
-          const parsed =
-            typeof item.artwork_files_json === 'string'
-              ? JSON.parse(item.artwork_files_json)
-              : item.artwork_files_json;
-          if (Array.isArray(parsed)) files = parsed;
-        } catch {
-          files = [];
-        }
-      }
-      for (const relPath of files) {
-        try {
-          const resolved = path.resolve(path.join(uploadsRoot, relPath));
-          if (resolved.startsWith(uploadsRoot) && existsSync(resolved)) {
-            await unlink(resolved);
-          }
-        } catch {
-          // Continue deletion even if one file fails.
-        }
-      }
-    }
-
-    await query('DELETE FROM orders WHERE id = ? AND customer_email = ?', [
+    await query('UPDATE orders SET customer_hidden = 1 WHERE id = ? AND customer_email = ?', [
       orderId,
       customer.email,
     ]);

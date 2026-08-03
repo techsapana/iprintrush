@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAdmin } from '../../hooks/useAdmin';
+import Link from 'next/link';
 
 export default function UsersPage() {
    const { adminUser, adminLoading } = useAdmin();
@@ -241,6 +242,9 @@ export default function UsersPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -277,6 +281,14 @@ export default function UsersPage() {
                         }`}>
                           {user.enabled ? 'Active' : 'Disabled'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <Link 
+                          href={`/admin/users/${user.id}`} 
+                          className="text-[#29b6f6] hover:text-[#1e8fc4]"
+                        >
+                          Edit / View
+                        </Link>
                       </td>
                     </tr>
                   ))}

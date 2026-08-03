@@ -52,7 +52,9 @@ export default function AdminOrderDetailPage() {
 
   const formatDate = (d) => {
     if (!d) return '—';
-    return new Date(d).toLocaleString(undefined, {
+    const parsed = new Date(d);
+    if (Number.isNaN(parsed.getTime())) return d;
+    return parsed.toLocaleString(undefined, {
       dateStyle: 'medium',
       timeStyle: 'short',
     });
@@ -340,10 +342,6 @@ export default function AdminOrderDetailPage() {
             <div className="text-xs text-gray-400">Saving changes…</div>
           )}
         </div>
-
-        {/* Order Messaging & Proofs */}
-        <OrderChat orderId={order.id} role="admin" />
-
         {/* Customer */}
         <div className="bg-white rounded-lg shadow p-6 space-y-4">
           <h2 className="font-semibold text-gray-900">Customer</h2>
@@ -400,6 +398,14 @@ export default function AdminOrderDetailPage() {
                )}
             </div>
           </div>
+          {order.orderNotes && (
+            <div className="mt-4 pt-4 border-t">
+              <span className="text-gray-500 text-sm">Customer Order Note</span>
+              <div className="text-sm font-medium text-gray-900 mt-1 bg-gray-50 p-3 rounded border">
+                {order.orderNotes}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Shipping / Delivery */}
@@ -550,6 +556,11 @@ export default function AdminOrderDetailPage() {
             <span>Total</span>
             <span>${order.amountTotal.toFixed(2)}</span>
           </div>
+        </div>
+
+        {/* Order Chat */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <OrderChat orderId={order.id} role="admin" />
         </div>
 
         {/* Items */}
@@ -728,16 +739,30 @@ export default function AdminOrderDetailPage() {
                     <tr>
                       <td className="px-6 pb-4 pt-0" colSpan={4}>
                         <div className="bg-gray-50 rounded-lg p-4 text-sm">
-                          {(item.customization.customizationsDisplay && Object.keys(item.customization.customizationsDisplay).length > 0) && (
-                            <div className="mb-3">
-                              <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Customizations</div>
-                              <ul className="text-gray-700 space-y-0.5">
-                                {Object.entries(item.customization.customizationsDisplay).map(([k, v]) => (
-                                  v ? <li key={k}><span className="font-medium">{k}:</span> {v}</li> : null
-                                ))}
-                              </ul>
-                            </div>
-                          )}
+                          {(() => {
+                            const cust = item.customization || {};
+                            const displaySource = cust.customizationsDisplay || cust;
+                            const hiddenKeys = ['quotePayload', 'quoteSummary', 'mode', 'splitGroupId', 'splitSizeLabel', 'customizationsDisplay', 'artworkFiles', 'tempArtworkFiles', 'artworkReady', 'customSizeNote', 'splitQuote', 'customLineTotal', 'extraPrice', 'merchandiseSubtotal', 'shippingTierSubtotal', 'lineItems', 'quantity', 'id', 'price', 'name'];
+                            
+                            const entries = Object.entries(displaySource).filter(([k, v]) => {
+                              return !hiddenKeys.includes(k) && !/size\s*breakdown/i.test(String(k)) && v;
+                            });
+
+                            if (entries.length === 0) return null;
+
+                            return (
+                              <div className="mb-3">
+                                <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Customizations</div>
+                                <ul className="text-gray-700 space-y-0.5">
+                                  {entries.map(([k, v]) => (
+                                    <li key={k}>
+                                      <span className="font-medium capitalize">{k.replace(/([A-Z])/g, ' $1').trim()}:</span> {String(v)}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })()}
                           {item.customization.lineItems && item.customization.lineItems.length > 0 && (
                             <div>
                               <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Quote Breakdown</div>

@@ -223,7 +223,7 @@ export function Navbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 bg-[#29b6f6] shadow-lg">
+      <nav className="sticky top-0 z-50 bg-[#29b6f6] shadow-lg print:hidden">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
 
           {/* ── Top Bar ── */}

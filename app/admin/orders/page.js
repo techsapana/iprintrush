@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdmin } from '../../hooks/useAdmin';
 import Link from 'next/link';
@@ -12,6 +12,28 @@ export default function AdminOrdersPage() {
    const [loading, setLoading] = useState(true);
    const [statusFilter, setStatusFilter] = useState('');
    const [search, setSearch] = useState('');
+   const [expandedOrders, setExpandedOrders] = useState({});
+   const [orderDetails, setOrderDetails] = useState({});
+
+   const toggleRow = async (orderId) => {
+     if (expandedOrders[orderId]) {
+       setExpandedOrders(prev => ({...prev, [orderId]: false}));
+       return;
+     }
+     setExpandedOrders(prev => ({...prev, [orderId]: true}));
+     
+     if (!orderDetails[orderId]) {
+       try {
+         const res = await fetch(`/api/admin/orders/${orderId}`);
+         if (res.ok) {
+           const data = await res.json();
+           setOrderDetails(prev => ({...prev, [orderId]: data.items || []}));
+         }
+       } catch (e) {
+         console.error('Failed to load order details', e);
+       }
+     }
+   };
 
    useEffect(() => {
      if (!adminLoading && !adminUser) router.push('/admin/login');
@@ -162,9 +184,10 @@ export default function AdminOrdersPage() {
                     );
                   })
                   .map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
+                  <React.Fragment key={order.id}>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
                         <img
                           src={
                             order.items?.[0]?.product?.image ||
@@ -190,31 +213,81 @@ export default function AdminOrdersPage() {
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
                       ${order.amountTotal.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 flex flex-col gap-1">
-                      <div>{workflowBadge(order.workflowStatus || 'order_review')}</div>
-                      {order.rush && (
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 w-fit">
-                          Rush
-                        </span>
-                      )}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1 items-start">
+                        <div>{workflowBadge(order.workflowStatus || 'order_review')}</div>
+                        {order.rush && (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 w-fit">
+                            Rush
+                          </span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 flex flex-col gap-1">
-                      <Link
-                        href={`/admin/orders/${order.id}`}
-                        className="text-[#29b6f6] hover:text-[#1e8fc4] font-medium"
-                      >
-                        View
-                      </Link>
-                      {order.artworkItemCount > 0 ? (
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1 items-start">
                         <Link
-                          href={`/admin/orders/${order.id}#artwork`}
-                          className="text-xs font-semibold text-gray-600 hover:text-[#29b6f6]"
+                          href={`/admin/orders/${order.id}`}
+                          className="text-[#29b6f6] hover:text-[#1e8fc4] font-medium text-sm"
                         >
-                          Download artwork
+                          View Full Order
                         </Link>
-                      ) : null}
+                        {order.artworkItemCount > 0 ? (
+                          <button
+                            onClick={() => toggleRow(order.id)}
+                            className="text-xs font-semibold text-gray-600 hover:text-[#29b6f6] text-left"
+                          >
+                            {expandedOrders[order.id] ? 'Hide Artwork' : 'View / Download Artwork'}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">No artwork uploaded</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
+                  {expandedOrders[order.id] && order.artworkItemCount > 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-4 bg-white border-b shadow-inner">
+                        {orderDetails[order.id] ? (
+                          <div className="space-y-4">
+                            <h4 className="text-sm font-semibold text-gray-900 border-b pb-2">Order Artwork</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                              {orderDetails[order.id]
+                                .filter(item => item.artworkFiles && item.artworkFiles.length > 0)
+                                .map((item, idx) => (
+                                <div key={idx} className="bg-gray-50 rounded-lg p-3 text-sm border">
+                                  <div className="font-medium text-gray-900 mb-2 truncate" title={item.name}>{item.name}</div>
+                                  <div className="flex flex-wrap gap-3">
+                                    {item.artworkFiles.map((_, i) => (
+                                      <div key={i} className="flex flex-col gap-1 items-start bg-white p-2 rounded border">
+                                        <img
+                                          src={`/api/order-items/${item.id}/artwork/${i}`}
+                                          alt={`Artwork ${i + 1}`}
+                                          className="w-16 h-16 object-cover rounded border"
+                                        />
+                                        <a
+                                          href={`/api/order-items/${item.id}/artwork/${i}?download=1`}
+                                          download
+                                          className="text-[10px] bg-[#29b6f6] text-white px-2 py-1 rounded font-semibold hover:bg-[#1e8fc4]"
+                                        >
+                                          Download
+                                        </a>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 py-4 flex items-center justify-center gap-2">
+                            <div className="w-4 h-4 border-2 border-gray-300 border-t-[#29b6f6] rounded-full animate-spin"></div>
+                            Loading artwork...
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
                 ))}
               </tbody>
             </table>

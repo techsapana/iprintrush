@@ -8,14 +8,27 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 async function checkAccess(request: Request, orderId: string) {
+  const url = new URL(request.url);
+  const context = url.searchParams.get('context');
+
+  if (context === 'customer') {
+    const customer = await getCustomerFromCookies();
+    if (customer) {
+      const rows = await query(`SELECT id, customer_email FROM orders WHERE id = ?`, [orderId]);
+      const order = (rows as any[])?.[0];
+      if (order && order.customer_email.toLowerCase() === customer.email.toLowerCase()) {
+        return { role: 'customer' as const, email: customer.email, order };
+      }
+    }
+  }
+
   // 1. Check if admin
   const admin = await getAdminFromCookies();
   if (admin) return { role: 'admin' as const, email: admin.email };
 
-  // 2. Check if customer
+  // 2. Check if customer fallback
   const customer = await getCustomerFromCookies();
   if (customer) {
-    // Verify customer owns this order
     const rows = await query(`SELECT id, customer_email FROM orders WHERE id = ?`, [orderId]);
     const order = (rows as any[])?.[0];
     if (order && order.customer_email.toLowerCase() === customer.email.toLowerCase()) {
@@ -117,5 +130,36 @@ export async function POST(
   } catch (err: any) {
     console.error('Post message error:', err);
     return NextResponse.json({ error: err?.message || 'Failed to post message' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const access = await checkAccess(request, id);
+    if (!access) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { messageId } = body;
+
+    if (!messageId) {
+      return NextResponse.json({ error: 'Message ID required' }, { status: 400 });
+    }
+
+    // Ensure the message belongs to the order and the current sender
+    await query(
+      `DELETE FROM order_messages WHERE id = ? AND order_id = ? AND sender_type = ?`,
+      [messageId, id, access.role]
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error('Delete message error:', err);
+    return NextResponse.json({ error: err?.message || 'Failed to delete message' }, { status: 500 });
   }
 }

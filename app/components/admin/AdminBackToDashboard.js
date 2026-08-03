@@ -7,7 +7,7 @@ import Link from 'next/link';
  */
 export function AdminBackToDashboard() {
   return (
-    <div className="bg-slate-800 border-b border-slate-700">
+    <div className="bg-slate-800 border-b border-slate-700 print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-2">
         <Link
           href="/admin/dashboard"

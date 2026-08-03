@@ -27,7 +27,7 @@ export function Footer() {
   }, []);
 
   return (
-    <footer className="bg-gray-900 text-white pt-12 pb-8">
+    <footer className="bg-gray-900 text-white pt-12 pb-8 print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">

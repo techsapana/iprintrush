@@ -142,6 +142,47 @@ export default function CartPage() {
 
   const [editingItem, setEditingItem] = useState(null);
   const [taxRatePercent, setTaxRatePercent] = useState(0);
+  const [selectedItemIds, setSelectedItemIds] = useState([]);
+
+  const seenIds = useRef(new Set());
+
+  useEffect(() => {
+    setSelectedItemIds(prev => {
+      let changed = false;
+      const newSelected = [...prev];
+      
+      items.forEach(item => {
+        if (!seenIds.current.has(item.cartItemId)) {
+          seenIds.current.add(item.cartItemId);
+          newSelected.push(item.cartItemId);
+          changed = true;
+        }
+      });
+      
+      const currentCartIds = new Set(items.map(i => i.cartItemId));
+      const filtered = newSelected.filter(id => currentCartIds.has(id));
+      
+      if (filtered.length !== newSelected.length) changed = true;
+      
+      return changed ? filtered : prev;
+    });
+  }, [items]);
+
+  const toggleSelection = (cartItemId) => {
+    setSelectedItemIds(prev => 
+      prev.includes(cartItemId)
+        ? prev.filter(id => id !== cartItemId)
+        : [...prev, cartItemId]
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectedItemIds.length === items.length) {
+      setSelectedItemIds([]);
+    } else {
+      setSelectedItemIds(items.map(item => item.cartItemId));
+    }
+  };
 
   useEffect(() => {
     fetch('/api/site-settings/announcement')
@@ -166,6 +207,14 @@ export default function CartPage() {
 
   const handleProceedToCheckout = () => {
     clearBuyNowItems();
+    if (selectedItemIds.length === 0) {
+      alert('Please select at least one item to proceed to checkout.');
+      return;
+    }
+    
+    // Save selected item ids for checkout page
+    localStorage.setItem('checkoutItems', JSON.stringify(selectedItemIds));
+
     if (!isAuthenticated) {
       requireLoginForCheckout(router, '/checkout');
       return;
@@ -193,8 +242,14 @@ export default function CartPage() {
     );
   }
 
-  const subtotal = getTotal();
-  const subtotalCents = Math.round((subtotal || 0) * 100);
+  // Calculate totals ONLY for selected items
+  const selectedItems = items.filter(item => selectedItemIds.includes(item.cartItemId));
+  
+  const subtotal = selectedItems.reduce((acc, item) => {
+    return acc + (computeLineTotal(item) || 0);
+  }, 0);
+
+  const subtotalCents = Math.round(subtotal * 100);
   
   const taxRatePercentNum = Number(taxRatePercent) || 0;
   const taxRate = taxRatePercentNum / 100;
@@ -214,6 +269,19 @@ export default function CartPage() {
           {/* Cart Items */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedItemIds.length === items.length && items.length > 0}
+                    onChange={toggleAll}
+                    className="w-4 h-4 rounded border-gray-300 text-[#29b6f6] focus:ring-[#29b6f6]"
+                  />
+                  Select All
+                </label>
+                <span className="text-sm text-gray-500">{items.length} items</span>
+              </div>
+              
               <div className="space-y-6">
                 {items.map((item, idx) => {
                   const isQuoteItem =
@@ -228,14 +296,26 @@ export default function CartPage() {
                     !!item.options?.quotePayload &&
                     item.options?.splitQuote !== true &&
                     !hasMultipleSizes;
+                    
+                  const isSelected = selectedItemIds.includes(item.cartItemId);
 
                   return (
                     <div
                       key={idx}
-                      className="flex gap-6 pb-6 border-b border-gray-200 last:pb-0 last:border-b-0"
+                      className={`flex gap-4 sm:gap-6 pb-6 border-b border-gray-200 last:pb-0 last:border-b-0 transition-opacity ${!isSelected ? 'opacity-50' : ''}`}
                     >
+                      {/* Checkbox */}
+                      <div className="flex items-center pt-8">
+                        <input 
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelection(item.cartItemId)}
+                          className="w-5 h-5 rounded border-gray-300 text-[#29b6f6] focus:ring-[#29b6f6] cursor-pointer"
+                        />
+                      </div>
+
                       {/* Product Image */}
-                      <div className="w-24 h-24 bg-gray-100 rounded-lg flex-shrink-0">
+                      <div className="w-24 h-24 bg-gray-100 rounded-lg flex-shrink-0 cursor-pointer" onClick={() => toggleSelection(item.cartItemId)}>
                         <img
                           src={item.image}
                           alt={item.name}
@@ -244,108 +324,110 @@ export default function CartPage() {
                       </div>
 
                       {/* Product Details */}
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 text-lg">
-                          {item.name}
-                        </h3>
-                        {/* Customizations Display (mirror quote summary) */}
-                        {item.options?.customizationsDisplay &&
-                          Object.keys(item.options.customizationsDisplay)
-                            .length > 0 && (
-                            <div className="mt-2 text-xs text-gray-700 space-y-0.5">
-                              {Object.entries(
-                                item.options.customizationsDisplay,
-                              )
-                                .filter(
-                                  ([k]) => !/size\s*breakdown/i.test(String(k)),
+                      <div className="flex-1 flex flex-col sm:flex-row justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900 text-lg">
+                            {item.name}
+                          </h3>
+                          {/* Customizations Display (mirror quote summary) */}
+                          {item.options?.customizationsDisplay &&
+                            Object.keys(item.options.customizationsDisplay)
+                              .length > 0 && (
+                              <div className="mt-2 text-xs text-gray-700 space-y-0.5">
+                                {Object.entries(
+                                  item.options.customizationsDisplay,
                                 )
-                                .map(([k, v]) =>
-                                    v ? (
-                                      <div key={k}>
-                                        <span className="font-semibold">
-                                          {k}:
-                                        </span>{' '}
-                                        {v}
-                                      </div>
-                                    ) : null,
-                                )}
-                            </div>
-                          )}
-                        {item.options?.deliveryMethod && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            Delivery:{' '}
-                            {item.options.deliveryMethod === 'shipping'
-                              ? 'Shipping'
-                              : 'Pickup'}
-                          </p>
-                        )}
-
-                        {/* Quantity Control */}
-                        <div
-                          className="flex items-center gap-2 mt-4"
-                          title={
-                            isQuoteItem && !canEditQuoteQuantity
-                              ? 'Edit product to change quantity'
-                              : undefined
-                          }
-                        >
-                          {!isQuoteItem ? (
-                            <CartQuantityControl 
-                              initialQuantity={item.quantity} 
-                              onQuantityChange={(newQty) => updateQuantity(item.id, newQty, item.options, item.cartItemId)} 
-                            />
-                          ) : canEditQuoteQuantity ? (
-                            <CartQuantityControl 
-                              initialQuantity={item.quantity} 
-                              onQuantityChange={(newQty) => updateQuoteQuantity(item.id, newQty, item.options, item.cartItemId)} 
-                            />
-                          ) : item.options?.splitQuote === true ? (
-                            <CartQuantityControl
-                              initialQuantity={item.quantity}
-                              onQuantityChange={(newQty) => updateSplitQuoteQuantity(item.cartItemId, newQty)}
-                            />
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="px-4 py-1 border border-gray-300 rounded bg-gray-50">
-                                {item.quantity}
-                              </span>
-
-                              <button
-                                type="button"
-                                onClick={() => handleEditItem(item, null)}
-                                className="text-xs text-[#29b6f6] hover:text-[#1e8fc4] underline ml-2 font-medium"
-                                title="Edit item to change quantities"
-                              >
-                                Edit quantities
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Price */}
-                      <div className="text-right">
-                        {(() => {
-                          const lineTotal = computeLineTotal(item);
-                          return (
-                            <p className="text-xl font-bold text-[#29b6f6]">
-                              ${(lineTotal || 0).toFixed(2)}
+                                  .filter(
+                                    ([k]) => !/size\s*breakdown/i.test(String(k)),
+                                  )
+                                  .map(([k, v]) =>
+                                      v ? (
+                                        <div key={k}>
+                                          <span className="font-semibold">
+                                            {k}:
+                                          </span>{' '}
+                                          {v}
+                                        </div>
+                                      ) : null,
+                                  )}
+                              </div>
+                            )}
+                          {item.options?.deliveryMethod && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              Delivery:{' '}
+                              {item.options.deliveryMethod === 'shipping'
+                                ? 'Shipping'
+                                : 'Pickup'}
                             </p>
-                          );
-                        })()}
-                        <section className="flex flex-col items-end gap-2 mt-4">
-                          {item.options?.quotePayload ? (
-                            <EditDropdown item={item} onSelect={handleEditItem} />
-                          ) : null}
-                          <button
-                            onClick={() =>
-                              removeFromCart(item.id, item.options, item.cartItemId)
+                          )}
+
+                          {/* Quantity Control */}
+                          <div
+                            className="flex items-center gap-2 mt-4"
+                            title={
+                              isQuoteItem && !canEditQuoteQuantity
+                                ? 'Edit product to change quantity'
+                                : undefined
                             }
-                            className="text-sm text-red-600 hover:text-red-800 font-medium"
                           >
-                            Remove
-                          </button>
-                        </section>
+                            {!isQuoteItem ? (
+                              <CartQuantityControl 
+                                initialQuantity={item.quantity} 
+                                onQuantityChange={(newQty) => updateQuantity(item.id, newQty, item.options, item.cartItemId)} 
+                              />
+                            ) : canEditQuoteQuantity ? (
+                              <CartQuantityControl 
+                                initialQuantity={item.quantity} 
+                                onQuantityChange={(newQty) => updateQuoteQuantity(item.id, newQty, item.options, item.cartItemId)} 
+                              />
+                            ) : item.options?.splitQuote === true ? (
+                              <CartQuantityControl
+                                initialQuantity={item.quantity}
+                                onQuantityChange={(newQty) => updateSplitQuoteQuantity(item.cartItemId, newQty)}
+                              />
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="px-4 py-1 border border-gray-300 rounded bg-gray-50">
+                                  {item.quantity}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditItem(item, null)}
+                                  className="text-xs text-[#29b6f6] hover:text-[#1e8fc4] underline ml-2 font-medium"
+                                  title="Edit item to change quantities"
+                                >
+                                  Edit quantities
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Price */}
+                        <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-row sm:flex-col justify-between items-center sm:items-end w-full sm:w-auto border-t sm:border-0 border-gray-100 pt-4 sm:pt-0">
+                          {(() => {
+                            const lineTotal = computeLineTotal(item);
+                            return (
+                              <p className="text-xl font-bold text-[#29b6f6]">
+                                ${(lineTotal || 0).toFixed(2)}
+                              </p>
+                            );
+                          })()}
+                          <section className="flex sm:flex-col items-center sm:items-end gap-4 sm:gap-2 mt-0 sm:mt-4">
+                            {item.options?.quotePayload ? (
+                              <EditDropdown item={item} onSelect={handleEditItem} />
+                            ) : null}
+                            <button
+                              onClick={() =>
+                                removeFromCart(item.id, item.options, item.cartItemId)
+                              }
+                              className="text-sm text-red-600 hover:text-red-800 font-medium"
+                            >
+                              Remove
+                            </button>
+                          </section>
+                        </div>
                       </div>
                     </div>
                   );
