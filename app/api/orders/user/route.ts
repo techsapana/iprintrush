@@ -46,9 +46,10 @@ export async function GET(request: NextRequest) {
            tracking_number,
            estimated_delivery_date,
            created_at,
-           paid_at
+           paid_at,
+           IF(ISNULL(customer_hidden), 0, customer_hidden) AS customer_hidden
          FROM orders
-         WHERE customer_email = ? AND id = ? AND customer_hidden = 0
+         WHERE customer_email = ? AND id = ?
          LIMIT 1`,
         [email, orderId]
       );
@@ -57,7 +58,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Order not found' }, { status: 404 });
       }
 
-      const o = order[0];
+      const o = order[0] as any;
+
+      // If this order was soft-deleted by customer, hide it
+      if (Number(o.customer_hidden) === 1) {
+        return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+      }
+
       const items = await query(
         `SELECT oi.id, oi.product_id, oi.name, oi.unit_price, oi.quantity, oi.line_total, oi.customization_json, oi.artwork_files_json, oi.custom_size_note,
                 p.image as product_image, p.slug as product_slug,
@@ -202,9 +209,10 @@ export async function GET(request: NextRequest) {
          shipping_service,
          payment_method,
          created_at,
-         paid_at
+         paid_at,
+         IF(ISNULL(customer_hidden), 0, customer_hidden) AS customer_hidden
        FROM orders
-       WHERE customer_email = ? AND customer_hidden = 0
+       WHERE customer_email = ?
        ORDER BY created_at DESC`,
       [email]
     );
@@ -213,9 +221,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ orders: [] });
     }
 
-    // Fetch items per order
+    // Fetch items per order — filter hidden orders in JS
     const results = [];
-    for (const o of orders as any[]) {
+    for (const o of (orders as any[])) {
+      // Skip orders soft-deleted by customer
+      if (Number(o.customer_hidden) === 1) continue;
+
       const items = await query(
         `SELECT oi.id, oi.product_id, oi.name, oi.unit_price, oi.quantity, oi.line_total, oi.customization_json, oi.artwork_files_json, oi.custom_size_note,
                 p.image as product_image, p.slug as product_slug,
@@ -371,11 +382,19 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     // Artwork files are retained on the server for the admin when an order is soft-deleted by a customer
-
-    await query('UPDATE orders SET customer_hidden = 1 WHERE id = ? AND customer_email = ?', [
-      orderId,
-      customer.email,
-    ]);
+    try {
+      await query('UPDATE orders SET customer_hidden = 1 WHERE id = ? AND customer_email = ?', [
+        orderId,
+        customer.email,
+      ]);
+    } catch (updateErr: any) {
+      // If customer_hidden column doesn't exist yet (pre-migration production DB), ignore the error.
+      // The migration at /api/admin/migrate/run-all-updates will add this column.
+      if (updateErr?.code !== 'ER_BAD_FIELD_ERROR') {
+        throw updateErr;
+      }
+      console.warn('customer_hidden column missing — run migration at /api/admin/migrate/run-all-updates');
+    }
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('User order delete error:', err);
