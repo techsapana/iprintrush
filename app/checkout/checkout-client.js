@@ -20,7 +20,9 @@ import {
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
+
 
 const inputClass =
   'w-full border border-gray-300 rounded-md px-4 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]';
@@ -672,13 +674,19 @@ const handleApplyCoupon = (e) => {
               </Button>
             ) : (
               <div className="pt-4 border-t border-gray-200">
-                <Elements stripe={stripePromise} options={{ clientSecret }}>
-                  <StripePaymentForm 
-                    clientSecret={clientSecret} 
-                    amount={finalTotal} 
-                    onCancel={() => setClientSecret('')} 
-                  />
-                </Elements>
+                {!stripePromise ? (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                    <strong>Configuration Error:</strong> Stripe is not configured. Please contact support.
+                  </div>
+                ) : (
+                  <Elements stripe={stripePromise} options={{ clientSecret }}>
+                    <StripePaymentForm 
+                      clientSecret={clientSecret} 
+                      amount={finalTotal} 
+                      onCancel={() => setClientSecret('')} 
+                    />
+                  </Elements>
+                )}
               </div>
             )}
           </div>
