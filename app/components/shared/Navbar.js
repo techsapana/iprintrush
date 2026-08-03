@@ -201,7 +201,7 @@ export function Navbar() {
 
   useEffect(() => {
     const q = (searchValue || '').trim().toLowerCase();
-    if (q.length < 3) {
+    if (q.length < 1) {
       setSearchSuggestions([]);
       return;
     }
