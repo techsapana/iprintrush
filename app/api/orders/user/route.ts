@@ -60,8 +60,8 @@ export async function GET(request: NextRequest) {
 
       const o = order[0] as any;
 
-      // If this order was soft-deleted by customer, hide it
-      if (Number(o.customer_hidden) === 1) {
+      // Hide pending (unpaid) orders and soft-deleted orders from customers
+      if (Number(o.customer_hidden) === 1 || o.status === 'pending') {
         return NextResponse.json({ error: 'Order not found' }, { status: 404 });
       }
 
@@ -213,6 +213,7 @@ export async function GET(request: NextRequest) {
          IF(ISNULL(customer_hidden), 0, customer_hidden) AS customer_hidden
        FROM orders
        WHERE customer_email = ?
+       AND status != 'pending'
        ORDER BY created_at DESC`,
       [email]
     );
