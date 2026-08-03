@@ -645,8 +645,10 @@ const handleApplyCoupon = (e) => {
           <p className="text-sm text-gray-600 mb-8">All items in your shopping cart are included below.</p>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
+        {/* Mobile-first: 1 col, desktop: 3-col with form left, summary right */}
+        <div className="flex flex-col-reverse lg:grid lg:grid-cols-3 gap-6">
+          {/* LEFT: Checkout form — on mobile shows BELOW summary (flex-col-reverse) */}
+          <div className="lg:col-span-2 space-y-5">
             <SameDayNotice />
 
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -750,14 +752,24 @@ const handleApplyCoupon = (e) => {
             )}
 
             {!clientSecret ? (
-              <Button
+              <button
                 type="button"
                 onClick={handleContinueToPayment}
                 disabled={isPaying}
-                className="w-full bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-semibold py-4 text-lg rounded-lg disabled:opacity-60"
+                className="w-full bg-[#29b6f6] hover:bg-[#0288d1] text-white font-bold py-3.5 text-base rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                {isPaying ? 'Processing...' : 'Continue to Payment'}
-              </Button>
+                {isPaying ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    Please wait...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    Continue to Payment
+                  </>
+                )}
+              </button>
             ) : (
               <div className="pt-4 border-t border-gray-200">
                 {!stripePromise ? (
@@ -777,79 +789,92 @@ const handleApplyCoupon = (e) => {
             )}
           </div>
 
+          {/* RIGHT: Order Summary — on mobile shows FIRST (top) due to flex-col-reverse */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-20">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h2>
-              <div className="space-y-4 mb-6 pb-6 border-b border-gray-200">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 lg:sticky lg:top-20">
+              {/* Summary header */}
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+                <svg className="w-5 h-5 text-[#29b6f6]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                <h2 className="text-base font-bold text-gray-900">Order Summary</h2>
+                <span className="ml-auto text-xs text-gray-400">{checkoutItems.length} item{checkoutItems.length !== 1 ? 's' : ''}</span>
+              </div>
+              {/* Item list */}
+              <div className="space-y-3 mb-4 pb-4 border-b border-gray-100 max-h-48 overflow-y-auto">
                 {checkoutItems.map((item, idx) => {
                   const itemTotal = computeLineTotal(item);
                   const itemSize = getItemSizeLabel(item);
                   return (
                     <div key={idx} className="flex justify-between text-sm gap-2">
-                      <span className="text-gray-700">
-                        {item.name} × {item.quantity}
+                      <span className="text-gray-600 leading-snug">
+                        <span className="font-medium text-gray-800">{item.name}</span>
+                        <span className="text-gray-500"> × {item.quantity}</span>
                         {itemSize ? (
-                          <span className="block text-xs text-gray-500">Size: {itemSize}</span>
+                          <span className="block text-xs text-gray-400">Size: {itemSize}</span>
                         ) : null}
                       </span>
-                      <span className="font-medium text-gray-900 shrink-0">${itemTotal.toFixed(2)}</span>
+                      <span className="font-semibold text-gray-900 shrink-0">${itemTotal.toFixed(2)}</span>
                     </div>
                   );
                 })}
               </div>
-              <div className="space-y-3 mb-6 pb-6 border-b border-gray-200">
-                <div className="flex justify-between text-gray-700">
-                  <span>Subtotal:</span>
+              {/* Totals */}
+              <div className="space-y-2.5 mb-4">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Subtotal</span>
                   <span>${(subtotal || 0).toFixed(2)}</span>
                 </div>
-                <div className="pt-2">
-                  <div className="flex flex-col sm:flex-row gap-2">
+                {/* Coupon */}
+                <div className="pt-1">
+                  <div className="flex gap-2">
                     <input
                       type="text"
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value)}
                       placeholder="Coupon code"
-                      className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-gray-700 uppercase text-xs"
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 uppercase text-xs focus:outline-none focus:ring-2 focus:ring-[#29b6f6] min-w-0"
                     />
-                    <Button type="button" onClick={handleApplyCoupon} variant="outline" className="text-xs whitespace-nowrap">
-                      Apply Coupon
-                    </Button>
+                    <button type="button" onClick={handleApplyCoupon} className="text-xs whitespace-nowrap px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 font-medium transition-colors">
+                      Apply
+                    </button>
                   </div>
-                  {couponMessage && <p className="mt-1 text-[11px] text-gray-600">{couponMessage}</p>}
+                  {couponMessage && <p className="mt-1 text-[11px] text-gray-500">{couponMessage}</p>}
                 </div>
                 {discount > 0 && (
-                  <div className="flex justify-between text-sm text-emerald-700">
-                    <span>Discount ({appliedCoupon}):</span>
-                    <span>- ${(discount || 0).toFixed(2)}</span>
+                  <div className="flex justify-between text-sm text-emerald-600 font-medium">
+                    <span>Discount ({appliedCoupon})</span>
+                    <span>−${(discount || 0).toFixed(2)}</span>
                   </div>
                 )}
                 {selectedMethod && selectedMethod !== 'pickup' && (
-                  <div className="flex justify-between items-center text-sm text-gray-700 gap-2">
-                    <span className="min-w-0">
+                  <div className="flex justify-between items-center text-sm text-gray-600 gap-2">
+                    <span className="min-w-0 truncate">
                       {shippingMethods.find((m) => m.type === selectedMethod)
-                        ? `Shipping (${shippingMethods.find((m) => m.type === selectedMethod)?.label}):`
-                        : 'Shipping:'}
+                        ? `Shipping (${shippingMethods.find((m) => m.type === selectedMethod)?.label})`
+                        : 'Shipping'}
                     </span>
                     {shippingMethods.find((m) => m.type === selectedMethod) ? (
                       <span className="shrink-0 font-medium">
                         {selectedMethod === 'review_required' ? 'Under review' : shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}
                       </span>
                     ) : (
-                      <span className="shrink-0 font-medium text-amber-600">Shipping methods pending</span>
+                      <span className="shrink-0 text-amber-600">Pending</span>
                     )}
                   </div>
                 )}
-                <div className="flex justify-between text-sm text-gray-700">
-                  <span>Tax:</span>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Tax</span>
                   <span>${(taxAmount || 0).toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-xl font-bold">
-                  <span>Total:</span>
-                  
-                  <span className="text-[#29b6f6]">${(finalTotal || 0).toFixed(2)}</span>
+                {/* Total */}
+                <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+                  <span className="text-base font-bold text-gray-900">Total</span>
+                  <span className="text-xl font-bold text-[#29b6f6]">${(finalTotal || 0).toFixed(2)}</span>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 text-center">Payments are processed securely by Stripe.</p>
+              <p className="text-[11px] text-gray-400 text-center flex items-center justify-center gap-1">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                Payments secured by Stripe
+              </p>
             </div>
           </div>
         </div>
