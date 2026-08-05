@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 export function GlobalPopupModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [data, setData] = useState(null);
+  const [isTabHidden, setIsTabHidden] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -104,10 +105,9 @@ export function GlobalPopupModal() {
       )}
 
       {/* Side Navbar / Floating Tab to Re-open */}
-      {!isOpen && data.popupEnabled && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed top-1/2 left-0 z-[90] -translate-y-1/2 flex flex-col items-center justify-center gap-4 px-3 py-8 text-gray-900 font-black shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] rounded-r-2xl border border-l-0 border-white/40 transition-all duration-300 hover:pr-5 hover:shadow-[0_10px_50px_-10px_rgba(0,0,0,0.7)] group backdrop-blur-sm overflow-hidden"
+      {!isOpen && data.popupEnabled && !isTabHidden && (
+        <div 
+          className="fixed top-1/2 left-0 z-[90] -translate-y-1/2 flex flex-col items-center justify-center shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] rounded-r-2xl border border-l-0 border-white/40 transition-all duration-300 group backdrop-blur-sm overflow-hidden"
           style={{ 
             background: `linear-gradient(135deg, ${data.popupColor || '#FFC520'}, ${data.popupColor ? data.popupColor + 'CC' : '#FFA000'})`
           }}
@@ -115,14 +115,34 @@ export function GlobalPopupModal() {
           {/* Subtle shine effect */}
           <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-tr from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
 
-          <div className="bg-white/20 p-2 rounded-full shadow-inner group-hover:scale-110 transition-transform duration-300">
-            <span className="text-2xl drop-shadow-md">🎁</span>
-          </div>
-          
-          <span className="[writing-mode:vertical-lr] rotate-180 tracking-[0.3em] uppercase text-sm drop-shadow-sm">
-            Offers
-          </span>
-        </button>
+          {/* Dismiss Tab Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsTabHidden(true);
+            }}
+            className="w-full py-2 flex justify-center hover:bg-black/10 transition-colors"
+            title="Hide this tab"
+          >
+            <svg className="w-3 h-3 md:w-4 md:h-4 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Re-open Modal Button */}
+          <button
+            onClick={() => setIsOpen(true)}
+            className="flex flex-col items-center justify-center gap-2 md:gap-4 px-2 md:px-3 py-3 md:py-6 text-gray-900 font-black hover:pr-4 md:hover:pr-5 transition-all"
+          >
+            <div className="bg-white/20 p-1.5 md:p-2 rounded-full shadow-inner group-hover:scale-110 transition-transform duration-300">
+              <span className="text-lg md:text-2xl drop-shadow-md">🎁</span>
+            </div>
+            
+            <span className="[writing-mode:vertical-lr] rotate-180 tracking-[0.2em] md:tracking-[0.3em] uppercase text-xs md:text-sm drop-shadow-sm">
+              Offers
+            </span>
+          </button>
+        </div>
       )}
     </>
   );
