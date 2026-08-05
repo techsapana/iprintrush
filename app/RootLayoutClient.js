@@ -8,6 +8,7 @@ import { AdminProvider } from './context/AdminContext';
 import { Navbar } from './components/shared/Navbar';
 import { Footer } from './components/shared/Footer';
 import { GlobalPopupModal } from './components/shared/GlobalPopupModal';
+import { Toaster } from 'sonner';
 
 export function RootLayoutClient({ children }) {
   const pathname = usePathname();
@@ -19,6 +20,7 @@ export function RootLayoutClient({ children }) {
       <CartProvider>
         <WishlistProvider>
           <AuthProvider>
+            <Toaster position="bottom-right" richColors />
             <div className="flex flex-col min-h-screen">
               {!isAdminRoute && !isPrintRoute && <Navbar />}
               <main className="flex-1">{children}</main>

@@ -46,12 +46,32 @@ export async function GET(req: NextRequest) {
         }
 
         if (stripeStatus === 'succeeded') {
+          let methodString = 'Stripe Card';
+          // Try to get payment details if we have payment_intent
+          if (order.stripe_payment_intent_id) {
+            const pi = await stripe.paymentIntents.retrieve(order.stripe_payment_intent_id, {
+              expand: ['latest_charge']
+            });
+            const charge = pi.latest_charge;
+            if (charge && charge.payment_method_details) {
+              const details = charge.payment_method_details;
+              if (details.type === 'card' && details.card) {
+                const brand = details.card.brand || '';
+                const brandName = brand.charAt(0).toUpperCase() + brand.slice(1);
+                methodString = `${brandName}(****${details.card.last4})`;
+              } else {
+                methodString = details.type;
+              }
+            }
+          }
+
           const { query } = await import('@/app/lib/db');
           await query(
-            `UPDATE orders SET status = 'paid', stripe_customer_id = ?, paid_at = CURRENT_TIMESTAMP WHERE id = ?`,
-            [customerId, order.id]
+            `UPDATE orders SET status = 'paid', payment_method = ?, stripe_customer_id = ?, paid_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [methodString, customerId, order.id]
           );
           order.status = 'paid';
+          order.paymentMethod = methodString;
 
           // Send order confirmation email (fallback — webhook may not have fired)
           try {

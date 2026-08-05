@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../../hooks/useAuth';
 import OrderChat from '@/app/components/order/OrderChat';
+import { toast } from 'sonner';
 
 export default function OrderDetailPage() {
   const { user, isAuthenticated } = useAuth();
@@ -21,41 +22,44 @@ export default function OrderDetailPage() {
   const [noteDrafts, setNoteDrafts] = useState({});
   const [savingNoteItemId, setSavingNoteItemId] = useState(null);
   const [deletingOrder, setDeletingOrder] = useState(false);
+  const [uploadSuccessMsg, setUploadSuccessMsg] = useState('');
+
+  const fetchOrderAndItems = useCallback(async () => {
+    if (!user?.email || !orderId) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/orders/user?email=${encodeURIComponent(user.email)}&orderId=${orderId}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to load order');
+      }
+      const data = await res.json();
+      if (data.order) {
+        setOrder(data.order);
+        const nextItems = data.items || [];
+        setItems(nextItems);
+        const nextDrafts = {};
+        nextItems.forEach((item) => {
+          if (item?.id) nextDrafts[item.id] = item.customSizeNote || '';
+        });
+        setNoteDrafts(nextDrafts);
+      } else {
+        throw new Error('Order not found');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to load order');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.email, orderId]);
 
   useEffect(() => {
-    const loadOrder = async () => {
-      if (!user?.email || !orderId) return;
-      setLoading(true);
-      setError('');
-      try {
-        const res = await fetch(`/api/orders/user?email=${encodeURIComponent(user.email)}&orderId=${orderId}`);
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'Failed to load order');
-        }
-        const data = await res.json();
-        if (data.order) {
-          setOrder(data.order);
-          const nextItems = data.items || [];
-          setItems(nextItems);
-          const nextDrafts = {};
-          nextItems.forEach((item) => {
-            if (item?.id) nextDrafts[item.id] = item.customSizeNote || '';
-          });
-          setNoteDrafts(nextDrafts);
-        } else {
-          throw new Error('Order not found');
-        }
-      } catch (err) {
-        setError(err.message || 'Failed to load order');
-      } finally {
-        setLoading(false);
-      }
-    };
     if (isAuthenticated && orderId) {
-      loadOrder();
+      fetchOrderAndItems();
     }
-  }, [isAuthenticated, user?.email, orderId]);
+  }, [isAuthenticated, fetchOrderAndItems, orderId]);
+
 
   const formatDate = (d) => {
     if (!d) return '—';
@@ -70,7 +74,7 @@ export default function OrderDetailPage() {
   const workflowLabel = (w) => {
     const map = {
       order_review: 'Order Review',
-      artwork_pending: 'Artwork Pending',
+      artwork_pending: 'Pending Artwork Approval',
       artwork_approved: 'Artwork Approved',
       in_production: 'On Production',
       ready_for_shipping: 'Ready for Shipping',
@@ -118,10 +122,22 @@ export default function OrderDetailPage() {
       }
 
       // Update local state
-      if (fileType === 'artwork') {
+      if (fileType === 'artwork_files_json') {
         setItems(prev => prev.map(item => 
           item.id === itemId 
-            ? { ...item, artworkFiles: item.artworkFiles.filter(url => url !== fileUrl) }
+            ? { ...item, artworkFiles: (item.artworkFiles || []).filter(url => url !== fileUrl) }
+            : item
+        ));
+      } else if (fileType === 'reuploaded_artwork_json') {
+        setItems(prev => prev.map(item => 
+          item.id === itemId 
+            ? { ...item, reuploadedArtworkFiles: (item.reuploadedArtworkFiles || []).filter(url => url !== fileUrl) }
+            : item
+        ));
+      } else if (fileType === 'replacement_artwork_json') {
+        setItems(prev => prev.map(item => 
+          item.id === itemId 
+            ? { ...item, replacementArtworkFiles: (item.replacementArtworkFiles || []).filter(url => url !== fileUrl) }
             : item
         ));
       } else if (fileType === 'requirement') {
@@ -131,8 +147,10 @@ export default function OrderDetailPage() {
             : item
         ));
       }
+      toast.success('File deleted successfully');
     } catch (err) {
       setUpdateError(err.message || 'Failed to delete file');
+      toast.error(err.message || 'Failed to delete file');
     } finally {
       setUpdatingItemId(null);
     }
@@ -165,10 +183,14 @@ export default function OrderDetailPage() {
       const url = uploadJson.url;
 
       const apiEndpoint = fileType === 'artwork' ? `/api/order-items/${itemId}/artwork` : `/api/order-items/${itemId}/requirements`;
+      const payload = { fileUrl: url, uploaderRole: 'customer' };
+      if (fileType === 'artwork') {
+        payload.replaceArtwork = false;
+      }
       const res = await fetch(apiEndpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileUrl: url }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -179,7 +201,7 @@ export default function OrderDetailPage() {
       if (fileType === 'artwork') {
         setItems(prev => prev.map(item => 
           item.id === itemId 
-            ? { ...item, artworkFiles: [...(item.artworkFiles || []), url] }
+            ? { ...item, reuploadedArtworkFiles: [...(item.reuploadedArtworkFiles || []), url] }
             : item
         ));
       } else if (fileType === 'requirement') {
@@ -193,8 +215,14 @@ export default function OrderDetailPage() {
             : item
         ));
       }
+      toast.success('File uploaded successfully');
+      if (fileType === 'artwork') {
+        setUploadSuccessMsg('Artwork sent successfully!');
+        setTimeout(() => setUploadSuccessMsg(''), 5000);
+      }
     } catch (err) {
       setUpdateError(err.message || 'Failed to upload file');
+      toast.error(err.message || 'Failed to upload file');
     } finally {
       setUpdatingItemId(null);
     }
@@ -224,6 +252,26 @@ export default function OrderDetailPage() {
       setUpdateError(err.message || 'Failed to save note');
     } finally {
       setSavingNoteItemId(null);
+    }
+  };
+
+  const handleApproveReplacement = async () => {
+    if (!order?.id) return;
+    if (!confirm('Approve the replacement artwork? This will move your order to production.')) return;
+    try {
+      setUpdatingItemId('approve-replacement');
+      const res = await fetch(`/api/orders/user`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, workflowStatus: 'in_production' }),
+      });
+      if (!res.ok) throw new Error('Failed to approve');
+      setOrder(prev => prev ? { ...prev, workflowStatus: 'in_production' } : prev);
+      toast.success('Artwork approved! Order moved to production.');
+    } catch (err) {
+      toast.error('Failed to approve artwork');
+    } finally {
+      setUpdatingItemId(null);
     }
   };
 
@@ -498,47 +546,146 @@ export default function OrderDetailPage() {
                         </button>
                       </div>
 
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-sm font-semibold text-gray-800">Artwork files</h4>
-                          <span className="text-xs text-gray-500">Max 20MB per file</span>
+                      <div className="space-y-6">
+                        {/* 1. Original Artwork */}
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-800 mb-2">Original Artwork</h4>
+                          {item.artworkFiles?.length > 0 ? (
+                            <div className="space-y-2">
+                              {item.artworkFiles.map((url, i) => (
+                                <div key={`orig-${i}`} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                  <a
+                                    href={`/api/order-items/${item.id}/artwork/${i}?type=original&t=${Date.now()}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#29b6f6] hover:text-[#1e8fc4] text-sm truncate flex-1"
+                                  >
+                                    Original File {i + 1}
+                                  </a>
+                                  <a
+                                    href={`/api/order-items/${item.id}/artwork/${i}?type=original&download=1`}
+                                    className="ml-2 text-[#29b6f6] hover:text-[#1e8fc4] text-sm"
+                                  >
+                                    Download
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500">No original artwork uploaded.</p>
+                          )}
                         </div>
-                        
-                        {item.artworkFiles && item.artworkFiles.length > 0 ? (
-                          <div className="space-y-2">
-                            {item.artworkFiles.map((url, i) => (
-                              <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                <a
-                                  href={`/api/order-items/${item.id}/artwork/${i}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[#29b6f6] hover:text-[#1e8fc4] text-sm truncate flex-1"
-                                >
-                                  Artwork {i + 1}
-                                </a>
-                                <a
-                                  href={`/api/order-items/${item.id}/artwork/${i}?download=1`}
-                                  className="ml-2 text-[#29b6f6] hover:text-[#1e8fc4] text-sm"
-                                >
-                                  Download
-                                </a>
-                                <button
-                                  onClick={() => handleDeleteFile(item.id, url, 'artwork')}
-                                  disabled={updatingItemId === item.id}
-                                  className="ml-2 text-red-600 hover:text-red-800 text-sm disabled:opacity-50"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            ))}
+
+                        {/* 2. Admin Suggested Replacement */}
+                        {item.replacementArtworkFiles?.length > 0 && (
+                          <div className="pt-4 border-t border-gray-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-sm font-semibold text-gray-800">Admin Suggested Replacement</h4>
+                            </div>
+                            <div className="space-y-4 mb-4">
+                              {item.replacementArtworkFiles.map((url, i) => {
+                                const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+                                const viewUrl = `/api/order-items/${item.id}/artwork/${i}?type=replacement&t=${Date.now()}`;
+                                const downloadUrl = `/api/order-items/${item.id}/artwork/${i}?type=replacement&download=1`;
+                                
+                                return (
+                                  <div key={`repl-${i}`} className="flex flex-col gap-2 p-3 bg-green-50/50 rounded border border-green-200">
+                                    {isImage && (
+                                      <div className="rounded overflow-hidden bg-white flex justify-center p-2 border border-green-100">
+                                        <img 
+                                          src={viewUrl} 
+                                          alt={`Replacement File ${i + 1}`} 
+                                          className="max-w-full max-h-[200px] object-contain rounded-sm"
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="flex items-center justify-between bg-white p-2 rounded border border-green-100">
+                                      <a
+                                        href={viewUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-green-700 hover:text-green-900 text-sm truncate flex-1 font-medium flex items-center gap-1"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        View File {i + 1}
+                                      </a>
+                                      <a
+                                        href={downloadUrl}
+                                        className="ml-2 text-green-700 hover:text-green-900 text-sm font-medium flex items-center gap-1 bg-green-100 px-2 py-1 rounded"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        Download
+                                      </a>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {order.workflowStatus === 'artwork_pending' && (
+                              <button
+                                type="button"
+                                onClick={handleApproveReplacement}
+                                disabled={updatingItemId === 'approve-replacement'}
+                                className="inline-flex items-center px-4 py-2 rounded-md bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-60"
+                              >
+                                {updatingItemId === 'approve-replacement' ? 'Approving...' : 'Approve Replacement Artwork'}
+                              </button>
+                            )}
                           </div>
-                        ) : (
-                          <p className="text-sm text-gray-500">No artwork files uploaded yet.</p>
                         )}
-                        
-                        {item.artworkFiles && item.artworkFiles.length < 1 && (
+
+                        {/* 3. My Reuploaded Artwork */}
+                        <div className="pt-4 border-t border-gray-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-gray-800">My Reuploaded Artwork</h4>
+                            <span className="text-xs text-gray-500">Max 20MB per file</span>
+                          </div>
+                          
+                          {item.reuploadedArtworkFiles?.length > 0 ? (
+                            <div className="space-y-2 mb-3">
+                              {item.reuploadedArtworkFiles.map((url, i) => (
+                                <div key={`reup-${i}`} className="flex items-center justify-between p-2 bg-yellow-50 rounded border border-yellow-200">
+                                  <a
+                                    href={`/api/order-items/${item.id}/artwork/${i}?type=reuploaded&t=${Date.now()}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-yellow-700 hover:text-yellow-900 text-sm truncate flex-1"
+                                  >
+                                    Reuploaded File {i + 1}
+                                  </a>
+                                  <a
+                                    href={`/api/order-items/${item.id}/artwork/${i}?type=reuploaded&download=1`}
+                                    className="ml-2 text-yellow-700 hover:text-yellow-900 text-sm"
+                                  >
+                                    Download
+                                  </a>
+                                  <button
+                                    onClick={() => handleDeleteFile(item.id, url, 'reuploaded_artwork_json')}
+                                    disabled={updatingItemId === item.id}
+                                    className="ml-2 text-red-600 hover:text-red-800 text-sm disabled:opacity-50 font-medium"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500 mb-3">No reuploaded files yet.</p>
+                          )}
+                          
+                          {uploadSuccessMsg && updatingItemId !== item.id && (
+                            <div className="text-sm font-semibold text-green-600 mb-3 bg-green-50 p-2 rounded border border-green-200">
+                              ✓ {uploadSuccessMsg}
+                            </div>
+                          )}
+                          
                           <label className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
-                            <span>{updatingItemId === item.id ? 'Uploading...' : 'Upload artwork image'}</span>
+                            <span>{updatingItemId === item.id ? 'Uploading...' : 'Upload Reuploaded Artwork'}</span>
                             <input
                               type="file"
                               accept="image/*"
@@ -552,7 +699,7 @@ export default function OrderDetailPage() {
                               }}
                             />
                           </label>
-                        )}
+                        </div>
                       </div>
 
                       <div>

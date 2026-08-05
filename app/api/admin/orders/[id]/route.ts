@@ -76,9 +76,8 @@ export async function GET(
     }
 
     const items = await query(
-      `SELECT id, product_id, name, unit_price, quantity, line_total, customization_json, artwork_files_json,
-              requirement_files_json, requirement_status, requirement_uploaded_at, requirement_reviewed_at, requirement_review_notes,
-              custom_size_note
+      `SELECT id, product_id, name, unit_price, quantity, line_total, customization_json, artwork_files_json, reuploaded_artwork_json, replacement_artwork_json,
+              custom_size_note, requirement_files_json, requirement_status, requirement_uploaded_at, requirement_reviewed_at, requirement_review_notes
        FROM order_items
        WHERE order_id = ?
        ORDER BY id`,
@@ -161,6 +160,8 @@ export async function GET(
         }
         let requirementFiles: string[] = [];
         let artworkFiles: string[] = [];
+        let reuploadedArtworkFiles: string[] = [];
+        let replacementArtworkFiles: string[] = [];
         if (i.artwork_files_json) {
           try {
             const parsed =
@@ -168,6 +169,28 @@ export async function GET(
                 ? JSON.parse(i.artwork_files_json)
                 : i.artwork_files_json;
             if (Array.isArray(parsed)) artworkFiles = parsed;
+          } catch {
+            // ignore
+          }
+        }
+        if (i.reuploaded_artwork_json) {
+          try {
+            const parsed =
+              typeof i.reuploaded_artwork_json === 'string'
+                ? JSON.parse(i.reuploaded_artwork_json)
+                : i.reuploaded_artwork_json;
+            if (Array.isArray(parsed)) reuploadedArtworkFiles = parsed;
+          } catch {
+            // ignore
+          }
+        }
+        if (i.replacement_artwork_json) {
+          try {
+            const parsed =
+              typeof i.replacement_artwork_json === 'string'
+                ? JSON.parse(i.replacement_artwork_json)
+                : i.replacement_artwork_json;
+            if (Array.isArray(parsed)) replacementArtworkFiles = parsed;
           } catch {
             // ignore
           }
@@ -192,6 +215,8 @@ export async function GET(
           lineTotal: parseFloat(i.line_total || 0),
           customization,
           artworkFiles,
+          reuploadedArtworkFiles,
+          replacementArtworkFiles,
           requirementFiles,
           requirementStatus: i.requirement_status || 'none',
           requirementUploadedAt: i.requirement_uploaded_at || null,

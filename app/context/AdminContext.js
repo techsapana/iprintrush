@@ -253,15 +253,20 @@ export function AdminProvider({ children }) {
       }
       return false;
     } catch {
-      setAdminUser(null);
+      // On network error, don't clear admin user if we already have one
+      // (e.g. transient network blip during file dialog focus regain)
+      // Only clear if there's no existing session
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('iprintrush_admin_session');
+        const stored = localStorage.getItem('iprintrush_admin_session');
+        if (!stored) {
+          setAdminUser(null);
+        }
       }
       return false;
     }
   }, []);
 
-// Check auth on mount and whenever window gains focus (in case tab was restored)
+// Check auth on mount and whenever tab becomes visible again (e.g. tab switch)
    useEffect(() => {
      const checkAndRestore = async () => {
        // First, try to restore from localStorage synchronously
@@ -280,13 +285,19 @@ export function AdminProvider({ children }) {
        setAdminLoading(false);
      };
      checkAndRestore();
-     const handleFocus = () => checkAdminAuth();
-     if (typeof window !== 'undefined') {
-       window.addEventListener('focus', handleFocus);
+     // Use visibilitychange instead of focus - focus fires on file dialog close
+     // which destroys components. visibilitychange only fires on actual tab switches.
+     const handleVisibility = () => {
+       if (document.visibilityState === 'visible') {
+         checkAdminAuth();
+       }
+     };
+     if (typeof document !== 'undefined') {
+       document.addEventListener('visibilitychange', handleVisibility);
      }
      return () => {
-       if (typeof window !== 'undefined') {
-         window.removeEventListener('focus', handleFocus);
+       if (typeof document !== 'undefined') {
+         document.removeEventListener('visibilitychange', handleVisibility);
        }
      };
    }, [checkAdminAuth]);

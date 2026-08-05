@@ -11,6 +11,8 @@ export default function EditUserPage() {
   const router = useRouter();
   const { adminUser, adminLoading } = useAdmin();
   const [user, setUser] = useState(null);
+  const [orderStats, setOrderStats] = useState({ totalOrders: 0, totalSpent: 0 });
+  const [topProducts, setTopProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -45,6 +47,8 @@ export default function EditUserPage() {
       
       if (data.success && data.user) {
         setUser(data.user);
+        setOrderStats(data.orderStats || { totalOrders: 0, totalSpent: 0 });
+        setTopProducts(data.topProducts || []);
         setFormData({
           name: data.user.name || '',
           email: data.user.email || '',
@@ -255,6 +259,51 @@ export default function EditUserPage() {
                 </button>
               </div>
             </form>
+
+            {/* User Statistics Section */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mt-6">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <h2 className="text-lg font-semibold text-gray-900">Customer Statistics</h2>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg">
+                    <div className="text-sm text-blue-600 font-medium uppercase tracking-wider mb-1">Total Orders</div>
+                    <div className="text-3xl font-bold text-gray-900">{orderStats.totalOrders}</div>
+                  </div>
+                  <div className="bg-green-50 border border-green-100 p-4 rounded-lg">
+                    <div className="text-sm text-green-600 font-medium uppercase tracking-wider mb-1">Total Amount Spent</div>
+                    <div className="text-3xl font-bold text-gray-900">${Number(orderStats.totalSpent).toFixed(2)}</div>
+                  </div>
+                </div>
+
+                <div className="mt-8">
+                  <h3 className="text-md font-semibold text-gray-800 mb-4 border-b pb-2">Most Purchased Products</h3>
+                  {topProducts.length === 0 ? (
+                    <div className="text-sm text-gray-500 italic">No products purchased yet.</div>
+                  ) : (
+                    <div className="overflow-hidden border border-gray-200 rounded-lg">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-2 font-medium text-gray-600">Product Name</th>
+                            <th className="px-4 py-2 font-medium text-gray-600 text-right">Quantity Bought</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {topProducts.map((product) => (
+                            <tr key={product.product_id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-gray-900">{product.product_name}</td>
+                              <td className="px-4 py-3 text-gray-600 text-right font-medium">{product.total_quantity_bought}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             {/* Read-only info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

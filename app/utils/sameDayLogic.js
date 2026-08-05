@@ -67,28 +67,28 @@ export function formatTime(date) {
   });
 }
 
-/**
- * Get hours and minutes until deadline
- * @param {number} ms - milliseconds
- * @returns {Object} { hours: number, minutes: number, display: string }
- */
 export function getTimeRemaining(ms) {
-  const totalMinutes = Math.floor(ms / (1000 * 60));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  
+  const pad = (num) => num.toString().padStart(2, '0');
   
   if (hours > 0) {
     return {
       hours,
       minutes,
-      display: `${hours}h ${minutes}m`
+      seconds,
+      display: `${hours}h ${pad(minutes)}m ${pad(seconds)}s`
     };
   }
   
   return {
     hours: 0,
     minutes,
-    display: `${minutes}m`
+    seconds,
+    display: `${minutes}m ${pad(seconds)}s`
   };
 }
 

@@ -6,10 +6,10 @@ export const dynamic = 'force-dynamic';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const itemId = params.id;
+    const { id: itemId } = await params;
     if (!itemId) {
       return NextResponse.json({ error: 'Missing order item id' }, { status: 400 });
     }

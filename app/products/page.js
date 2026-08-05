@@ -6,6 +6,7 @@ import { ProductCard } from '../components/shared/ProductCard';
 import { useAdmin } from '../hooks/useAdmin';
 import { useSearchParams } from 'next/navigation';
 import { SAME_DAY_PRINTING_CATEGORY_SLUG, isSameDayPrintingProduct } from '../lib/siteConstants';
+import { SameDayNotice } from '../components/shared/SameDayNotice';
 
 const PRODUCTS_PER_PAGE = 16;
 
@@ -260,13 +261,13 @@ function ProductsContent() {
           </div>
         )}
         {isSameDayPrintingView && (
-          <div className="mb-4 p-4 bg-[#29b6f6]/10 border border-[#29b6f6]/30 rounded-lg flex items-center justify-between flex-wrap gap-2">
-            <span className="text-gray-700">
-              Order before 2:00 PM for same-day completion.
-            </span>
-            <Link href="/products" className="text-[#29b6f6] hover:underline font-medium text-sm">
-              View all products →
-            </Link>
+          <div className="mb-4">
+            <SameDayNotice />
+            <div className="flex justify-end mt-2">
+              <Link href="/products" className="text-[#29b6f6] hover:underline font-medium text-sm">
+                View all products →
+              </Link>
+            </div>
           </div>
         )}
         {filteredProducts.length > 0 ? (

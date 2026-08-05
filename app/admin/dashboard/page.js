@@ -10,8 +10,17 @@ import { useState } from 'react';
 export default function AdminDashboardPage() {
    const router = useRouter();
    const { adminUser, adminLoading, logoutAdmin, products, categories } = useAdmin();
-   const [announcementText, setAnnouncementText] = useState('');
+  const [announcementText, setAnnouncementText] = useState('');
   const [announcementEnabled, setAnnouncementEnabled] = useState(true);
+  const [announcementDiscountEnabled, setAnnouncementDiscountEnabled] = useState(false);
+  const [announcementDiscountType, setAnnouncementDiscountType] = useState('percentage');
+  const [announcementDiscountValue, setAnnouncementDiscountValue] = useState(0);
+  const [announcementDiscountCondition, setAnnouncementDiscountCondition] = useState('none');
+  const [barDiscountEnabled, setBarDiscountEnabled] = useState(false);
+  const [barDiscountType, setBarDiscountType] = useState('percentage');
+  const [barDiscountValue, setBarDiscountValue] = useState(0);
+  const [barDiscountStartDate, setBarDiscountStartDate] = useState('');
+  const [barDiscountEndDate, setBarDiscountEndDate] = useState('');
   const [announcementLoading, setAnnouncementLoading] = useState(false);
   const [announcementMessage, setAnnouncementMessage] = useState('');
   const [taxRatePercent, setTaxRatePercent] = useState(0);
@@ -52,7 +61,26 @@ useEffect(() => {
         const data = await res.json();
         setAnnouncementText(data.announcementText || '');
         setAnnouncementEnabled(data.announcementEnabled !== false);
-        setTaxRatePercent(Number(data.taxRatePercent || 0));
+        setAnnouncementDiscountEnabled(!!data.announcementDiscountEnabled);
+        setAnnouncementDiscountType(data.announcementDiscountType || 'percentage');
+        setAnnouncementDiscountValue(data.announcementDiscountValue || 0);
+        setAnnouncementDiscountCondition(data.announcementDiscountCondition || 'none');
+        setBarDiscountEnabled(!!data.barDiscountEnabled);
+        setBarDiscountType(data.barDiscountType || 'percentage');
+        setBarDiscountValue(data.barDiscountValue || 0);
+        
+        // Format dates for datetime-local input (YYYY-MM-DDThh:mm)
+        const formatDateTimeLocal = (dateStr) => {
+          if (!dateStr) return '';
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return '';
+          return d.toISOString().slice(0, 16);
+        };
+        
+        setBarDiscountStartDate(formatDateTimeLocal(data.barDiscountStartDate));
+        setBarDiscountEndDate(formatDateTimeLocal(data.barDiscountEndDate));
+        
+        setTaxRatePercent(data.taxRatePercent || 0);
         setPromoHeadline(data.promoHeadline || '');
         setPromoSubheadline(data.promoSubheadline || '');
         setPromoBannerImageUrl(data.promoBannerImageUrl || '');
@@ -111,6 +139,15 @@ useEffect(() => {
         body: JSON.stringify({
           announcementText,
           announcementEnabled,
+          announcementDiscountEnabled,
+          announcementDiscountType,
+          announcementDiscountValue,
+          announcementDiscountCondition,
+          barDiscountEnabled,
+          barDiscountType,
+          barDiscountValue,
+          barDiscountStartDate,
+          barDiscountEndDate,
           taxRatePercent,
           promoHeadline,
           promoSubheadline,
@@ -201,6 +238,74 @@ useEffect(() => {
               placeholder="Enter announcement text..."
               className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
             />
+            
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 mt-4">
+              <h3 className="text-md font-semibold text-gray-900 mb-2">Time-Based Discount Integration</h3>
+              <p className="text-xs text-gray-500 mb-4">
+                Automatically apply a discount at checkout during a specific time period. 
+                Perfect for flash sales and festivals! (e.g., Black Friday).
+              </p>
+              
+              <label className="flex items-center gap-2 mb-4">
+                <input
+                  type="checkbox"
+                  checked={barDiscountEnabled}
+                  onChange={(e) => setBarDiscountEnabled(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm font-medium text-gray-700">Enable Time-Based Discount</span>
+              </label>
+              
+              {barDiscountEnabled && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-700 mb-1">Start Date & Time (Local)</label>
+                      <input
+                        type="datetime-local"
+                        value={barDiscountStartDate}
+                        onChange={(e) => setBarDiscountStartDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-700 mb-1">End Date & Time (Local)</label>
+                      <input
+                        type="datetime-local"
+                        value={barDiscountEndDate}
+                        onChange={(e) => setBarDiscountEndDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-700 mb-1">Discount Type</label>
+                      <select
+                        value={barDiscountType}
+                        onChange={(e) => setBarDiscountType(e.target.value)}
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                      >
+                        <option value="percentage">Percentage (%)</option>
+                        <option value="fixed">Fixed Amount ($)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-700 mb-1">Discount Value</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={barDiscountValue}
+                        onChange={(e) => setBarDiscountValue(e.target.value)}
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="max-w-xs">
               <label className="block text-sm text-gray-700 mb-1">Tax Rate (%)</label>
               <input
@@ -533,11 +638,67 @@ useEffect(() => {
                   <textarea
                     value={popupMessage}
                     onChange={(e) => setPopupMessage(e.target.value)}
+                    placeholder="Use <br/> for line breaks"
                     rows={2}
-                    placeholder="e.g. Your First Transfer Order..."
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
                   />
                 </div>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 mt-4">
+                <h3 className="text-md font-semibold text-gray-900 mb-2">Auto-Discount Integration</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Automatically apply a discount at checkout based on this popup. 
+                  If a customer applies a manual coupon, the system will use whichever discount is greater.
+                </p>
+                
+                <label className="flex items-center gap-2 mb-4">
+                  <input
+                    type="checkbox"
+                    checked={announcementDiscountEnabled}
+                    onChange={(e) => setAnnouncementDiscountEnabled(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Enable Auto-Discount</span>
+                </label>
+                
+                {announcementDiscountEnabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-700 mb-1">Condition</label>
+                      <select
+                        value={announcementDiscountCondition}
+                        onChange={(e) => setAnnouncementDiscountCondition(e.target.value)}
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                      >
+                        <option value="none">No Condition (All Orders)</option>
+                        <option value="first_order">First Order Only</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-700 mb-1">Discount Type</label>
+                      <select
+                        value={announcementDiscountType}
+                        onChange={(e) => setAnnouncementDiscountType(e.target.value)}
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                      >
+                        <option value="percentage">Percentage (%)</option>
+                        <option value="fixed">Fixed Amount ($)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-700 mb-1">Discount Value</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={announcementDiscountValue}
+                        onChange={(e) => setAnnouncementDiscountValue(e.target.value)}
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3 mt-4">
@@ -677,6 +838,23 @@ useEffect(() => {
                 className="block w-full bg-emerald-600 text-white text-center py-2 rounded-lg hover:bg-emerald-700 transition font-medium"
               >
                 View All Orders
+              </Link>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-pink-600 text-white p-6">
+              <h2 className="text-xl font-bold">Analytics & Statistics</h2>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                View sales, revenue, top products, and your top customers.
+              </p>
+              <Link
+                href="/admin/analytics"
+                className="block w-full bg-pink-600 text-white text-center py-2 rounded-lg hover:bg-pink-700 transition font-medium"
+              >
+                View Analytics
               </Link>
             </div>
           </div>

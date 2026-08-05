@@ -6,13 +6,14 @@ import { unlink, rename, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { getWorkflowWriteCandidates, normalizeWorkflowStatus } from '@/app/lib/orderWorkflow';
+import { sendEmail } from '@/app/lib/mailer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const admin = getAdminFromRequest(request);
@@ -21,7 +22,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const itemId = params.id;
+    const { id: itemId } = await params;
     if (!itemId) {
       return NextResponse.json({ error: 'Missing order item id' }, { status: 400 });
     }
@@ -30,6 +31,7 @@ export async function PATCH(
     const fileUrl: string | undefined = body.fileUrl; // actually relative storage path
     const customSizeNote: string | undefined = body.customSizeNote;
     const replaceArtwork = body.replaceArtwork !== false;
+    const uploaderRole = body.uploaderRole || (admin ? 'admin' : 'customer');
 
     if (!fileUrl && customSizeNote === undefined) {
       return NextResponse.json(
@@ -39,7 +41,7 @@ export async function PATCH(
     }
 
     const rows: any = await query(
-      `SELECT oi.artwork_files_json, oi.custom_size_note, o.id as order_id, o.customer_email
+      `SELECT oi.artwork_files_json, oi.reuploaded_artwork_json, oi.replacement_artwork_json, oi.custom_size_note, o.id as order_id, o.customer_email
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        WHERE oi.id = ?`,
@@ -50,16 +52,25 @@ export async function PATCH(
     }
 
     const current = rows[0];
-    if (!admin && customer?.email !== current.customer_email) {
+    
+    // Verify permissions based on claimed role
+    if (uploaderRole === 'admin' && !admin) {
+      return NextResponse.json({ error: 'Unauthorized as admin' }, { status: 401 });
+    }
+    if (uploaderRole === 'customer' && !admin && customer?.email !== current.customer_email) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const targetColumn = uploaderRole === 'admin' ? 'replacement_artwork_json' : 'reuploaded_artwork_json';
+    const targetJsonStr = current[targetColumn];
+
     let files: string[] = [];
-    if (current.artwork_files_json) {
+    if (targetJsonStr) {
       try {
         const parsed =
-          typeof current.artwork_files_json === 'string'
-            ? JSON.parse(current.artwork_files_json)
-            : current.artwork_files_json;
+          typeof targetJsonStr === 'string'
+            ? JSON.parse(targetJsonStr)
+            : targetJsonStr;
         if (Array.isArray(parsed)) {
           files = parsed;
         }
@@ -73,9 +84,14 @@ export async function PATCH(
         return NextResponse.json({ error: 'Invalid fileUrl' }, { status: 400 });
       }
       let resolvedFilePath = fileUrl;
+      
+      if (resolvedFilePath.startsWith('/api/uploads/')) {
+        resolvedFilePath = resolvedFilePath.replace('/api/uploads/', '');
+      }
+      
       // If a temp artwork id is provided, move it into private order storage.
-      if (!fileUrl.includes('/')) {
-        const tempName = path.basename(fileUrl);
+      if (!resolvedFilePath.includes('/')) {
+        const tempName = path.basename(resolvedFilePath);
         const tempPath = path.join(process.cwd(), 'uploads', 'private-artwork-temp', tempName);
         const targetDir = path.join(process.cwd(), 'uploads', 'private-artwork', `order-${current.order_id}`);
         if (!existsSync(targetDir)) {
@@ -87,7 +103,7 @@ export async function PATCH(
           return NextResponse.json({ error: 'Uploaded temp artwork not found' }, { status: 400 });
         }
         await rename(tempPath, finalPath);
-        resolvedFilePath = path.join('private-artwork', `order-${current.order_id}`, finalName);
+        resolvedFilePath = path.join('private-artwork', `order-${current.order_id}`, finalName).replace(/\\/g, '/');
       }
 
       const nextFiles = replaceArtwork
@@ -115,10 +131,17 @@ export async function PATCH(
     const nextNote =
       customSizeNote !== undefined ? String(customSizeNote) : current.custom_size_note;
 
-    await query(
-      'UPDATE order_items SET artwork_files_json = ?, custom_size_note = ? WHERE id = ?',
-      [JSON.stringify(files), nextNote, itemId]
-    );
+    if (fileUrl) {
+      await query(
+        `UPDATE order_items SET ${targetColumn} = ?, custom_size_note = ? WHERE id = ?`,
+        [JSON.stringify(files), nextNote, itemId]
+      );
+    } else {
+      await query(
+        `UPDATE order_items SET custom_size_note = ? WHERE id = ?`,
+        [nextNote, itemId]
+      );
+    }
 
     // New or re-uploaded artwork should move order into artwork pending.
     if (fileUrl) {
@@ -134,11 +157,35 @@ export async function PATCH(
           // Try next compatible enum value.
         }
       }
+
+
+
+      // If Admin, optionally notify customer
+      if (uploaderRole === 'admin' && current.customer_email) {
+        try {
+          const content = `
+            <h2>Replacement Artwork Suggested</h2>
+            <p>We have uploaded a suggested replacement artwork for your order.</p>
+            <p>Please log in to your account and go to your order page to view and approve the replacement.</p>
+            <br/>
+            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://iprintrush.com'}/my-orders/${current.order_id}">View Order</a></p>
+          `;
+          await sendEmail({
+            to: current.customer_email,
+            subject: 'Action Required: Replacement Artwork Suggested',
+            text: 'We have uploaded a suggested replacement artwork for your order. Please log in to view and approve.',
+            html: content
+          });
+        } catch (e) {
+          console.error('Failed to send artwork notification email:', e);
+        }
+      }
     }
 
     return NextResponse.json({
       success: true,
       artworkFiles: files,
+      targetColumn,
       customSizeNote: nextNote || '',
       workflowStatus: fileUrl ? normalizeWorkflowStatus('artwork_pending') : undefined,
     });

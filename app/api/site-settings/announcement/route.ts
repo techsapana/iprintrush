@@ -56,7 +56,7 @@ export async function GET() {
   try {
     await ensureSiteSettingsColumns();
     const row: any = await queryOne(
-      'SELECT announcement_text, announcement_enabled, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color FROM site_settings ORDER BY id ASC LIMIT 1',
+      'SELECT announcement_text, announcement_enabled, announcement_discount_enabled, announcement_discount_type, announcement_discount_value, announcement_discount_condition, bar_discount_enabled, bar_discount_type, bar_discount_value, bar_discount_start_date, bar_discount_end_date, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color FROM site_settings ORDER BY id ASC LIMIT 1',
     );
     let faqs = DEFAULT_CONTACT_FAQS;
     if (row?.contact_faqs_json) {
@@ -79,6 +79,15 @@ export async function GET() {
       success: true,
       announcementText: row?.announcement_text || DEFAULT_TEXT,
       announcementEnabled: row?.announcement_enabled !== 0,
+      announcementDiscountEnabled: row?.announcement_discount_enabled === 1,
+      announcementDiscountType: row?.announcement_discount_type || 'percentage',
+      announcementDiscountValue: row?.announcement_discount_value != null ? Number(row.announcement_discount_value) : 0,
+      announcementDiscountCondition: row?.announcement_discount_condition || 'none',
+      barDiscountEnabled: row?.bar_discount_enabled === 1,
+      barDiscountType: row?.bar_discount_type || 'percentage',
+      barDiscountValue: row?.bar_discount_value != null ? Number(row.bar_discount_value) : 0,
+      barDiscountStartDate: row?.bar_discount_start_date || '',
+      barDiscountEndDate: row?.bar_discount_end_date || '',
       taxRatePercent: row?.tax_rate_percent != null ? Number(row.tax_rate_percent) : 0,
       promoHeadline: row?.promo_headline || '',
       promoSubheadline: row?.promo_subheadline || '',
@@ -106,6 +115,11 @@ export async function GET() {
       success: true,
       announcementText: DEFAULT_TEXT,
       announcementEnabled: true,
+      barDiscountEnabled: false,
+      barDiscountType: 'percentage',
+      barDiscountValue: 0,
+      barDiscountStartDate: '',
+      barDiscountEndDate: '',
       taxRatePercent: 0,
       promoHeadline: '',
       promoSubheadline: '',
@@ -142,6 +156,15 @@ export async function PUT(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const announcementText = String(body.announcementText || '').trim();
     const announcementEnabled = body.announcementEnabled !== false;
+    const announcementDiscountEnabled = !!body.announcementDiscountEnabled;
+    const announcementDiscountType = body.announcementDiscountType || 'percentage';
+    const announcementDiscountValue = Number(body.announcementDiscountValue) || 0;
+    const announcementDiscountCondition = body.announcementDiscountCondition || 'none';
+    const barDiscountEnabled = !!body.barDiscountEnabled;
+    const barDiscountType = body.barDiscountType || 'percentage';
+    const barDiscountValue = Number(body.barDiscountValue) || 0;
+    const barDiscountStartDate = String(body.barDiscountStartDate || '').trim();
+    const barDiscountEndDate = String(body.barDiscountEndDate || '').trim();
     const taxRatePercent = Number.isFinite(Number(body.taxRatePercent))
       ? Math.max(0, Number(body.taxRatePercent))
       : 0;
@@ -174,11 +197,20 @@ export async function PUT(req: NextRequest) {
     const popupColor = String(body.popupColor || '#FFC520').trim();
 
     await query(
-      `INSERT INTO site_settings (id, announcement_text, announcement_enabled, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO site_settings (id, announcement_text, announcement_enabled, announcement_discount_enabled, announcement_discount_type, announcement_discount_value, announcement_discount_condition, bar_discount_enabled, bar_discount_type, bar_discount_value, bar_discount_start_date, bar_discount_end_date, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          announcement_text = VALUES(announcement_text),
          announcement_enabled = VALUES(announcement_enabled),
+         announcement_discount_enabled = VALUES(announcement_discount_enabled),
+         announcement_discount_type = VALUES(announcement_discount_type),
+         announcement_discount_value = VALUES(announcement_discount_value),
+         announcement_discount_condition = VALUES(announcement_discount_condition),
+         bar_discount_enabled = VALUES(bar_discount_enabled),
+         bar_discount_type = VALUES(bar_discount_type),
+         bar_discount_value = VALUES(bar_discount_value),
+         bar_discount_start_date = VALUES(bar_discount_start_date),
+         bar_discount_end_date = VALUES(bar_discount_end_date),
          tax_rate_percent = VALUES(tax_rate_percent),
          promo_headline = VALUES(promo_headline),
          promo_subheadline = VALUES(promo_subheadline),
@@ -203,6 +235,15 @@ export async function PUT(req: NextRequest) {
       [
         announcementText,
         announcementEnabled ? 1 : 0,
+        announcementDiscountEnabled ? 1 : 0,
+        announcementDiscountType,
+        announcementDiscountValue,
+        announcementDiscountCondition,
+        barDiscountEnabled ? 1 : 0,
+        barDiscountType,
+        barDiscountValue,
+        barDiscountStartDate || null,
+        barDiscountEndDate || null,
         taxRatePercent,
         promoHeadline || null,
         promoSubheadline || null,

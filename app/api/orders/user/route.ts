@@ -5,6 +5,7 @@ import { getCustomerFromRequest } from '@/app/lib/customerAuth';
 import path from 'path';
 import { existsSync } from 'fs';
 import { unlink } from 'fs/promises';
+import { sendEmail } from '@/app/lib/mailer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
            estimated_delivery_date,
            created_at,
            paid_at,
+           payment_method,
            IF(ISNULL(customer_hidden), 0, customer_hidden) AS customer_hidden
          FROM orders
          WHERE customer_email = ? AND id = ?
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
       }
 
       const items = await query(
-        `SELECT oi.id, oi.product_id, oi.name, oi.unit_price, oi.quantity, oi.line_total, oi.customization_json, oi.artwork_files_json, oi.custom_size_note,
+        `SELECT oi.id, oi.product_id, oi.name, oi.unit_price, oi.quantity, oi.line_total, oi.customization_json, oi.artwork_files_json, oi.reuploaded_artwork_json, oi.replacement_artwork_json, oi.custom_size_note,
                 p.image as product_image, p.slug as product_slug,
                 requirement_files_json, requirement_status, requirement_review_notes
          FROM order_items oi
@@ -126,6 +128,34 @@ export async function GET(request: NextRequest) {
             // ignore bad JSON
           }
         }
+        let reuploadedArtworkFiles: string[] | null = null;
+        if (i.reuploaded_artwork_json) {
+          try {
+            const parsed =
+              typeof i.reuploaded_artwork_json === 'string'
+                ? JSON.parse(i.reuploaded_artwork_json)
+                : i.reuploaded_artwork_json;
+            if (Array.isArray(parsed)) {
+              reuploadedArtworkFiles = parsed;
+            }
+          } catch {
+            // ignore bad JSON
+          }
+        }
+        let replacementArtworkFiles: string[] | null = null;
+        if (i.replacement_artwork_json) {
+          try {
+            const parsed =
+              typeof i.replacement_artwork_json === 'string'
+                ? JSON.parse(i.replacement_artwork_json)
+                : i.replacement_artwork_json;
+            if (Array.isArray(parsed)) {
+              replacementArtworkFiles = parsed;
+            }
+          } catch {
+            // ignore bad JSON
+          }
+        }
 
         let requirementFiles: string[] | null = null;
         if (i.requirement_files_json) {
@@ -151,6 +181,8 @@ export async function GET(request: NextRequest) {
           productSlug: i.product_slug || null,
           customization,
           artworkFiles: artworkFiles || [],
+          reuploadedArtworkFiles: reuploadedArtworkFiles || [],
+          replacementArtworkFiles: replacementArtworkFiles || [],
           customSizeNote: i.custom_size_note || '',
           requirementFiles: requirementFiles || [],
           requirementStatus: i.requirement_status || 'none',
@@ -176,6 +208,7 @@ export async function GET(request: NextRequest) {
           customerPhone: o.customer_phone || '',
           deliveryMethod: o.delivery_method || 'pickup',
           trackingNumber: o.tracking_number || '',
+          paymentMethod: o.payment_method || null,
           estimatedDeliveryDate: o.estimated_delivery_date || null,
           billingAddress,
           shippingAddress,
@@ -229,7 +262,7 @@ export async function GET(request: NextRequest) {
       if (Number(o.customer_hidden) === 1) continue;
 
       const items = await query(
-        `SELECT oi.id, oi.product_id, oi.name, oi.unit_price, oi.quantity, oi.line_total, oi.customization_json, oi.artwork_files_json, oi.custom_size_note,
+        `SELECT oi.id, oi.product_id, oi.name, oi.unit_price, oi.quantity, oi.line_total, oi.customization_json, oi.artwork_files_json, oi.reuploaded_artwork_json, oi.replacement_artwork_json, oi.custom_size_note,
                 p.image as product_image, p.slug as product_slug,
                 requirement_files_json, requirement_status, requirement_review_notes
          FROM order_items oi
@@ -289,6 +322,22 @@ export async function GET(request: NextRequest) {
             // ignore bad JSON
           }
         }
+        
+        let reuploadedArtworkFiles: string[] | null = null;
+        if (i.reuploaded_artwork_json) {
+          try {
+            const parsed = typeof i.reuploaded_artwork_json === 'string' ? JSON.parse(i.reuploaded_artwork_json) : i.reuploaded_artwork_json;
+            if (Array.isArray(parsed)) reuploadedArtworkFiles = parsed;
+          } catch {}
+        }
+        
+        let replacementArtworkFiles: string[] | null = null;
+        if (i.replacement_artwork_json) {
+          try {
+            const parsed = typeof i.replacement_artwork_json === 'string' ? JSON.parse(i.replacement_artwork_json) : i.replacement_artwork_json;
+            if (Array.isArray(parsed)) replacementArtworkFiles = parsed;
+          } catch {}
+        }
 
         let requirementFiles: string[] | null = null;
         if (i.requirement_files_json) {
@@ -314,6 +363,8 @@ export async function GET(request: NextRequest) {
           productSlug: i.product_slug || null,
           customization,
           artworkFiles: artworkFiles || [],
+          reuploadedArtworkFiles: reuploadedArtworkFiles || [],
+          replacementArtworkFiles: replacementArtworkFiles || [],
           customSizeNote: i.custom_size_note || '',
           requirementFiles: requirementFiles || [],
           requirementStatus: i.requirement_status || 'none',
@@ -401,6 +452,74 @@ export async function DELETE(request: NextRequest) {
     console.error('User order delete error:', err);
     return NextResponse.json(
       { error: err?.message || 'Failed to delete order' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const customer = getCustomerFromRequest(request);
+    if (!customer?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const orderId = Number(body.orderId);
+    const { workflowStatus } = body;
+    
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      return NextResponse.json({ error: 'Invalid orderId' }, { status: 400 });
+    }
+
+    const orders: any[] = (await query(
+      'SELECT id, order_number, customer_email, workflow_status FROM orders WHERE id = ? LIMIT 1',
+      [orderId]
+    )) as any[];
+    
+    if (!Array.isArray(orders) || orders.length === 0) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+    if (orders[0].customer_email !== customer.email) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (workflowStatus) {
+      await query(
+        'UPDATE orders SET workflow_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [workflowStatus, orderId]
+      );
+      
+      if (workflowStatus === 'in_production') {
+        await query(
+          `INSERT INTO order_messages (order_id, sender_type, message) VALUES (?, ?, ?)`,
+          [orderId, 'customer', 'Customer approved the replacement artwork.']
+        );
+        
+        try {
+          const orderNum = orders[0].order_number;
+          await sendEmail({
+            to: process.env.ADMIN_EMAIL || 'support@iprintrush.com',
+            subject: `Artwork Approved: Order #${orderNum}`,
+            text: `The customer has approved the replacement artwork for Order #${orderNum}. The order is now in production.`,
+            html: `
+              <h2>Artwork Approved</h2>
+              <p>The customer has approved the replacement artwork for <strong>Order #${orderNum}</strong>.</p>
+              <p>The order workflow status has automatically been moved to <strong>On Production</strong>.</p>
+              <p><a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://iprintrush.com'}/admin/orders/${orderId}">View Order in Admin Dashboard</a></p>
+            `
+          });
+        } catch (mailErr) {
+          console.error('Failed to send admin approval email:', mailErr);
+        }
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error('User order patch error:', err);
+    return NextResponse.json(
+      { error: err?.message || 'Failed to update order' },
       { status: 500 }
     );
   }

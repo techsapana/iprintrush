@@ -7,14 +7,14 @@ export const dynamic = 'force-dynamic';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const admin = getAdminFromRequest(request);
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const itemId = params.id;
+    const { id: itemId } = await params;
     if (!itemId) {
       return NextResponse.json({ error: 'Missing order item id' }, { status: 400 });
     }

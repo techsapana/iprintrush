@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useCart } from '../hooks/useCart';
 import { useAuth } from '../hooks/useAuth';
-import { SameDayNotice } from '../components/shared/SameDayNotice';
+
 import { ShippingSelector } from '../components/shared/ShippingSelector';
 import { clearAllQuoteDrafts } from '../lib/quoteDraft';
 import {
@@ -176,6 +176,7 @@ export default function CheckoutClient() {
   const [sessionReady, setSessionReady] = useState(false);
   const [buyNowItems, setBuyNowItems] = useState([]);
   const [taxRatePercent, setTaxRatePercent] = useState(0);
+  const [autoDiscounts, setAutoDiscounts] = useState([]);
   const [couponLookup, setCouponLookup] = useState({});
   const [formData, setFormData] = useState({
     firstName: '',
@@ -189,6 +190,12 @@ export default function CheckoutClient() {
     shippingCity: '',
     shippingState: '',
     shippingZip: '',
+    billingAddress: '',
+    billingApt: '',
+    billingCity: '',
+    billingState: '',
+    billingZip: '',
+    sameAsShipping: true,
   });
   const [isPaying, setIsPaying] = useState(false);
   const [payError, setPayError] = useState('');
@@ -264,6 +271,37 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
     };
     loadSettings();
   }, []);
+
+  // Fetch auto-discount eligibility when email changes
+  useEffect(() => {
+    const checkAutoDiscount = async () => {
+      if (!formData.email) {
+        setAutoDiscounts([]);
+        return;
+      }
+      try {
+        const res = await fetch('/api/checkout/auto-discount', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email })
+        });
+        const data = await res.json();
+        if (data.eligible && data.discounts && data.discounts.length > 0) {
+          setAutoDiscounts(data.discounts);
+        } else {
+          setAutoDiscounts([]);
+        }
+      } catch (err) {
+        setAutoDiscounts([]);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      checkAutoDiscount();
+    }, 500); // debounce email input
+
+    return () => clearTimeout(timer);
+  }, [formData.email]);
 
   useEffect(() => {
     if (isBuyNow) {
@@ -523,8 +561,23 @@ const handleApplyCoupon = (e) => {
     
     // It's safe to use the closure variables because they are updated on every render.
     
+    // Verify billing address if needed
+    if ((!needsShippingAddress || !formData.sameAsShipping) && (!formData.billingAddress || !formData.billingCity || !formData.billingState || !formData.billingZip)) {
+      setPayError('Please complete the billing address.');
+      return;
+    }
+
     setIsPaying(true);
     try {
+      // Prepare final form data
+      const finalFormData = { ...formData };
+      if (needsShippingAddress && formData.sameAsShipping) {
+        finalFormData.billingAddress = formData.shippingAddress;
+        finalFormData.billingApt = formData.shippingApt;
+        finalFormData.billingCity = formData.shippingCity;
+        finalFormData.billingState = formData.shippingState;
+        finalFormData.billingZip = formData.shippingZip;
+      }
       const res = await fetch('/api/stripe/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -539,13 +592,13 @@ const handleApplyCoupon = (e) => {
               options: i.options,
             };
           }),
-          formData,
+          formData: finalFormData,
           shippingMethod: selectedMethod,
           shippingAmount,
           taxAmount,
           discountAmount: discount,
           finalTotal,
-          couponCode: appliedCoupon || undefined,
+          couponCode: isAutoDiscountApplied ? (bestAutoDiscountConfig?.description || 'Auto Discount') : (appliedCoupon || undefined),
         }),
       });
       const data = await res.json();
@@ -570,9 +623,34 @@ const handleApplyCoupon = (e) => {
   const subtotal = computeItemsMerchandiseSubtotal(checkoutItems);
   
   const subtotalCents = Math.round((subtotal || 0) * 100);
-  const discountCents = appliedCoupon
+  
+  const manualDiscountCents = appliedCoupon
     ? Math.round(subtotalCents * ((couponLookup[appliedCoupon] || 0) / 100))
     : 0;
+
+  let bestAutoDiscountCents = 0;
+  let bestAutoDiscountConfig = null;
+
+  if (autoDiscounts && autoDiscounts.length > 0) {
+    for (const autoDiscountConfig of autoDiscounts) {
+      let calculatedCents = 0;
+      if (autoDiscountConfig.type === 'percentage') {
+        calculatedCents = Math.round(subtotalCents * (autoDiscountConfig.value / 100));
+      } else if (autoDiscountConfig.type === 'fixed') {
+        calculatedCents = Math.round(autoDiscountConfig.value * 100);
+      }
+      
+      if (calculatedCents > bestAutoDiscountCents) {
+        bestAutoDiscountCents = calculatedCents;
+        bestAutoDiscountConfig = autoDiscountConfig;
+      }
+    }
+  }
+
+  const discountCents = Math.max(manualDiscountCents, bestAutoDiscountCents);
+  const isAutoDiscountApplied = discountCents === bestAutoDiscountCents && bestAutoDiscountCents > 0 && manualDiscountCents < bestAutoDiscountCents;
+  const appliedDiscountDescription = isAutoDiscountApplied ? bestAutoDiscountConfig?.description : appliedCoupon;
+  
   const taxableBaseCents = Math.max(0, subtotalCents - discountCents);
   
   const shippingAmount =
@@ -649,7 +727,7 @@ const handleApplyCoupon = (e) => {
         <div className="flex flex-col-reverse lg:grid lg:grid-cols-3 gap-6">
           {/* LEFT: Checkout form — on mobile shows BELOW summary (flex-col-reverse) */}
           <div className="lg:col-span-2 space-y-5">
-            <SameDayNotice />
+
 
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Methods</h2>
@@ -733,6 +811,47 @@ const handleApplyCoupon = (e) => {
                   </div>
                 </div>
               )}
+
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Billing Address</h2>
+                {needsShippingAddress && (
+                  <label className="flex items-center gap-2 mb-4 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      name="sameAsShipping" 
+                      checked={formData.sameAsShipping} 
+                      onChange={(e) => setFormData(p => ({ ...p, sameAsShipping: e.target.checked }))} 
+                      className="w-4 h-4 text-[#29b6f6] rounded border-gray-300 focus:ring-[#29b6f6]"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Same as shipping address</span>
+                  </label>
+                )}
+                
+                {(!needsShippingAddress || !formData.sameAsShipping) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Street address</label>
+                      <input name="billingAddress" value={formData.billingAddress} onChange={handleInputChange} required className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Apartment (optional)</label>
+                      <input name="billingApt" value={formData.billingApt} onChange={handleInputChange} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                      <input name="billingCity" value={formData.billingCity} onChange={handleInputChange} required className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                      <input name="billingState" value={formData.billingState} onChange={handleInputChange} required className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+                      <input name="billingZip" value={formData.billingZip} onChange={handleInputChange} required className={inputClass} maxLength={5} />
+                    </div>
+                  </div>
+                )}
+              </div>
 
 
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -841,7 +960,7 @@ const handleApplyCoupon = (e) => {
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-sm text-emerald-600 font-medium">
-                    <span>Discount ({appliedCoupon})</span>
+                    <span>Discount ({appliedDiscountDescription || 'Auto Discount'})</span>
                     <span>−${(discount || 0).toFixed(2)}</span>
                   </div>
                 )}

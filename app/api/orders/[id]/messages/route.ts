@@ -109,6 +109,7 @@ export async function POST(
           await sendEmail({
             to: order.customer_email,
             subject: `New Message on Order #${order.order_number}`,
+            text: `New message on order #${order.order_number}. Please check your order page.`,
             html: content
           });
         } catch (mailErr) {

@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAdmin } from '../../../hooks/useAdmin';
 import Link from 'next/link';
 import OrderChat from '@/app/components/order/OrderChat';
+import { toast } from 'sonner';
 
 export default function AdminOrderDetailPage() {
    const router = useRouter();
@@ -19,6 +20,7 @@ export default function AdminOrderDetailPage() {
    const [creatingShipment, setCreatingShipment] = useState(false);
    const [shipmentServiceType, setShipmentServiceType] = useState('FEDEX_GROUND');
    const [shipmentError, setShipmentError] = useState('');
+   const [uploadSuccessMsg, setUploadSuccessMsg] = useState('');
 
    useEffect(() => {
      if (!adminLoading && !adminUser) router.push('/admin/login');
@@ -82,26 +84,35 @@ export default function AdminOrderDetailPage() {
     }
   };
 
-  const handleDeleteArtwork = async (itemId, fileUrl) => {
-    if (!confirm('Delete this artwork file?')) return;
+  const handleDeleteArtwork = async (itemId, fileUrl, fileType) => {
+    if (!itemId || !fileUrl) return;
     try {
       setUpdatingArtworkItemId(itemId);
       const res = await fetch(`/api/order-items/${itemId}/files`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileUrl, fileType: 'artwork' }),
+        body: JSON.stringify({ fileUrl, fileType }),
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('Failed');
       setItems((prev) =>
-        prev.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                artworkFiles: (item.artworkFiles || []).filter((url) => url !== fileUrl),
-              }
-            : item
-        )
+        prev.map((item) => {
+          if (item.id === itemId) {
+            const newItem = { ...item };
+            if (fileType === 'artwork_files_json') {
+              newItem.artworkFiles = (item.artworkFiles || []).filter((url) => url !== fileUrl);
+            } else if (fileType === 'reuploaded_artwork_json') {
+              newItem.reuploadedArtworkFiles = (item.reuploadedArtworkFiles || []).filter((url) => url !== fileUrl);
+            } else if (fileType === 'replacement_artwork_json') {
+              newItem.replacementArtworkFiles = (item.replacementArtworkFiles || []).filter((url) => url !== fileUrl);
+            }
+            return newItem;
+          }
+          return item;
+        })
       );
+      toast.success('File deleted successfully');
+    } catch (err) {
+      toast.error('Failed to delete file');
     } finally {
       setUpdatingArtworkItemId(null);
     }
@@ -122,18 +133,27 @@ export default function AdminOrderDetailPage() {
       const res = await fetch(`/api/order-items/${itemId}/artwork`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileUrl: uploadJson.tempId, replaceArtwork: true }),
+        body: JSON.stringify({ fileUrl: uploadJson.tempId, replaceArtwork: false, uploaderRole: 'admin' }), // Admin appends replacement artwork
       });
       if (!res.ok) return;
       const saved = await res.json().catch(() => ({}));
       setItems((prev) =>
-        prev.map((item) =>
-          item.id === itemId
-            ? { ...item, artworkFiles: saved.artworkFiles || item.artworkFiles || [] }
-            : item
-        )
+        prev.map((item) => {
+          if (item.id === itemId) {
+            return { 
+              ...item, 
+              replacementArtworkFiles: saved.targetColumn === 'replacement_artwork_json' ? (saved.artworkFiles || []) : (item.replacementArtworkFiles || [])
+            };
+          }
+          return item;
+        })
       );
       setOrder((prev) => (prev ? { ...prev, workflowStatus: 'artwork_pending' } : prev));
+      toast.success('Artwork uploaded successfully');
+      setUploadSuccessMsg('Replacement artwork sent to customer successfully!');
+      setTimeout(() => setUploadSuccessMsg(''), 5000);
+    } catch (err) {
+      toast.error('Failed to upload artwork');
     } finally {
       setUpdatingArtworkItemId(null);
     }
@@ -267,7 +287,7 @@ export default function AdminOrderDetailPage() {
                 }
               >
                 <option value="order_review">Order Review</option>
-                <option value="artwork_pending">Artwork Pending</option>
+                <option value="artwork_pending">Pending Artwork Approval</option>
                 <option value="artwork_approved">Artwork Approved</option>
                 <option value="in_production">On Production</option>
                 <option value="ready_for_shipping">Ready for Shipping</option>
@@ -595,58 +615,130 @@ export default function AdminOrderDetailPage() {
                   </tr>
                   <tr>
                     <td className="px-6 pb-4 pt-0" colSpan={4}>
-                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm space-y-3">
-                        <div id="artwork" className="text-xs font-semibold text-gray-500 uppercase">Artwork</div>
-                        {item.artworkFiles?.length > 0 ? (
-                          <div className="flex flex-wrap gap-4 items-start">
-                            {item.artworkFiles.map((_, i) => (
-                              <div key={i} className="flex flex-col gap-2 items-start">
-                                <img
-                                  src={`/api/order-items/${item.id}/artwork/${i}`}
-                                  alt={`Artwork ${i + 1}`}
-                                  className="max-w-[220px] rounded-md border border-gray-200"
-                                />
-                                <a
-                                  href={`/api/order-items/${item.id}/artwork/${i}?download=1`}
-                                  download
-                                  className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#29b6f6] text-white text-xs font-semibold hover:bg-[#1e8fc4]"
-                                >
-                                  Download artwork {i + 1}
-                                </a>
-                                <button
-                                  type="button"
-                                  disabled={updatingArtworkItemId === item.id}
-                                  onClick={() => handleDeleteArtwork(item.id, item.artworkFiles[i])}
-                                  className="text-xs font-semibold text-red-600 hover:text-red-800 disabled:opacity-60"
-                                >
-                                  Delete file {i + 1}
-                                </button>
-                              </div>
-                            ))}
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm space-y-6">
+                        {/* 1. Original Artwork */}
+                        <div>
+                          <div id="artwork" className="text-xs font-semibold text-gray-500 uppercase mb-3">Original Artwork</div>
+                          {item.artworkFiles?.length > 0 ? (
+                            <div className="flex flex-wrap gap-4 items-start">
+                              {item.artworkFiles.map((url, i) => (
+                                <div key={`orig-${i}`} className="flex flex-col gap-2 items-start">
+                                  <img
+                                    src={`/api/order-items/${item.id}/artwork/${i}?type=original&t=${Date.now()}`}
+                                    alt={`Original Artwork ${i + 1}`}
+                                    className="max-w-[200px] rounded-md border border-gray-200"
+                                  />
+                                  <a
+                                    href={`/api/order-items/${item.id}/artwork/${i}?type=original&download=1`}
+                                    download
+                                    className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#29b6f6] text-white text-xs font-semibold hover:bg-[#1e8fc4]"
+                                  >
+                                    Download file
+                                  </a>
+                                  <button
+                                    type="button"
+                                    disabled={updatingArtworkItemId === item.id}
+                                    onClick={() => handleDeleteArtwork(item.id, url, 'artwork_files_json')}
+                                    className="text-xs font-semibold text-red-600 hover:text-red-800 disabled:opacity-60"
+                                  >
+                                    Delete file
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-500">No original artwork uploaded.</div>
+                          )}
+                        </div>
+
+                        {/* 2. Customer Reuploaded Artwork */}
+                        {item.reuploadedArtworkFiles?.length > 0 && (
+                          <div className="pt-4 border-t border-gray-200">
+                            <div className="text-xs font-semibold text-gray-500 uppercase mb-3">Customer Reuploaded Artwork</div>
+                            <div className="flex flex-wrap gap-4 items-start">
+                              {item.reuploadedArtworkFiles.map((url, i) => (
+                                <div key={`reup-${i}`} className="flex flex-col gap-2 items-start">
+                                  <img
+                                    src={`/api/order-items/${item.id}/artwork/${i}?type=reuploaded&t=${Date.now()}`}
+                                    alt={`Reuploaded Artwork ${i + 1}`}
+                                    className="max-w-[200px] rounded-md border border-gray-200 ring-2 ring-yellow-400"
+                                  />
+                                  <a
+                                    href={`/api/order-items/${item.id}/artwork/${i}?type=reuploaded&download=1`}
+                                    download
+                                    className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#29b6f6] text-white text-xs font-semibold hover:bg-[#1e8fc4]"
+                                  >
+                                    Download file
+                                  </a>
+                                  <button
+                                    type="button"
+                                    disabled={updatingArtworkItemId === item.id}
+                                    onClick={() => handleDeleteArtwork(item.id, url, 'reuploaded_artwork_json')}
+                                    className="text-xs font-semibold text-red-600 hover:text-red-800 disabled:opacity-60"
+                                  >
+                                    Delete file
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        ) : (
-                          <div className="text-xs text-gray-500">No artwork uploaded yet.</div>
                         )}
-                        <label className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
-                          <span>
-                            {updatingArtworkItemId === item.id
-                              ? 'Uploading...'
-                              : item.artworkFiles?.length > 0
-                                ? 'Upload replacement artwork'
-                                : 'Upload artwork'}
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            disabled={updatingArtworkItemId === item.id}
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) await handleUploadArtwork(item.id, file);
-                              if (e.target) e.target.value = '';
-                            }}
-                          />
-                        </label>
+
+                        {/* 3. Admin Replacement Artwork */}
+                        <div className="pt-4 border-t border-gray-200">
+                          <div className="text-xs font-semibold text-gray-500 uppercase mb-3">Admin Replacement Artwork</div>
+                          {item.replacementArtworkFiles?.length > 0 ? (
+                            <div className="flex flex-wrap gap-4 items-start mb-4">
+                              {item.replacementArtworkFiles.map((url, i) => (
+                                <div key={`repl-${i}`} className="flex flex-col gap-2 items-start">
+                                  <img
+                                    src={`/api/order-items/${item.id}/artwork/${i}?type=replacement&t=${Date.now()}`}
+                                    alt={`Replacement Artwork ${i + 1}`}
+                                    className="max-w-[200px] rounded-md border border-gray-200 ring-2 ring-green-500"
+                                  />
+                                  <a
+                                    href={`/api/order-items/${item.id}/artwork/${i}?type=replacement&download=1`}
+                                    download
+                                    className="inline-flex items-center px-2.5 py-1 rounded-md bg-[#29b6f6] text-white text-xs font-semibold hover:bg-[#1e8fc4]"
+                                  >
+                                    Download file
+                                  </a>
+                                  <button
+                                    type="button"
+                                    disabled={updatingArtworkItemId === item.id}
+                                    onClick={() => handleDeleteArtwork(item.id, url, 'replacement_artwork_json')}
+                                    className="text-xs font-semibold text-red-600 hover:text-red-800 disabled:opacity-60"
+                                  >
+                                    Delete file
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-500 mb-4">No replacement artwork uploaded.</div>
+                          )}
+                          {uploadSuccessMsg && updatingArtworkItemId !== item.id && (
+                            <div className="text-sm font-semibold text-green-600 mb-3 bg-green-50 p-2 rounded border border-green-200">
+                              ✓ {uploadSuccessMsg}
+                            </div>
+                          )}
+                          <label className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100 shadow-sm">
+                            <span>
+                              {updatingArtworkItemId === item.id ? 'Uploading...' : 'Upload Replacement Artwork'}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={updatingArtworkItemId === item.id}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) await handleUploadArtwork(item.id, file);
+                                if (e.target) e.target.value = '';
+                              }}
+                            />
+                          </label>
+                        </div>
                       </div>
                     </td>
                   </tr>

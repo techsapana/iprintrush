@@ -85,7 +85,7 @@ export default function MyOrdersPage() {
   const workflowLabel = (w) => {
     const map = {
       order_review: 'Order Review',
-      artwork_pending: 'Artwork Pending',
+      artwork_pending: 'Pending Artwork Approval',
       artwork_approved: 'Artwork Approved',
       in_production: 'On Production',
       ready_for_shipping: 'Ready for Shipping',

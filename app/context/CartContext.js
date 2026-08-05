@@ -7,7 +7,7 @@ export const CartContext = createContext(null);
 
 const CART_STORAGE_KEY = 'iprintrush_cart_v1';
 
-const SUPPORTED_QUOTE_MODES = ['simple', 'apparel', 'print_product', 'mailbox'];
+const SUPPORTED_QUOTE_MODES = ['simple', 'apparel', 'custom_apparel', 'print_product', 'mailbox'];
 
 // Distribute a new total quantity across an apparel size array, keeping
 // the sum exactly equal to newTotal and every entry >= 0.
@@ -58,7 +58,7 @@ function buildUpdatedQuotePayload(payload, newTotal, oldTotal) {
     p.quantity = newTotal;
   } else if (mode === 'mailbox') {
     p.months = newTotal;
-  } else if (mode === 'apparel') {
+  } else if (mode === 'apparel' || mode === 'custom_apparel') {
     p.quantities = adjustApparelQuantities(payload.quantities, newTotal);
   } else if (mode === 'print_product') {
     const key = findPrintQuantityKey(payload.selections, oldTotal);
@@ -79,7 +79,7 @@ function rebuildCustomizationsDisplay(
 ) {
   if (!prevDisplay || typeof prevDisplay !== 'object') return prevDisplay;
   const display = { ...prevDisplay };
-  if (mode === 'apparel') {
+  if (mode === 'apparel' || mode === 'custom_apparel') {
     const breakdown = Array.isArray(summary?.sizeBreakdown)
       ? summary.sizeBreakdown
       : [];
@@ -127,6 +127,24 @@ export function CartProvider({ children }) {
       setItems([]);
     }
     setCartHydrated(true);
+
+    const handleStorageChange = (e) => {
+      if (e.key === CART_STORAGE_KEY) {
+        try {
+          const raw = e.newValue;
+          let parsed = [];
+          if (raw) {
+            parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) parsed = [];
+          }
+          setItems(parsed);
+        } catch {
+          setItems([]);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   useEffect(() => {

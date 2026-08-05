@@ -36,8 +36,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const type = request.nextUrl.searchParams.get('type') || 'original'; // original, reuploaded, replacement
+
     const row: any = await queryOne(
-      `SELECT oi.artwork_files_json, o.customer_email
+      `SELECT oi.artwork_files_json, oi.reuploaded_artwork_json, oi.replacement_artwork_json, o.customer_email
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        WHERE oi.id = ?
@@ -52,12 +54,16 @@ export async function GET(
     }
 
     let files: string[] = [];
-    if (row.artwork_files_json) {
+    const targetCol = type === 'reuploaded' ? row.reuploaded_artwork_json 
+                    : type === 'replacement' ? row.replacement_artwork_json 
+                    : row.artwork_files_json;
+                    
+    if (targetCol) {
       try {
         const parsed =
-          typeof row.artwork_files_json === 'string'
-            ? JSON.parse(row.artwork_files_json)
-            : row.artwork_files_json;
+          typeof targetCol === 'string'
+            ? JSON.parse(targetCol)
+            : targetCol;
         if (Array.isArray(parsed)) files = parsed;
       } catch {
         files = [];

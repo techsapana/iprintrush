@@ -14,18 +14,22 @@ export async function GET(req: NextRequest) {
 
     const users = await query(`
       SELECT 
-        id, 
-        name, 
-        email, 
-        phone,
-        enabled, 
-        email_verified,
-        preferences,
-        saved_items,
-        created_at,
-        updated_at
-      FROM customer_users 
-      ORDER BY created_at DESC
+        cu.id, 
+        cu.name, 
+        cu.email, 
+        cu.phone,
+        cu.enabled, 
+        cu.email_verified,
+        cu.preferences,
+        cu.saved_items,
+        cu.created_at,
+        cu.updated_at,
+        COUNT(o.id) as total_orders,
+        SUM(o.amount_total) as total_spent
+      FROM customer_users cu
+      LEFT JOIN orders o ON cu.email = o.customer_email AND o.status = 'paid'
+      GROUP BY cu.id
+      ORDER BY cu.created_at DESC
     `);
 
     return NextResponse.json({ 

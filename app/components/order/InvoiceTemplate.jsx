@@ -117,7 +117,7 @@ export default function InvoiceTemplate({ order }) {
               Payment Method
             </div>
             <div className="text-sm font-medium text-gray-800 capitalize">
-              {order.paymentMethod ? order.paymentMethod.replace(/_/g, ' ') : (order.paidAt ? 'Stripe / Credit Card' : 'N/A')}
+              {order.paymentMethod ? order.paymentMethod.replace(/_/g, ' ') : (order.paidAt ? 'Credit Card' : 'N/A')}
             </div>
             <div className="text-xs text-gray-500 mt-2">
               {order.paidAt ? (

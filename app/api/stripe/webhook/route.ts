@@ -167,6 +167,12 @@ export async function POST(req: NextRequest) {
         const paymentIntent = session?.payment_intent || null;
         const customerId = session?.customer || null;
 
+        let methodString = 'Stripe Checkout';
+        if (session.payment_intent) {
+          // It's just a string ID here usually, we might not have full charge details
+          // but if we do, we can parse it.
+        }
+
         if (orderId) {
           await query(
             `UPDATE orders
@@ -201,23 +207,38 @@ export async function POST(req: NextRequest) {
         
         // Only process if it's from our custom Stripe Elements flow
         if (paymentIntent?.metadata?.isCustomStripeElements === 'true') {
+          let methodString = 'Stripe Card';
+          const charge = paymentIntent?.charges?.data?.[0];
+          if (charge && charge.payment_method_details) {
+            const details = charge.payment_method_details;
+            if (details.type === 'card' && details.card) {
+              const brand = details.card.brand || '';
+              const brandName = brand.charAt(0).toUpperCase() + brand.slice(1);
+              methodString = `${brandName}(****${details.card.last4})`;
+            } else {
+              methodString = details.type;
+            }
+          }
+
           if (orderId) {
             await query(
               `UPDATE orders
                SET status = 'paid',
+                   payment_method = ?,
                    stripe_customer_id = ?,
                    paid_at = CURRENT_TIMESTAMP
                WHERE id = ?`,
-              [customerId, orderId]
+              [methodString, customerId, orderId]
             );
           } else if (orderNumber) {
             await query(
               `UPDATE orders
                SET status = 'paid',
+                   payment_method = ?,
                    stripe_customer_id = ?,
                    paid_at = CURRENT_TIMESTAMP
                WHERE order_number = ?`,
-              [customerId, orderNumber]
+              [methodString, customerId, orderNumber]
             );
           }
           // Send order confirmation email

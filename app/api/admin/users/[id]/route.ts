@@ -33,7 +33,41 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, user });
+    // Fetch order statistics for this user
+    const orderStats = await queryOne(
+      `SELECT 
+         COUNT(id) as total_orders, 
+         SUM(amount_total) as total_spent 
+       FROM orders 
+       WHERE customer_email = ? AND status = 'paid'`,
+      [user.email]
+    );
+
+    // Fetch most purchased products for this user
+    const { query } = await import('@/app/lib/db');
+    const topProducts = await query(
+      `SELECT 
+         oi.product_id, 
+         oi.name as product_name, 
+         SUM(oi.quantity) as total_quantity_bought
+       FROM order_items oi
+       JOIN orders o ON oi.order_id = o.id
+       WHERE o.customer_email = ? AND o.status = 'paid'
+       GROUP BY oi.product_id, oi.name
+       ORDER BY total_quantity_bought DESC
+       LIMIT 5`,
+      [user.email]
+    );
+
+    return NextResponse.json({ 
+      success: true, 
+      user, 
+      orderStats: {
+        totalOrders: orderStats?.total_orders || 0,
+        totalSpent: orderStats?.total_spent || 0
+      },
+      topProducts: topProducts || []
+    });
   } catch (error: any) {
     console.error('Error fetching admin user detail:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });

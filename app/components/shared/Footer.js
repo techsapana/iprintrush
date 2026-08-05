@@ -6,21 +6,26 @@ import { useEffect, useState } from 'react';
 
 export function Footer() {
   const [logoImageUrl, setLogoImageUrl] = useState('');
+  const [contactPhone, setContactPhone] = useState('+19164581139');
+  const [contactEmail, setContactEmail] = useState('info@iprintrush.com');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const loadLogo = async () => {
+    const loadSettings = async () => {
       try {
         const res = await fetch('/api/site-settings/announcement', { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         setLogoImageUrl(typeof data.logoImageUrl === 'string' ? data.logoImageUrl.trim() : '');
+        if (data.contactPhone) setContactPhone(data.contactPhone);
+        if (data.contactEmail) setContactEmail(data.contactEmail);
       } catch {
-        // keep static logo fallback
+        // keep static fallback
       }
     };
-    loadLogo();
+    loadSettings();
     return () => {
       cancelled = true;
     };
@@ -163,14 +168,57 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Quick Help floating button */}
-      <a
-        href="sms:+19164581139"
-        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#29b6f6] text-white text-sm font-semibold shadow-xl hover:bg-[#1e8fc4] transition"
-      >
-        <span className="text-lg">❓</span>
-        <span>Quick help needed?</span>
-      </a>
+      {/* Quick Help floating button & Menu */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end">
+        {/* Slide-up Menu */}
+        {isMenuOpen && (
+          <div className="mb-4 bg-white rounded-xl shadow-2xl p-2 w-48 text-gray-800 animate-in slide-in-from-bottom-5 fade-in duration-200 border border-gray-100">
+            <div className="text-xs font-bold text-gray-400 px-3 py-2 uppercase tracking-wider mb-1">
+              Contact Us
+            </div>
+            <a
+              href={`sms:${contactPhone.replace(/[^0-9+]/g, '')}`}
+              onClick={(e) => {
+                if (typeof window !== 'undefined' && window.innerWidth > 768) {
+                  e.preventDefault();
+                  if (navigator?.clipboard?.writeText) {
+                    navigator.clipboard.writeText(contactPhone).then(() => {
+                      alert(`Phone number ${contactPhone} copied to clipboard! Text us from your phone.`);
+                    }).catch(() => {
+                      alert(`Text us at: ${contactPhone}`);
+                    });
+                  } else {
+                    alert(`Text us at: ${contactPhone}`);
+                  }
+                }
+              }}
+              className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg transition text-sm font-medium"
+            >
+              <span className="text-xl">💬</span> Text Us
+            </a>
+            <a
+              href={`tel:${contactPhone.replace(/[^0-9+]/g, '')}`}
+              className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg transition text-sm font-medium"
+            >
+              <span className="text-xl">📞</span> Call Us
+            </a>
+            <a
+              href={`mailto:${contactEmail}`}
+              className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg transition text-sm font-medium"
+            >
+              <span className="text-xl">✉️</span> Email Us
+            </a>
+          </div>
+        )}
+
+        <button
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="inline-flex items-center gap-2 px-4 py-3 rounded-full bg-[#29b6f6] text-white text-sm font-semibold shadow-xl hover:bg-[#1e8fc4] hover:shadow-2xl hover:-translate-y-1 transition transform duration-200"
+        >
+          <span className="text-lg">{isMenuOpen ? '✕' : '❓'}</span>
+          <span>{isMenuOpen ? 'Close Menu' : 'Quick help needed?'}</span>
+        </button>
+      </div>
     </footer>
   );
 }

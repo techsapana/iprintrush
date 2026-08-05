@@ -9,7 +9,7 @@ import { unlink } from 'fs/promises';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function DELETE(req: NextRequest, { params }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = getAdminFromRequest(req);
     const customer = getCustomerFromRequest(req);
@@ -17,9 +17,10 @@ export async function DELETE(req: NextRequest, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json();
-    const { fileUrl, fileType } = body;
+    const { fileUrl } = body;
+    let { fileType } = body;
 
     if (!id || !fileUrl || !fileType) {
       return NextResponse.json(
@@ -28,16 +29,16 @@ export async function DELETE(req: NextRequest, { params }) {
       );
     }
 
-    if (!['artwork', 'requirement'].includes(fileType)) {
+    if (!['artwork', 'requirement', 'artwork_files_json', 'reuploaded_artwork_json', 'replacement_artwork_json'].includes(fileType)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Must be "artwork" or "requirement"' },
+        { error: 'Invalid file type.' },
         { status: 400 }
       );
     }
 
     // Get current item data
     const item = await query(
-      `SELECT oi.id, oi.artwork_files_json, oi.requirement_files_json, o.customer_email
+      `SELECT oi.id, oi.artwork_files_json, oi.reuploaded_artwork_json, oi.replacement_artwork_json, oi.requirement_files_json, o.customer_email
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        WHERE oi.id = ?
@@ -59,19 +60,33 @@ export async function DELETE(req: NextRequest, { params }) {
     let currentFiles: string[] = [];
 
     // Parse existing files based on type
-    if (fileType === 'artwork') {
-      if (currentItem.artwork_files_json) {
+    if (['artwork', 'artwork_files_json', 'reuploaded_artwork_json', 'replacement_artwork_json'].includes(fileType)) {
+      let targetColumn = fileType === 'artwork' ? 'artwork_files_json' : fileType;
+      
+      const checkAndParse = (jsonStr: any, colName: string) => {
+        if (!jsonStr) return false;
         try {
-          const parsed = typeof currentItem.artwork_files_json === 'string' 
-            ? JSON.parse(currentItem.artwork_files_json) 
-            : currentItem.artwork_files_json;
-          if (Array.isArray(parsed)) {
+          const parsed = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+          if (Array.isArray(parsed) && parsed.includes(fileUrl)) {
             currentFiles = parsed;
+            targetColumn = colName;
+            return true;
           }
-        } catch {
-          // ignore bad JSON
+        } catch {}
+        return false;
+      };
+
+      if (fileType === 'artwork') {
+        if (!checkAndParse(currentItem.reuploaded_artwork_json, 'reuploaded_artwork_json')) {
+          if (!checkAndParse(currentItem.replacement_artwork_json, 'replacement_artwork_json')) {
+            checkAndParse(currentItem.artwork_files_json, 'artwork_files_json');
+          }
         }
+      } else {
+        checkAndParse(currentItem[fileType], fileType);
       }
+      
+      fileType = targetColumn; // use this to pass the exact column below
     } else if (fileType === 'requirement') {
       if (currentItem.requirement_files_json) {
         try {
@@ -102,7 +117,7 @@ export async function DELETE(req: NextRequest, { params }) {
     }
 
     // Update the database
-    const updateField = fileType === 'artwork' ? 'artwork_files_json' : 'requirement_files_json';
+    const updateField = fileType === 'requirement' ? 'requirement_files_json' : fileType;
     await query(
       `UPDATE order_items SET ${updateField} = ? WHERE id = ?`,
       [JSON.stringify(updatedFiles), id]

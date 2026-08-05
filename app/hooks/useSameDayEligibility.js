@@ -22,8 +22,8 @@ export function useSameDayEligibility() {
 
     update();
 
-    // Update every 60 seconds to track deadline approach
-    const interval = setInterval(update, 60000);
+    // Update every 1 second to track deadline approach for digital clock
+    const interval = setInterval(update, 1000);
 
     return () => clearInterval(interval);
   }, []);

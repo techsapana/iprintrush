@@ -59,6 +59,15 @@ export async function POST(req: NextRequest) {
       state: formData.shippingState || '',
       zip: formData.shippingZip || '',
     };
+    
+    // Build billing address object
+    const billingAddress = {
+      address: formData.billingAddress || '',
+      apt: formData.billingApt || '',
+      city: formData.billingCity || '',
+      state: formData.billingState || '',
+      zip: formData.billingZip || '',
+    };
 
     const customerName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim();
     const safeDiscount = Number(discountAmount) || 0;
@@ -106,7 +115,7 @@ export async function POST(req: NextRequest) {
         formData.email,                                       // customer_email
         formData.phone || null,                               // customer_phone
         JSON.stringify(shippingAddress),                      // shipping_address_json
-        JSON.stringify(shippingAddress),                      // billing_address_json (same for Stripe Elements)
+        JSON.stringify(billingAddress),                       // billing_address_json
         formData.notes || null,                               // order_notes
         formData.deliveryMethod || 'pickup',                  // delivery_method
         shippingMethod || null,                               // shipping_service

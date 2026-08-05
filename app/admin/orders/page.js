@@ -80,7 +80,7 @@ export default function AdminOrdersPage() {
   const workflowLabel = (w) => {
     const map = {
       order_review: 'Order Review',
-      artwork_pending: 'Artwork Pending',
+      artwork_pending: 'Pending Artwork Approval',
       artwork_approved: 'Artwork Approved',
       in_production: 'On Production',
       ready_for_shipping: 'Ready for Shipping',
@@ -131,7 +131,7 @@ export default function AdminOrdersPage() {
             >
               <option value="">All workflows</option>
               <option value="order_review">Order Review</option>
-              <option value="artwork_pending">Artwork Pending</option>
+              <option value="artwork_pending">Pending Artwork Approval</option>
               <option value="artwork_approved">Artwork Approved</option>
               <option value="in_production">On Production</option>
               <option value="ready_for_shipping">Ready for Shipping</option>

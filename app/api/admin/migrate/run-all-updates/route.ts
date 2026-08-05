@@ -167,6 +167,14 @@ export async function GET(req: NextRequest) {
       "Add artwork_files_json to order_items"
     );
     await safeExecute(
+      "ALTER TABLE order_items ADD COLUMN reuploaded_artwork_json JSON DEFAULT NULL",
+      "Add reuploaded_artwork_json to order_items"
+    );
+    await safeExecute(
+      "ALTER TABLE order_items ADD COLUMN replacement_artwork_json JSON DEFAULT NULL",
+      "Add replacement_artwork_json to order_items"
+    );
+    await safeExecute(
       "ALTER TABLE order_items ADD COLUMN custom_size_note TEXT DEFAULT NULL",
       "Add custom_size_note to order_items"
     );
@@ -318,6 +326,50 @@ export async function GET(req: NextRequest) {
     await safeExecute(
       "ALTER TABLE products ADD COLUMN featured TINYINT(1) NOT NULL DEFAULT 0",
       "Add featured to products"
+    );
+
+    // ─────────────────────────────────────────────────────────────────
+    // SECTION 11: site_settings auto discounts
+    // ─────────────────────────────────────────────────────────────────
+    // NOTE: 'announcement_discount_*' refers to the Global Popup discount (legacy name)
+    // 'bar_discount_*' refers to the actual top Announcement Bar date-based discount
+    await safeExecute(
+      "ALTER TABLE site_settings ADD COLUMN announcement_discount_enabled TINYINT(1) NOT NULL DEFAULT 0",
+      "Add announcement_discount_enabled to site_settings"
+    );
+    await safeExecute(
+      "ALTER TABLE site_settings ADD COLUMN announcement_discount_type ENUM('percentage', 'fixed') NOT NULL DEFAULT 'percentage'",
+      "Add announcement_discount_type to site_settings"
+    );
+    await safeExecute(
+      "ALTER TABLE site_settings ADD COLUMN announcement_discount_value DECIMAL(10,2) NOT NULL DEFAULT 0",
+      "Add announcement_discount_value to site_settings"
+    );
+    await safeExecute(
+      "ALTER TABLE site_settings ADD COLUMN announcement_discount_condition ENUM('none', 'first_order') NOT NULL DEFAULT 'none'",
+      "Add announcement_discount_condition to site_settings"
+    );
+
+    // New Announcement Bar Date-based discount columns
+    await safeExecute(
+      "ALTER TABLE site_settings ADD COLUMN bar_discount_enabled TINYINT(1) NOT NULL DEFAULT 0",
+      "Add bar_discount_enabled to site_settings"
+    );
+    await safeExecute(
+      "ALTER TABLE site_settings ADD COLUMN bar_discount_type ENUM('percentage', 'fixed') NOT NULL DEFAULT 'percentage'",
+      "Add bar_discount_type to site_settings"
+    );
+    await safeExecute(
+      "ALTER TABLE site_settings ADD COLUMN bar_discount_value DECIMAL(10,2) NOT NULL DEFAULT 0",
+      "Add bar_discount_value to site_settings"
+    );
+    await safeExecute(
+      "ALTER TABLE site_settings ADD COLUMN bar_discount_start_date DATETIME DEFAULT NULL",
+      "Add bar_discount_start_date to site_settings"
+    );
+    await safeExecute(
+      "ALTER TABLE site_settings ADD COLUMN bar_discount_end_date DATETIME DEFAULT NULL",
+      "Add bar_discount_end_date to site_settings"
     );
 
     const summary = {

@@ -7,7 +7,7 @@ import { saveQuotePrefill } from '../lib/quotePrefill';
 import { Button } from '@/components/ui/button';
 import { useCart } from '../hooks/useCart';
 import { useSameDayEligibility } from '../hooks/useSameDayEligibility';
-import { SameDayNotice } from '../components/shared/SameDayNotice';
+
 import { useAuth } from '../hooks/useAuth';
 import { clearBuyNowItems, requireLoginForCheckout, computeLineTotal } from '../lib/checkoutFlow';
 import { buildQuoteCartEntries } from '../lib/cartHelpers';
@@ -477,7 +477,7 @@ export default function CartPage() {
 
 {/* Same-Day Status */}
               <div className="mb-6">
-                <SameDayNotice />
+
               </div>
 
               {/* Shipping Review Warning */}
