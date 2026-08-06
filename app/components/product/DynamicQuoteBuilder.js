@@ -675,7 +675,7 @@ const handleDeliveryMethodChange = (method) => {
       }
     }
     const hasAreaPricing = dimensionConfig?.pricePerSqInch != null;
-    const shouldUseCustomDimensions = hasAreaPricing && !hasPresetPrintSize && allowCustomDimensions;
+    const shouldUseCustomDimensions = !hasPresetPrintSize && allowCustomDimensions;
 
     // Validate custom dimensions only when no preset print size is selected.
     if (shouldUseCustomDimensions) {
@@ -869,13 +869,15 @@ const handleDeliveryMethodChange = (method) => {
           }
         }
         
-        // Display the size based on width and height for area-based products
-        if (dimensionConfig && dimensionConfig.pricePerSqInch && widthIn && heightIn) {
+        // Display the custom size dimensions if entered
+        if (widthIn && heightIn) {
           const w = parseFloat(widthIn);
           const h = parseFloat(heightIn);
           if (Number.isFinite(w) && Number.isFinite(h)) {
             customizationsDisplay['Dimensions'] = `${w}" × ${h}"`;
-            customizationsDisplay['Area'] = `${(w * h).toFixed(2)} sq. in`;
+            if (dimensionConfig && dimensionConfig.pricePerSqInch) {
+              customizationsDisplay['Area'] = `${(w * h).toFixed(2)} sq. in`;
+            }
           }
         }
 
