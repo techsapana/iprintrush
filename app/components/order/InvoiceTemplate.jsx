@@ -22,6 +22,55 @@ function formatAddress(addressObj) {
   return parts.filter(Boolean).map((p, i) => <div key={i}>{p}</div>);
 }
 
+// Helper to render card brand logos based on payment method string
+function getCardBrandIcon(methodString) {
+  if (!methodString) return null;
+  const str = methodString.toLowerCase();
+  
+  if (str.includes('visa')) {
+    return (
+      <svg className="w-8 h-auto" viewBox="0 0 48 48" fill="none">
+        <rect width="48" height="32" y="8" rx="4" fill="#1434CB" />
+        <path fill="#fff" d="M19.7 27.6h3L24.5 17h-2.9c-.5 0-.9.3-1.1.8l-3.8 9.8h3.2l.6-1.7h3.9l.3 1.7h2.8l-3.8-10.6h-3.1l-4 10.6zm2.3-3.7l1.3-3.6 1 3.6h-2.3zM32.8 17.5c-1.3-.4-2.3-.6-3.2-.6-3.5 0-6 1.8-6 4.4 0 2 1.8 3 3 3.6 1.3.6 1.7 1 1.7 1.6 0 .9-1.1 1.4-2.2 1.4-1.5 0-2.3-.2-3.4-.7l-.4-.2-.5 3c1 .5 2.6.9 4.3.9 3.8 0 6.2-1.9 6.2-4.6 0-1.5-1-2.6-3.4-3.8-1.1-.6-1.8-1-1.8-1.6 0-.6.7-1.2 2-1.2 1 0 1.9.2 2.6.5l.4.2.4-2.9zM36.1 17h-2.4c-.6 0-1 .4-1.2.9l-4.1 9.7h3.1l.6-1.8h3.8l.4 1.8h2.9l-3.1-10.6zm.5 2.6l1 3.1h-2l1-3.1zM11.9 17L9.5 24.3l-.3-1.5c-.5-1.9-2-3.6-4.1-4.3l2.7 9.1h3.3l4.9-10.6h-4.1z" />
+        <path fill="#F2A900" d="M5.1 17h-.3L2 17.4v.6c2.6.7 5.1 2.5 6 4.6l-2.9-5.6z" />
+      </svg>
+    );
+  }
+  if (str.includes('mastercard')) {
+    return (
+      <svg className="w-8 h-auto" viewBox="0 0 48 48" fill="none">
+        <rect width="48" height="32" y="8" rx="4" fill="#241F20" />
+        <circle cx="20" cy="24" r="8" fill="#EB001B" />
+        <circle cx="28" cy="24" r="8" fill="#F79E1B" fillOpacity="0.8" />
+      </svg>
+    );
+  }
+  if (str.includes('amex') || str.includes('american express')) {
+    return (
+      <svg className="w-8 h-auto" viewBox="0 0 48 48" fill="none">
+        <rect width="48" height="32" y="8" rx="4" fill="#006FCF" />
+        <path fill="#fff" d="M16 27h-2l-3-7-3 7H6l4.5-10h2l4.5 10zm-3-2.5l-2-4.5-2 4.5h4zm11-7.5l-2.5 6-2.5-6h-2v10h2v-6l2.5 6h1l2.5-6v6h2v-10h-3zm14 0h-5v10h5v-2h-3v-2h2.5v-2H35v-2h3v-2zm-6.5 6l2-6h-2.5l-1.5 4-1.5-4h-2.5l2 6-2.5 4h2.5l1.5-4 1.5 4h2.5l-2-4z" />
+      </svg>
+    );
+  }
+  if (str.includes('discover')) {
+    return (
+      <svg className="w-8 h-auto" viewBox="0 0 48 48" fill="none">
+        <rect width="48" height="32" y="8" rx="4" fill="#F5F5F5" />
+        <path fill="#F9A021" d="M24 16c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 13c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5z" />
+        <path fill="#333" d="M12.5 20.5h2.5c1.1 0 2 .9 2 2s-.9 2-2 2h-2.5v-4zm-2-2v8h4.5c2.2 0 4-1.8 4-4s-1.8-4-4-4h-4.5zM38.5 24.5v-6h-2v10h2v-2h2v2h2v-10h-2v6h-2z" />
+      </svg>
+    );
+  }
+  
+  // Generic Card
+  return (
+    <svg className="w-8 h-auto text-gray-500" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 4H4C2.89 4 2.01 4.89 2.01 6L2 18C2 19.11 2.89 20 4 20H20C21.11 20 22 19.11 22 18V6C22 4.89 21.11 4 20 4ZM20 18H4V12H20V18ZM20 8H4V6H20V8Z" />
+    </svg>
+  );
+}
+
 export default function InvoiceTemplate({ order }) {
   const [logoUrl, setLogoUrl] = useState('');
 
