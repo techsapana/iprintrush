@@ -288,6 +288,10 @@ export function CartProvider({ children }) {
       return;
     }
 
+    const tokenKey = `split::${splitGroupId}`;
+    const myToken = (recalcTokens.current[tokenKey] || 0) + 1;
+    recalcTokens.current[tokenKey] = myToken;
+
     try {
       const res = await fetch('/api/quote/calculate', {
         method: 'POST',
@@ -295,6 +299,11 @@ export function CartProvider({ children }) {
         body: JSON.stringify(payload),
       });
       if (!res.ok) return;
+      
+      // Ignore if a newer request for this group has already been fired
+      if (recalcTokens.current[tokenKey] !== myToken) {
+        return;
+      }
       const summary = await res.json();
       
       // Re-build cart lines for this group
