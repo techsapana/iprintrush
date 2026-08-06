@@ -248,10 +248,10 @@ export default function AdminOrderDetailPage() {
       <div className="bg-white shadow">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="mb-4">
-            <Link href="/admin/orders" className="text-sm font-medium text-[#29b6f6] hover:text-[#1e8fc4] flex items-center gap-1 w-fit">
+            <button onClick={() => router.back()} className="text-sm font-medium text-[#29b6f6] hover:text-[#1e8fc4] flex items-center gap-1 w-fit bg-transparent border-none cursor-pointer">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
               Back to Orders
-            </Link>
+            </button>
           </div>
           <div className="flex justify-between items-center flex-wrap gap-4">
             <h1 className="text-2xl font-bold text-gray-900">Order {order.orderNumber}</h1>

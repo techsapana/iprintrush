@@ -138,10 +138,10 @@ export default function EditUserPage() {
         
         {/* Header & Breadcrumb */}
         <div className="mb-6">
-          <Link href="/admin/users" className="text-sm text-[#29b6f6] hover:underline flex items-center gap-1 mb-4">
+          <button onClick={() => router.back()} className="text-sm font-medium text-[#29b6f6] hover:text-[#1e8fc4] flex items-center gap-1 mb-4 w-fit bg-transparent border-none cursor-pointer">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             Back to Users
-          </Link>
+          </button>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Manage User</h1>
