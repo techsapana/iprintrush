@@ -495,23 +495,23 @@ export default function AdminOrderDetailPage() {
                   </button>
                 </div>
                 {paymentLink && (
-                  <div className="mt-3 bg-white p-2 rounded border border-gray-200">
-                    <span className="text-xs font-semibold text-gray-700 block mb-1">Share this link with the customer:</span>
-                    <div className="flex gap-2 items-center">
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value={paymentLink} 
-                        className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 w-full text-gray-600"
-                      />
+                  <div className="mt-3 bg-white p-3 rounded border border-gray-200">
+                    <span className="text-xs font-semibold text-gray-700 block mb-2">Message Template (Ready to send to customer):</span>
+                    <div className="relative bg-gray-50 p-3 rounded border border-gray-200 text-sm text-gray-800 font-mono">
+                      <div>Order ID: #{order.orderNumber}</div>
+                      <div>Reason for link: Over size product Shipping & Handling Fee</div>
+                      <div className="mt-2">Payment Link:</div>
+                      <div className="break-all text-[#29b6f6] underline">{paymentLink}</div>
+                      
                       <button 
                         onClick={() => {
-                          navigator.clipboard.writeText(paymentLink);
-                          toast.success('Copied to clipboard');
+                          const text = `Order ID: #${order.orderNumber}\nReason for link: Over size product Shipping & Handling Fee\nPayment Link: ${paymentLink}`;
+                          navigator.clipboard.writeText(text);
+                          toast.success('Message copied to clipboard');
                         }}
-                        className="text-xs px-2 py-1 bg-gray-100 border border-gray-300 hover:bg-gray-200 rounded whitespace-nowrap"
+                        className="absolute top-2 right-2 text-xs px-2 py-1 bg-white border border-gray-300 hover:bg-gray-100 rounded shadow-sm"
                       >
-                        Copy
+                        Copy Message
                       </button>
                     </div>
                   </div>
