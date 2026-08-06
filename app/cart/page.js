@@ -143,6 +143,7 @@ export default function CartPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [taxRatePercent, setTaxRatePercent] = useState(0);
   const [selectedItemIds, setSelectedItemIds] = useState([]);
+  const [oversizeConsent, setOversizeConsent] = useState(false);
 
   const seenIds = useRef(new Set());
 
@@ -209,6 +210,12 @@ export default function CartPage() {
     clearBuyNowItems();
     if (selectedItemIds.length === 0) {
       alert('Please select at least one item to proceed to checkout.');
+      return;
+    }
+
+    const hasOversizedItems = items.some((item) => item.options?.quoteSummary?.shippingReviewRequired || item.options?.shippingReviewRequired);
+    if (hasOversizedItems && !oversizeConsent) {
+      alert('Please agree to the Oversize Shipping & handling fee to proceed.');
       return;
     }
     
@@ -482,9 +489,20 @@ export default function CartPage() {
 
               {/* Shipping Review Warning */}
               {items.some((item) => item.options?.quoteSummary?.shippingReviewRequired || item.options?.shippingReviewRequired) && (
-                <div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
-                  <span className="font-semibold">Shipping Review Required</span>
-                  <p className="text-sm mt-1">Your order contains oversized items. Final shipping cost will be determined after manual review.</p>
+                <div className="mb-6 space-y-4">
+                  <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+                    <span className="font-semibold">Shipping Review Required</span>
+                    <p className="text-sm mt-1">Your order contains oversized items. Final shipping cost will be determined after manual review.</p>
+                  </div>
+                  <label className="flex items-start gap-2 text-sm font-medium text-gray-700 cursor-pointer bg-white p-3 border border-gray-200 rounded-lg shadow-sm">
+                    <input 
+                      type="checkbox"
+                      checked={oversizeConsent}
+                      onChange={(e) => setOversizeConsent(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#29b6f6] focus:ring-[#29b6f6]"
+                    />
+                    <span>I agree to pay this Over size Shipping & handling fee</span>
+                  </label>
                 </div>
               )}
 

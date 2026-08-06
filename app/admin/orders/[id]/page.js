@@ -21,6 +21,9 @@ export default function AdminOrderDetailPage() {
    const [shipmentServiceType, setShipmentServiceType] = useState('FEDEX_GROUND');
    const [shipmentError, setShipmentError] = useState('');
    const [uploadSuccessMsg, setUploadSuccessMsg] = useState('');
+   const [feeAmount, setFeeAmount] = useState('');
+   const [generatingLink, setGeneratingLink] = useState(false);
+   const [paymentLink, setPaymentLink] = useState('');
 
    useEffect(() => {
      if (!adminLoading && !adminUser) router.push('/admin/login');
@@ -169,6 +172,30 @@ export default function AdminOrderDetailPage() {
       router.push('/admin/orders');
     } finally {
       setDeletingOrder(false);
+    }
+  };
+
+  const handleGeneratePaymentLink = async () => {
+    if (!order?.id || !feeAmount) return;
+    try {
+      setGeneratingLink(true);
+      const res = await fetch('/api/admin/stripe/create-payment-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          amount: parseFloat(feeAmount),
+          description: `Oversize Shipping & Handling Fee for Order #${order.orderNumber}`
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate link');
+      setPaymentLink(data.url);
+      toast.success('Payment link generated');
+    } catch (err) {
+      toast.error(err.message || 'Failed to generate link');
+    } finally {
+      setGeneratingLink(false);
     }
   };
 
@@ -443,6 +470,53 @@ export default function AdminOrderDetailPage() {
               <p className="text-xs text-amber-700 mt-1">
                 This order contains oversized items requiring manual shipping review.
               </p>
+              
+              <div className="mt-4 pt-4 border-t border-amber-200/50">
+                <span className="text-sm font-semibold text-amber-900">Generate Oversize Shipping Fee Link</span>
+                <div className="mt-2 flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                    <input 
+                      type="number"
+                      placeholder="0.00"
+                      value={feeAmount}
+                      onChange={(e) => setFeeAmount(e.target.value)}
+                      className="pl-6 border border-gray-300 rounded-md px-3 py-1.5 text-sm w-32"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <button 
+                    onClick={handleGeneratePaymentLink}
+                    disabled={generatingLink || !feeAmount}
+                    className="text-xs px-3 py-2 rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60 font-medium"
+                  >
+                    {generatingLink ? 'Generating...' : 'Generate Link'}
+                  </button>
+                </div>
+                {paymentLink && (
+                  <div className="mt-3 bg-white p-2 rounded border border-gray-200">
+                    <span className="text-xs font-semibold text-gray-700 block mb-1">Share this link with the customer:</span>
+                    <div className="flex gap-2 items-center">
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={paymentLink} 
+                        className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 w-full text-gray-600"
+                      />
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(paymentLink);
+                          toast.success('Copied to clipboard');
+                        }}
+                        className="text-xs px-2 py-1 bg-gray-100 border border-gray-300 hover:bg-gray-200 rounded whitespace-nowrap"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {order.deliveryMethod === 'shipping' && (

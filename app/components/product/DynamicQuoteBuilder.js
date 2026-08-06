@@ -1144,7 +1144,11 @@ const handleDeliveryMethodChange = (method) => {
                       setWidthIn('');
                       setHeightIn('');
                     }
-                    handleSelectionChange(group.poolKey, opt.id);
+                    if (selected) {
+                      handleSelectionChange(group.poolKey, '');
+                    } else {
+                      handleSelectionChange(group.poolKey, opt.id);
+                    }
                   }}
                   className={`rounded-lg border px-4 py-3 text-left transition ${
                     selected
