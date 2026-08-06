@@ -246,8 +246,15 @@ export default function AdminOrderDetailPage() {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="bg-white shadow">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center flex-wrap gap-4">
-          <h1 className="text-2xl font-bold text-gray-900">Order {order.orderNumber}</h1>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="mb-4">
+            <Link href="/admin/orders" className="text-sm font-medium text-[#29b6f6] hover:text-[#1e8fc4] flex items-center gap-1 w-fit">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              Back to Orders
+            </Link>
+          </div>
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <h1 className="text-2xl font-bold text-gray-900">Order {order.orderNumber}</h1>
           <div className="flex items-center gap-3">
             <Link
               href={`/admin/orders/${order.id}/invoice`}
@@ -263,12 +270,6 @@ export default function AdminOrderDetailPage() {
             >
               {deletingOrder ? 'Deleting...' : 'Delete order'}
             </button>
-            <Link
-              href="/admin/orders"
-              className="text-[#29b6f6] hover:text-[#1e8fc4] font-medium"
-            >
-              ← Back to Orders
-            </Link>
           </div>
         </div>
       </div>
