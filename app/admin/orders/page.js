@@ -164,14 +164,13 @@ export default function AdminOrdersPage() {
             <table className="w-full min-w-[700px]">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Order #</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Items</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Total</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Payment</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Workflow</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Order Details</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Customer</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Items</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Total</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Payment</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Workflow</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -187,41 +186,41 @@ export default function AdminOrdersPage() {
                   .map((order) => (
                   <React.Fragment key={order.id}>
                     <tr className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                        <img
-                          src={
-                            order.items?.[0]?.product?.image ||
-                            order.items?.[0]?.image ||
-                            "/placeholder.png"
-                          }
-                          alt="Product"
-                          className="w-8 h-8 rounded object-cover border"
-                        />
-                        <span>#{order.orderNumber || order.id}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                      {formatDate(order.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={
+                              order.items?.[0]?.product?.image ||
+                              order.items?.[0]?.image ||
+                              "/placeholder.png"
+                            }
+                            alt="Product"
+                            className="w-10 h-10 rounded object-cover border"
+                          />
+                          <div className="flex flex-col">
+                            <span>#{order.orderNumber || order.id}</span>
+                            <span className="text-xs text-gray-500 font-normal">{formatDate(order.createdAt)}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
                       <div>{order.customerName || '—'}</div>
                       {order.customerEmail && (
                         <div className="text-xs text-gray-500">{order.customerEmail}</div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{order.itemCount}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                    <td className="px-4 py-3 text-sm text-gray-600">{order.itemCount}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
                       ${order.amountTotal.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       {order.status === 'paid' ? (
                         <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Paid</span>
                       ) : (
                         <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">Pending</span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex flex-col gap-1 items-start">
                         <div>{workflowBadge(order.workflowStatus || 'order_review')}</div>
                         {order.rush && (
@@ -231,7 +230,7 @@ export default function AdminOrdersPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex flex-col gap-1 items-start">
                         <Link
                           href={`/admin/orders/${order.id}`}
@@ -254,7 +253,7 @@ export default function AdminOrdersPage() {
                   </tr>
                   {expandedOrders[order.id] && order.artworkItemCount > 0 && (
                     <tr>
-                      <td colSpan={8} className="px-6 py-4 bg-white border-b shadow-inner">
+                      <td colSpan={7} className="px-4 py-3 bg-white border-b shadow-inner">
                         {orderDetails[order.id] ? (
                           <div className="space-y-4">
                             <h4 className="text-sm font-semibold text-gray-900 border-b pb-2">Order Artwork</h4>
