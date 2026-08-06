@@ -488,7 +488,7 @@ export default function CartPage() {
               </div>
 
               {/* Shipping Review Warning */}
-              {items.some((item) => item.options?.quoteSummary?.shippingDecision?.oversized || item.options?.quoteSummary?.shippingDecision?.status === 'review_required') && (
+              {items.some((item) => item.options?.quoteSummary?.shippingDecision?.isOversized || item.options?.quoteSummary?.shippingDecision?.status === 'REVIEW_REQUIRED' || item.options?.quoteSummary?.shippingDecision?.shippingReviewRequired) && (
                 <div className="mb-6 space-y-4">
                   <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
                     <span className="font-semibold">Shipping Review Required</span>
