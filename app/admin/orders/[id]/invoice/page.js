@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAdmin } from '@/app/hooks/useAdmin';
 import InvoiceTemplate from '@/app/components/order/InvoiceTemplate';
+import Link from 'next/link';
 
 export default function AdminOrderInvoicePage() {
   const router = useRouter();
@@ -52,5 +53,15 @@ export default function AdminOrderInvoicePage() {
     );
   }
 
-  return <InvoiceTemplate order={order} />;
+  return (
+    <div className="bg-gray-100 min-h-screen">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 print:hidden">
+        <Link href={`/admin/orders/${order.id}`} className="text-sm font-medium text-[#29b6f6] hover:text-[#1e8fc4] flex items-center gap-1 w-fit">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          Back to Order
+        </Link>
+      </div>
+      <InvoiceTemplate order={order} />
+    </div>
+  );
 }
