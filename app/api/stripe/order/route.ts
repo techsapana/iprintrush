@@ -35,21 +35,27 @@ export async function GET(req: NextRequest) {
       let customerId = null;
 
       try {
-        if (order.stripe_payment_intent_id) {
-          const pi = await stripe.paymentIntents.retrieve(order.stripe_payment_intent_id);
+        let fetchedPaymentIntentId = order.stripe_payment_intent_id;
+
+        if (fetchedPaymentIntentId) {
+          const pi = await stripe.paymentIntents.retrieve(fetchedPaymentIntentId);
           stripeStatus = pi.status;
           customerId = pi.customer;
         } else if (order.stripe_checkout_session_id) {
           const session = await stripe.checkout.sessions.retrieve(order.stripe_checkout_session_id);
           stripeStatus = session.payment_status === 'paid' ? 'succeeded' : session.status;
           customerId = session.customer;
+          
+          if (session.payment_intent && typeof session.payment_intent === 'string') {
+            fetchedPaymentIntentId = session.payment_intent;
+          }
         }
 
         if (stripeStatus === 'succeeded') {
           let methodString = 'Stripe Card';
           // Try to get payment details if we have payment_intent
-          if (order.stripe_payment_intent_id) {
-            const pi = await stripe.paymentIntents.retrieve(order.stripe_payment_intent_id, {
+          if (fetchedPaymentIntentId) {
+            const pi = await stripe.paymentIntents.retrieve(fetchedPaymentIntentId, {
               expand: ['latest_charge']
             });
             const charge = pi.latest_charge;

@@ -168,30 +168,48 @@ export async function POST(req: NextRequest) {
         const customerId = session?.customer || null;
 
         let methodString = 'Stripe Checkout';
-        if (session.payment_intent) {
-          // It's just a string ID here usually, we might not have full charge details
-          // but if we do, we can parse it.
+        if (session.payment_intent && typeof session.payment_intent === 'string') {
+          try {
+            const pi = await stripe.paymentIntents.retrieve(session.payment_intent, {
+              expand: ['latest_charge']
+            });
+            const charge = pi.latest_charge as any;
+            if (charge && charge.payment_method_details) {
+              const details = charge.payment_method_details;
+              if (details.type === 'card' && details.card) {
+                const brand = details.card.brand || '';
+                const brandName = brand.charAt(0).toUpperCase() + brand.slice(1);
+                methodString = `${brandName}(****${details.card.last4})`;
+              } else {
+                methodString = details.type;
+              }
+            }
+          } catch (e) {
+            console.error('Failed to retrieve PI for webhook:', e);
+          }
         }
 
         if (orderId) {
           await query(
             `UPDATE orders
              SET status = 'paid',
+                 payment_method = ?,
                  stripe_payment_intent_id = ?,
                  stripe_customer_id = ?,
                  paid_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
-            [paymentIntent, customerId, orderId]
+            [methodString, paymentIntent, customerId, orderId]
           );
         } else if (orderNumber) {
           await query(
             `UPDATE orders
              SET status = 'paid',
+                 payment_method = ?,
                  stripe_payment_intent_id = ?,
                  stripe_customer_id = ?,
                  paid_at = CURRENT_TIMESTAMP
              WHERE order_number = ?`,
-            [paymentIntent, customerId, orderNumber]
+            [methodString, paymentIntent, customerId, orderNumber]
           );
         }
         // Send order confirmation email
