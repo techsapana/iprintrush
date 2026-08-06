@@ -301,7 +301,7 @@ export default function CartPage() {
 
                   return (
                     <div
-                      key={idx}
+                      key={item.cartItemId || `${item.id}-${idx}`}
                       className={`flex gap-4 sm:gap-6 pb-6 border-b border-gray-200 last:pb-0 last:border-b-0 transition-opacity ${!isSelected ? 'opacity-50' : ''}`}
                     >
                       {/* Checkbox */}

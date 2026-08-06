@@ -341,10 +341,24 @@ export function CartProvider({ children }) {
           };
         });
 
-      setItems(prev => [
-        ...prev.filter(it => it.options?.splitGroupId !== splitGroupId),
-        ...newItems
-      ]);
+      setItems(prev => {
+        let firstIndex = -1;
+        const nextItems = [];
+        prev.forEach((it, idx) => {
+          if (it.options?.splitGroupId === splitGroupId) {
+            if (firstIndex === -1) firstIndex = idx;
+          } else {
+            nextItems.push(it);
+          }
+        });
+        
+        if (firstIndex === -1) {
+          return [...nextItems, ...newItems];
+        } else {
+          nextItems.splice(firstIndex, 0, ...newItems);
+          return nextItems;
+        }
+      });
     } catch (err) {
       console.error(err);
     }

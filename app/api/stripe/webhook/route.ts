@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
               if (details.type === 'card' && details.card) {
                 const brand = details.card.brand || '';
                 const brandName = brand.charAt(0).toUpperCase() + brand.slice(1);
-                methodString = `${brandName}(****${details.card.last4})`;
+                methodString = `${brandName} •••• ${details.card.last4}`;
               } else {
                 methodString = details.type;
               }
@@ -232,7 +232,7 @@ export async function POST(req: NextRequest) {
             if (details.type === 'card' && details.card) {
               const brand = details.card.brand || '';
               const brandName = brand.charAt(0).toUpperCase() + brand.slice(1);
-              methodString = `${brandName}(****${details.card.last4})`;
+              methodString = `${brandName} •••• ${details.card.last4}`;
             } else {
               methodString = details.type;
             }
