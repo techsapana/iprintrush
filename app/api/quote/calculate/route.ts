@@ -22,8 +22,6 @@ import type {
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
-    console.log('[Q] entry', payload?.mode, payload?.productId, 'sel=' + !!payload?.selections);
-    console.log('[DBG][POST] entry', { productId: payload?.productId, mode: payload?.mode });
 
     // Handle mailbox mode separately (no unification needed - different domain)
     if (payload.mode === 'mailbox') {
@@ -45,7 +43,6 @@ export async function POST(req: NextRequest) {
       return await handlePrintProductQuote(payload);
     }
 
-    console.error('[Q] early-return invalid-mode', payload?.mode, 'hasSel=' + !!payload?.selections);
     return NextResponse.json({ error: 'Invalid quote mode specified' }, { status: 400 });
   } catch (err: any) {
     console.error('[Q] catch', 'msg=' + err?.message, 'code=' + err?.code);
@@ -346,14 +343,12 @@ async function handleApparelQuote(payload: QuoteRequestPayload) {
 }
 
 async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
-  console.error('[DBG][HANDLE_PRINT] entry', { productId: payload?.productId, mode: payload?.mode, hasSelections: !!payload?.selections });
   const qtyBounds = await getProductQuantityBounds(String(payload.productId));
 
   const productWithCat = await queryOne(
     'SELECT p.id, p.price, p.min_width_in, p.max_width_in, p.min_height_in, p.max_height_in, p.price_per_sq_inch, c.customization_schema FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?',
     [payload.productId],
   );
-  console.error('[Q] db1 product', 'found=' + !!productWithCat, 'hasSchema=' + !!productWithCat?.customization_schema);
 
   let schema: any = { mode: 'print_product', groups: [] };
   if (productWithCat?.customization_schema) {
@@ -364,27 +359,17 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
     } catch {}
   }
 
-  const { getDynamicConfig } = await import('@/app/lib/dynamicQuoteConfig');
+    const { getDynamicConfig } = await import('@/app/lib/dynamicQuoteConfig');
     const { pools } = await getDynamicConfig(payload.productId, schema);
-    console.error('[DBG][BACKEND_ENTRY]', {
-      productId: payload.productId,
-      payloadSelectionsKeys: Object.keys(payload.selections || {}),
-      payloadSelectionsRaw: payload.selections,
-      width_in: (payload.selections as any)?.width_in,
-      height_in: (payload.selections as any)?.height_in,
-    });
-    console.error('[DBG][AFTER_GET_DYNAMIC_CONFIG]', { productId: payload?.productId, poolCount: pools?.length ?? 0, poolKeys: (pools as any[]).map(p => p?.key) });
-    console.error('[Q] dynamic-config', 'pools=' + (pools?.length ?? 0));
 
   // Normalize delivery method before shipping decisions and quote calculation.
   const normalizedDeliveryMethod = normalizeDeliveryMethod(payload.deliveryMethod);
 
   // Get config for apparel-style options
   const config = await getConfigWithCustomPrices(payload.productId);
-  console.error('[Q] config', 'qtyTiers=' + config?.quantityTiers?.length, 'base=' + config?.baseUnitPrice);
 
   const productEligibility = await queryOne(
-    'SELECT local_delivery_eligible FROM products WHERE id = ? LIMIT 1',
+    'SELECT local_delivery_eligible, weight_lb, package_width_in FROM products WHERE id = ? LIMIT 1',
     [payload.productId],
   );
 
@@ -398,7 +383,6 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
     ...payload,
     deliveryMethod: normalizedDeliveryMethod,
   }, pools);
-  console.error('[Q] normalized', 'totalQty=' + unifiedRequest?.quantityBreakdown?.reduce((s, q) => s + q.quantity, 0));
 
   // Validate quantity
   const totalQty = unifiedRequest.quantityBreakdown.reduce((sum, q) => sum + q.quantity, 0);
@@ -418,33 +402,8 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
       }
     : undefined;
 
-    console.error('[DBG][PRODUCT_DIMENSIONS]', {
-      productId: payload.productId,
-      productWithCat: {
-        price_per_sq_inch: productWithCat?.price_per_sq_inch,
-        min_width_in: productWithCat?.min_width_in,
-        max_width_in: productWithCat?.max_width_in,
-        min_height_in: productWithCat?.min_height_in,
-        max_height_in: productWithCat?.max_height_in,
-        allow_custom_dimensions: productWithCat?.allow_custom_dimensions,
-      },
-      dimensionPricing,
-    });
-
   // Use the unified engine - shipping is calculated from DB config
-    console.error('[Q] calc-in', payload?.productId);
-    console.error('[DBG][BEFORE_CALC]', {
-      productId: payload?.productId,
-      configBaseUnitPrice: config?.baseUnitPrice,
-      configQtyTierCount: config?.quantityTiers?.length ?? 0,
-      poolCount: pools?.length ?? 0,
-      poolKeys: (pools as any[]).map(p => p?.key),
-      qtyBreakdown: (unifiedRequest?.quantityBreakdown || []).map((q: any) => ({ key: q?.key, qty: q?.quantity })),
-      selectionKeys: Object.keys(unifiedRequest?.selections || {}),
-      dimensionPricing: dimensionPricing ? { pricePerSqInch: dimensionPricing.pricePerSqInch, hasMinWidth: dimensionPricing.minWidthIn != null } : null,
-    });
     const summary = calculateUnifiedQuote(config, pools, unifiedRequest, dimensionPricing, payload.shippingState, payload.shippingZip);
-  console.error('[Q] calc-out', 'subtotal=' + summary?.subtotal, 'gt=' + summary?.grandTotal);
 
   const shippingDecision = resolveShippingDecisionForQuote({
     productId: payload.productId,
@@ -456,7 +415,6 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
     shippingConfig: config.shipping,
     mode: 'print_product',
   });
-  console.error('[Q] shipping', 'status=' + shippingDecision?.status);
 
   if (zoneResult.available && normalizedDeliveryMethod === 'local_delivery') {
     const shippingAmount = summary.subtotal >= zoneResult.freeMinimum ? 0 : zoneResult.fee;
@@ -477,7 +435,5 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
   const valueBounds = await getProductOrderValueBounds(String(payload.productId));
   assertTotalValueWithinProductBounds(summary.subtotal, valueBounds);
 
-    console.error('[Q] return-200', payload?.productId);
-    console.error('[DBG][BEFORE_RETURN]', { productId: payload?.productId, subtotal: summary?.subtotal, grandTotal: summary?.grandTotal, shippingStatus: shippingDecision?.status });
     return NextResponse.json({ ...summary, shippingDecision });
 }
