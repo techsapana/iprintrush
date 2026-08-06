@@ -169,6 +169,7 @@ export default function AdminOrdersPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Customer</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Items</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Total</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Payment</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Workflow</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
                 </tr>
@@ -214,6 +215,13 @@ export default function AdminOrdersPage() {
                       ${order.amountTotal.toFixed(2)}
                     </td>
                     <td className="px-6 py-4">
+                      {order.status === 'paid' ? (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Paid</span>
+                      ) : (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">Pending</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="flex flex-col gap-1 items-start">
                         <div>{workflowBadge(order.workflowStatus || 'order_review')}</div>
                         {order.rush && (
@@ -246,7 +254,7 @@ export default function AdminOrdersPage() {
                   </tr>
                   {expandedOrders[order.id] && order.artworkItemCount > 0 && (
                     <tr>
-                      <td colSpan={7} className="px-6 py-4 bg-white border-b shadow-inner">
+                      <td colSpan={8} className="px-6 py-4 bg-white border-b shadow-inner">
                         {orderDetails[order.id] ? (
                           <div className="space-y-4">
                             <h4 className="text-sm font-semibold text-gray-900 border-b pb-2">Order Artwork</h4>
