@@ -716,11 +716,6 @@ export function Navbar() {
         .announcement-marquee-track {
           animation: announcement-marquee 28s linear infinite;
         }
-        @media (prefers-reduced-motion: reduce) {
-          .announcement-marquee-track {
-            animation: none;
-          }
-        }
       `}</style>
     </>
   );

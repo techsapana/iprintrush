@@ -11,6 +11,7 @@ export async function PUT(
     const label = String(body?.label || '').trim();
     const imageUrl = String(body?.imageUrl || '').trim();
     const displayOrder = Number.isFinite(Number(body?.displayOrder)) ? Number(body.displayOrder) : 0;
+    const categoryId = body?.categoryId ? Number(body.categoryId) : null;
 
     if (!label) {
       return NextResponse.json({ error: 'Label is required.' }, { status: 400 });
@@ -20,8 +21,8 @@ export async function PUT(
     }
 
     await query(
-      'UPDATE portfolio_images SET label = ?, image_url = ?, display_order = ? WHERE id = ?',
-      [label, imageUrl, displayOrder, id]
+      'UPDATE portfolio_images SET label = ?, image_url = ?, display_order = ?, category_id = ? WHERE id = ?',
+      [label, imageUrl, displayOrder, categoryId, id]
     );
     return NextResponse.json({ ok: true });
   } catch (error: any) {

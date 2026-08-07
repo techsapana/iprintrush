@@ -7,7 +7,10 @@
  * @returns {Object} { isEligible: boolean, deadline: Date, nextAvailableDate: Date, timeUntilDeadline: number }
  */
 export function calculateSameDayEligibility() {
-  const now = new Date();
+  // Get current time locked to EST (America/New_York)
+  const nowStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
+  const now = new Date(nowStr);
+  
   const year = now.getFullYear();
   const month = now.getMonth();
   const date = now.getDate();
