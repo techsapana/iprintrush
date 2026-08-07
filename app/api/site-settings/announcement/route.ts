@@ -43,6 +43,9 @@ async function ensureSiteSettingsColumns() {
     ['popup_message', 'TEXT NULL'],
     ['popup_image_url', 'TEXT NULL'],
     ['popup_color', 'VARCHAR(32) NULL'],
+    ['sameday_enabled', 'TINYINT(1) DEFAULT 1'],
+    ['sameday_deadline_time', 'VARCHAR(32) DEFAULT "14:00"'],
+    ['sameday_custom_message', 'TEXT NULL'],
   ];
   for (const [name, ddl] of columns) {
     const col: any = await queryOne(`SHOW COLUMNS FROM site_settings LIKE '${name}'`);
@@ -56,7 +59,7 @@ export async function GET() {
   try {
     await ensureSiteSettingsColumns();
     const row: any = await queryOne(
-      'SELECT announcement_text, announcement_enabled, announcement_discount_enabled, announcement_discount_type, announcement_discount_value, announcement_discount_condition, bar_discount_enabled, bar_discount_type, bar_discount_value, bar_discount_start_date, bar_discount_end_date, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color FROM site_settings ORDER BY id ASC LIMIT 1',
+      'SELECT announcement_text, announcement_enabled, announcement_discount_enabled, announcement_discount_type, announcement_discount_value, announcement_discount_condition, bar_discount_enabled, bar_discount_type, bar_discount_value, bar_discount_start_date, bar_discount_end_date, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color, sameday_enabled, sameday_deadline_time, sameday_custom_message FROM site_settings ORDER BY id ASC LIMIT 1',
     );
     let faqs = DEFAULT_CONTACT_FAQS;
     if (row?.contact_faqs_json) {
@@ -109,6 +112,9 @@ export async function GET() {
       popupMessage: row?.popup_message || '',
       popupImageUrl: row?.popup_image_url || '',
       popupColor: row?.popup_color || '#FFC520',
+      samedayEnabled: row?.sameday_enabled !== 0,
+      samedayDeadlineTime: row?.sameday_deadline_time || '14:00',
+      samedayCustomMessage: row?.sameday_custom_message || '',
     });
   } catch {
     return NextResponse.json({
@@ -141,6 +147,9 @@ export async function GET() {
       popupMessage: '',
       popupImageUrl: '',
       popupColor: '#FFC520',
+      samedayEnabled: true,
+      samedayDeadlineTime: '14:00',
+      samedayCustomMessage: '',
     });
   }
 }
@@ -195,10 +204,13 @@ export async function PUT(req: NextRequest) {
     const popupMessage = String(body.popupMessage || '').trim();
     const popupImageUrl = String(body.popupImageUrl || '').trim();
     const popupColor = String(body.popupColor || '#FFC520').trim();
+    const samedayEnabled = body.samedayEnabled !== false;
+    const samedayDeadlineTime = String(body.samedayDeadlineTime || '14:00').trim();
+    const samedayCustomMessage = String(body.samedayCustomMessage || '').trim();
 
     await query(
-      `INSERT INTO site_settings (id, announcement_text, announcement_enabled, announcement_discount_enabled, announcement_discount_type, announcement_discount_value, announcement_discount_condition, bar_discount_enabled, bar_discount_type, bar_discount_value, bar_discount_start_date, bar_discount_end_date, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO site_settings (id, announcement_text, announcement_enabled, announcement_discount_enabled, announcement_discount_type, announcement_discount_value, announcement_discount_condition, bar_discount_enabled, bar_discount_type, bar_discount_value, bar_discount_start_date, bar_discount_end_date, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color, sameday_enabled, sameday_deadline_time, sameday_custom_message)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          announcement_text = VALUES(announcement_text),
          announcement_enabled = VALUES(announcement_enabled),
@@ -231,7 +243,10 @@ export async function PUT(req: NextRequest) {
          popup_title = VALUES(popup_title),
          popup_message = VALUES(popup_message),
          popup_image_url = VALUES(popup_image_url),
-         popup_color = VALUES(popup_color)`,
+         popup_color = VALUES(popup_color),
+         sameday_enabled = VALUES(sameday_enabled),
+         sameday_deadline_time = VALUES(sameday_deadline_time),
+         sameday_custom_message = VALUES(sameday_custom_message)`,
       [
         announcementText,
         announcementEnabled ? 1 : 0,
@@ -265,6 +280,9 @@ export async function PUT(req: NextRequest) {
         popupMessage || null,
         popupImageUrl || null,
         popupColor || null,
+        samedayEnabled ? 1 : 0,
+        samedayDeadlineTime || '14:00',
+        samedayCustomMessage || null,
       ],
     );
 

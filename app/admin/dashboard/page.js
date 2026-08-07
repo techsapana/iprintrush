@@ -46,6 +46,9 @@ export default function AdminDashboardPage() {
   const [popupMessage, setPopupMessage] = useState('');
   const [popupImageUrl, setPopupImageUrl] = useState('');
   const [popupColor, setPopupColor] = useState('#FFC520');
+  const [samedayEnabled, setSamedayEnabled] = useState(true);
+  const [samedayDeadlineTime, setSamedayDeadlineTime] = useState('14:00');
+  const [samedayCustomMessage, setSamedayCustomMessage] = useState('');
 
 useEffect(() => {
      if (!adminLoading && !adminUser) {
@@ -105,6 +108,9 @@ useEffect(() => {
         setPopupMessage(data.popupMessage || '');
         setPopupImageUrl(data.popupImageUrl || '');
         setPopupColor(data.popupColor || '#FFC520');
+        setSamedayEnabled(data.samedayEnabled !== false);
+        setSamedayDeadlineTime(data.samedayDeadlineTime || '14:00');
+        setSamedayCustomMessage(data.samedayCustomMessage || '');
       } catch {
       }
     };
@@ -169,6 +175,9 @@ useEffect(() => {
           popupMessage,
           popupImageUrl,
           popupColor,
+          samedayEnabled,
+          samedayDeadlineTime,
+          samedayCustomMessage,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -304,6 +313,49 @@ useEffect(() => {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="border border-gray-300 rounded-lg p-4 bg-blue-50 mt-4">
+              <h3 className="text-md font-semibold text-gray-900 mb-2">Same-Day Printing Settings</h3>
+              <p className="text-xs text-gray-500 mb-4">
+                Control the same-day printing availability, cutoff time (EST), and the message displayed when the deadline has passed.
+              </p>
+              
+              <label className="flex items-center gap-2 mb-4">
+                <input
+                  type="checkbox"
+                  checked={samedayEnabled}
+                  onChange={(e) => setSamedayEnabled(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm font-medium text-gray-700">Enable Same-Day Printing Feature</span>
+              </label>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="max-w-xs">
+                  <label className="block text-xs text-gray-700 mb-1">Cutoff Time (EST)</label>
+                  <input
+                    type="time"
+                    value={samedayDeadlineTime}
+                    onChange={(e) => setSamedayDeadlineTime(e.target.value)}
+                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Default is 14:00 (2:00 PM).</p>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-700 mb-1">Deadline Passed Custom Message</label>
+                  <textarea
+                    value={samedayCustomMessage}
+                    onChange={(e) => setSamedayCustomMessage(e.target.value)}
+                    rows={2}
+                    placeholder="Orders after [TIME] are available for [NEXT_DAY]. Order now for next business day completion."
+                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Leave blank for default. Use <strong>[TIME]</strong> to inject the cutoff time (e.g. 2:00 PM) and <strong>[NEXT_DAY]</strong> to inject the calculated next business day (e.g. Sat, Aug 8).
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="max-w-xs">

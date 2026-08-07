@@ -14,7 +14,7 @@ export function SameDayNotice({ variant = 'default' }) {
     setMounted(true);
   }, []);
 
-  if (!mounted || eligibility.loading || !eligibility.timeRemaining) {
+  if (!mounted || eligibility.loading || !eligibility.timeRemaining || !eligibility.samedayEnabled) {
     return null;
   }
 
@@ -30,7 +30,7 @@ export function SameDayNotice({ variant = 'default' }) {
               SAME-DAY COMPLETION AVAILABLE!
             </h3>
             <p className="text-gray-700 font-medium text-sm md:text-base">
-              Order before <strong className="text-[#0288d1] text-lg">2:00 PM</strong> to get it printed today.
+              Order before <strong className="text-[#0288d1] text-lg">{eligibility.deadlineString}</strong> to get it printed today.
             </p>
           </div>
           
@@ -50,6 +50,26 @@ export function SameDayNotice({ variant = 'default' }) {
   }
 
   const nextDay = formatDate(eligibility.nextAvailableDate);
+  let messageContent = (
+    <>
+      Orders placed after {eligibility.deadlineString} are available for <strong className="text-orange-600">{nextDay}</strong>. Order now for next business day completion.
+    </>
+  );
+
+  if (eligibility.samedayCustomMessage) {
+    const rawMsg = eligibility.samedayCustomMessage;
+    const parts = rawMsg.split(/(\[TIME\]|\[NEXT_DAY\])/g);
+    messageContent = (
+      <>
+        {parts.map((part, i) => {
+          if (part === '[TIME]') return <strong key={i} className="text-gray-900">{eligibility.deadlineString}</strong>;
+          if (part === '[NEXT_DAY]') return <strong key={i} className="text-orange-600">{nextDay}</strong>;
+          return <span key={i}>{part}</span>;
+        })}
+      </>
+    );
+  }
+
   return (
     <div className="bg-gradient-to-r from-amber-400 to-orange-500 p-[3px] rounded-xl shadow-lg my-6">
       <div className="bg-white rounded-lg p-5 flex items-start gap-4">
@@ -61,7 +81,7 @@ export function SameDayNotice({ variant = 'default' }) {
         <div>
           <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-1">Same-Day Deadline Passed</h3>
           <p className="text-gray-700 font-medium text-sm md:text-base">
-            Orders placed after 2:00 PM are available for <strong className="text-orange-600">{nextDay}</strong>. Order now for next business day completion.
+            {messageContent}
           </p>
         </div>
       </div>

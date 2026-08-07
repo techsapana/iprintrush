@@ -3,10 +3,10 @@
 
 /**
  * Calculate if an order is eligible for same-day printing
- * Same-day cutoff is 2:00 PM (14:00)
+ * @param {string} deadlineTimeString - HH:mm format (24 hour)
  * @returns {Object} { isEligible: boolean, deadline: Date, nextAvailableDate: Date, timeUntilDeadline: number }
  */
-export function calculateSameDayEligibility() {
+export function calculateSameDayEligibility(deadlineTimeString = '14:00') {
   // Get current time locked to EST (America/New_York)
   const nowStr = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
   const now = new Date(nowStr);
@@ -15,8 +15,9 @@ export function calculateSameDayEligibility() {
   const month = now.getMonth();
   const date = now.getDate();
   
-  // Create today's deadline at 2:00 PM
-  const sameDayDeadline = new Date(year, month, date, 14, 0, 0, 0);
+  const [deadlineHour, deadlineMinute] = deadlineTimeString.split(':').map(Number);
+  // Create today's deadline
+  const sameDayDeadline = new Date(year, month, date, deadlineHour || 14, deadlineMinute || 0, 0, 0);
   
   // Check if we're before the deadline
   const isEligible = now < sameDayDeadline;
@@ -34,12 +35,16 @@ export function calculateSameDayEligibility() {
   // Time until deadline in milliseconds
   const timeUntilDeadline = sameDayDeadline - now;
   
+  // Create display string (e.g., 2:00 PM)
+  const deadlineDateForFormat = new Date(sameDayDeadline);
+  const deadlineString = deadlineDateForFormat.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
   return {
     isEligible,
     deadline: sameDayDeadline,
     nextAvailableDate,
     timeUntilDeadline,
-    deadlineString: '2:00 PM',
+    deadlineString,
     currentTime: now
   };
 }
