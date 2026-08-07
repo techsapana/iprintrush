@@ -412,16 +412,16 @@ export default function CartPage() {
                         </div>
 
                         {/* Price */}
-                        <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-row sm:flex-col justify-between items-center sm:items-end w-full sm:w-auto border-t sm:border-0 border-gray-100 pt-4 sm:pt-0">
+                        <div className="text-left sm:text-right mt-4 sm:mt-0 flex flex-row sm:flex-col justify-between items-start sm:items-end w-full sm:w-auto border-t sm:border-0 border-gray-100 pt-4 sm:pt-0">
                           {(() => {
                             const lineTotal = computeLineTotal(item);
                             return (
-                              <p className="text-xl font-bold text-[#29b6f6]">
+                              <p className="text-xl font-bold text-[#29b6f6] mt-1 sm:mt-0">
                                 ${(lineTotal || 0).toFixed(2)}
                               </p>
                             );
                           })()}
-                          <section className="flex sm:flex-col items-center sm:items-end gap-4 sm:gap-2 mt-0 sm:mt-4">
+                          <section className="flex flex-col items-end gap-3 sm:gap-2 mt-0 sm:mt-4">
                             {item.options?.quotePayload ? (
                               <EditDropdown item={item} onSelect={handleEditItem} />
                             ) : null}
