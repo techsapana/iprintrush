@@ -318,7 +318,7 @@ useEffect(() => {
             <div className="border border-gray-300 rounded-lg p-4 bg-blue-50 mt-4">
               <h3 className="text-md font-semibold text-gray-900 mb-2">Same-Day Printing Settings</h3>
               <p className="text-xs text-gray-500 mb-4">
-                Control the same-day printing availability, cutoff time (EST), and the message displayed when the deadline has passed.
+                Control the same-day printing availability, cutoff time (PST), and the message displayed when the deadline has passed.
               </p>
               
               <label className="flex items-center gap-2 mb-4">
@@ -333,7 +333,7 @@ useEffect(() => {
 
               <div className="grid grid-cols-1 gap-4">
                 <div className="max-w-xs">
-                  <label className="block text-xs text-gray-700 mb-1">Cutoff Time (EST)</label>
+                  <label className="block text-xs text-gray-700 mb-1">Cutoff Time (PST)</label>
                   <input
                     type="time"
                     value={samedayDeadlineTime}
