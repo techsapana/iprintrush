@@ -604,6 +604,7 @@ const invalidateQuote = () => {
   };
 
   const handleColorChange = (id) => {
+    if (productSettings?.colorOutOfStock?.[id]) return;
     invalidateQuote();
     setColorId(id);
     if (onColorSelect) {
@@ -1005,25 +1006,47 @@ const handleDeliveryMethodChange = (method) => {
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Step 3 – Select Color</h3>
-        <div className="flex flex-wrap gap-4">
-          {options.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => handleColorChange(opt.id)}
-              className={`flex flex-col items-center gap-2 ${
-                colorId === opt.id ? 'text-gray-900' : 'text-gray-600'
-              }`}
-            >
-              <span
-                className={`w-10 h-10 rounded-full border-2 ${
-                  colorId === opt.id ? 'border-[#29b6f6]' : 'border-gray-300'
-                }`}
-                style={{ backgroundColor: opt.hex || '#f3f4f6' }}
-              />
-              <span className="text-sm font-medium">{opt.name}</span>
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-3">
+          {options.map((opt) => {
+            const isOos = productSettings?.colorOutOfStock?.[opt.id];
+            const isSelected = colorId === opt.id;
+            return (
+              <div key={opt.id} className="relative group">
+                <button
+                  type="button"
+                  onClick={() => handleColorChange(opt.id)}
+                  disabled={isOos}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-full border transition-all duration-200 ${
+                    isOos 
+                      ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed' 
+                      : isSelected 
+                        ? 'border-[#29b6f6] bg-[#29b6f6]/10 ring-2 ring-[#29b6f6]/20' 
+                        : 'border-gray-300 bg-white hover:border-[#29b6f6]/50 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="relative">
+                    <span
+                      className={`block w-6 h-6 rounded-full border ${isSelected ? 'border-[#29b6f6]' : 'border-gray-300'}`}
+                      style={{ backgroundColor: opt.hex || '#f3f4f6' }}
+                    />
+                    {isOos && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-full h-[2px] bg-red-500 rotate-45 transform origin-center rounded"></div>
+                      </div>
+                    )}
+                  </div>
+                  <span className={`text-sm font-medium ${isOos ? 'text-gray-400 line-through' : isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
+                    {opt.name}
+                  </span>
+                </button>
+                {isOos && (
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                    Out of Stock
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );

@@ -137,6 +137,7 @@ const [formData, setFormData] = useState({
   const [useCustomQuantityTiers, setUseCustomQuantityTiers] = useState(true);
   const [selectedColors, setSelectedColors] = useState([]);
   const [colorImages, setColorImages] = useState({});
+  const [colorOutOfStock, setColorOutOfStock] = useState({});
   
   // Options with custom prices: { id: string, customPrice: number | null, pricingType?: string, percentageValue?: number | null }
   const [selectedDecorations, setSelectedDecorations] = useState([]);
@@ -458,6 +459,7 @@ setCustomizationMode('print_product');
           setUseCustomQuantityTiers(true);
           setSelectedColors(ps.colorOptionIds || []);
           setColorImages(ps.colorImages || {});
+          setColorOutOfStock(ps.colorOutOfStock || {});
           setSelectedDecorations(
             (ps.decorationOptionIds || []).map((id) => ({
               id,
@@ -1081,6 +1083,7 @@ const productData = {
               useCustomQuantityTiers: true,
               colorOptionIds: selectedColors,
               colorImages: colorImages,
+              colorOutOfStock: colorOutOfStock,
               decorationOptionIds: selectedDecorations.map((d) => d.id),
               sizeOptionIds: selectedSizes.map((s) => s.id),
               printLocationOptionIds: selectedPrintLocations.map((p) => p.id),
@@ -2515,6 +2518,22 @@ multi-month discounts.
                             }))}
                           />
                         ))}
+                      </div>
+                      
+                      <div className="mt-2 px-1 flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`oos-${color.id}`}
+                          checked={colorOutOfStock[color.id] || false}
+                          onChange={(e) => setColorOutOfStock(prev => ({
+                            ...prev,
+                            [color.id]: e.target.checked
+                          }))}
+                          className="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500 cursor-pointer"
+                        />
+                        <label htmlFor={`oos-${color.id}`} className="text-sm font-medium text-gray-700 cursor-pointer hover:text-red-600 transition-colors">
+                          Mark Out of Stock
+                        </label>
                       </div>
                     </div>
                   )}

@@ -237,7 +237,7 @@ export async function GET(
         [actualProductId]
       ),
       query(
-        'SELECT color_option_id as id, image_url FROM product_color_options WHERE product_id = ?',
+        'SELECT color_option_id as id, image_url, out_of_stock FROM product_color_options WHERE product_id = ?',
         [actualProductId]
       ),
       query(
@@ -302,6 +302,7 @@ export async function GET(
           .map((d) => d.id),
         colorOptionIds: config.colors.filter((c) => c.enabled).map((c) => c.id),
         colorImages: {},
+        colorOutOfStock: {},
         sizeOptionIds: config.sizes.filter((s) => s.baseEnabled).map((s) => s.id),
         printLocationOptionIds: config.printLocations
           .filter((p) => p.enabled)
@@ -343,6 +344,9 @@ export async function GET(
         colorOptionIds: (colorIds as any[]).map((r: any) => r.id),
         colorImages: Object.fromEntries(
           colorIds.map((c: any) => [c.id, c.image_url || null])
+        ),
+        colorOutOfStock: Object.fromEntries(
+          colorIds.map((c: any) => [c.id, Boolean(c.out_of_stock)])
         ),
         sizeOptionIds: (sizeOptions as any[]).map((r: any) => r.id),
         printLocationOptionIds: (printLocationOptions as any[]).map((r: any) => r.id),
@@ -482,17 +486,18 @@ if (body.colorOptionIds) {
        await query('DELETE FROM product_color_options WHERE product_id = ?', [
          actualProductId,
        ]);
-       if (body.colorOptionIds.length > 0) {
-         const values = body.colorOptionIds.map((id: string) => [
-           actualProductId,
-           id,
-           body.colorImages?.[id] || null,
-         ]);
-         await query(
-           'INSERT INTO product_color_options (product_id, color_option_id, image_url) VALUES ?',
-           [values]
-         );
-       }
+        if (body.colorOptionIds.length > 0) {
+          const values = body.colorOptionIds.map((id: string) => [
+            actualProductId,
+            id,
+            body.colorImages?.[id] || null,
+            Boolean(body.colorOutOfStock?.[id]) ? 1 : 0,
+          ]);
+          await query(
+            'INSERT INTO product_color_options (product_id, color_option_id, image_url, out_of_stock) VALUES ?',
+            [values]
+          );
+        }
      }
 
 // Update size options with custom prices
