@@ -610,6 +610,18 @@ const invalidateQuote = () => {
     if (onColorSelect) {
       onColorSelect(productSettings?.colorImages?.[id] || null);
     }
+    
+    // Check if the currently selected turnaround is still valid for the new color
+    if (turnaroundId) {
+      const custom = productSettings?.customTurnaroundPricing?.[turnaroundId];
+      if (custom?.allowedColors && custom.allowedColors.length > 0) {
+        if (!custom.allowedColors.includes(id)) {
+          setTurnaroundId('');
+          window.alert('The previously selected turnaround time is not available for this color, so it has been cleared.');
+        }
+      }
+    }
+    
     scheduleRecalculation();
   };
 
