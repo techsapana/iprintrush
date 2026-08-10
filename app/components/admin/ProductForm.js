@@ -386,7 +386,7 @@ setCustomizationMode('print_product');
             json.config.printLocations.filter((p) => p.enabled).map((p) => ({ id: p.id, customPrice: null }))
           );
           setSelectedTurnarounds(
-            json.config.turnarounds.filter((t) => t.enabled).map((t) => ({ id: t.id, customPrice: null, pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null }))
+            json.config.turnarounds.filter((t) => t.enabled).map((t) => ({ id: t.id, customPrice: null, pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null, minQuantity: t.minQuantity ?? null, maxQuantity: t.maxQuantity ?? null }))
           );
           setSelectedDesignerHelp(
             json.config.designerHelp.filter((d) => d.enabled).map((d) => ({ id: d.id, customPrice: null }))
@@ -425,6 +425,8 @@ setCustomizationMode('print_product');
               customPrice: o.priceModifier && o.priceModifier !== 0 ? o.priceModifier : null,
               pricingType: o.pricingType || 'flat',
               percentageValue: o.percentageValue ?? null,
+              minQuantity: o.minQuantity ?? null,
+              maxQuantity: o.maxQuantity ?? null,
             }));
             if (pool.selectionType === 'quantity') {
               quantityTiersByPool[pool.id] = (pool.quantityTiers || []).map(mapQuantityTierFromApi);
@@ -482,6 +484,8 @@ setCustomizationMode('print_product');
                 customPrice: ps.customPrices?.turnarounds?.[id] ?? null,
                 pricingType: custom?.pricingType || 'flat',
                 percentageValue: custom?.percentageValue ?? null,
+                minQuantity: custom?.minQuantity ?? null,
+                maxQuantity: custom?.maxQuantity ?? null,
               };
             })
           );
@@ -1039,7 +1043,7 @@ const productData = {
       const customTurnaroundPricing = Object.fromEntries(
         (selectedTurnarounds || [])
           .filter((t) => t.pricingType)
-          .map((t) => [t.id, { pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null }])
+          .map((t) => [t.id, { pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null, minQuantity: t.minQuantity ?? null, maxQuantity: t.maxQuantity ?? null }])
       );
 
       // Save quote settings
@@ -2296,6 +2300,50 @@ multi-month discounts.
                                     />
                                   </div>
                                 )}
+                                {pool.key === 'production_time' && (
+                                  <div className="grid grid-cols-2 gap-2 mt-2">
+                                    <div>
+                                      <label className="block text-xs text-gray-600 mb-1">Min Qty</label>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={sel?.minQuantity ?? ''}
+                                        disabled={disabledPoolIds.includes(pool.id)}
+                                        onChange={(e) => {
+                                          const val = e.target.value === '' ? null : parseInt(e.target.value);
+                                          setPoolSelections((prev) => ({
+                                            ...prev,
+                                            [pool.id]: (prev[pool.id] || []).map((item) =>
+                                              item.id === opt.id ? { ...item, minQuantity: val } : item
+                                            ),
+                                          }));
+                                        }}
+                                        placeholder="Min"
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-600 mb-1">Max Qty</label>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={sel?.maxQuantity ?? ''}
+                                        disabled={disabledPoolIds.includes(pool.id)}
+                                        onChange={(e) => {
+                                          const val = e.target.value === '' ? null : parseInt(e.target.value);
+                                          setPoolSelections((prev) => ({
+                                            ...prev,
+                                            [pool.id]: (prev[pool.id] || []).map((item) =>
+                                              item.id === opt.id ? { ...item, maxQuantity: val } : item
+                                            ),
+                                          }));
+                                        }}
+                                        placeholder="Max"
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -2600,10 +2648,48 @@ multi-month discounts.
                             className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
                           />
                           <p className="mt-1 text-xs text-gray-500">
-                            Applied on discounted subtotal (after quantity discount)
+                            Calculated as a percentage of the base unit price.
                           </p>
                         </div>
                       )}
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Min Qty</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={selected.minQuantity ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseInt(e.target.value);
+                              setSelectedTurnarounds((prev) =>
+                                prev.map((item) =>
+                                  item.id === turn.id ? { ...item, minQuantity: val } : item
+                                )
+                              );
+                            }}
+                            placeholder="Min"
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Max Qty</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={selected.maxQuantity ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseInt(e.target.value);
+                              setSelectedTurnarounds((prev) =>
+                                prev.map((item) =>
+                                  item.id === turn.id ? { ...item, maxQuantity: val } : item
+                                )
+                              );
+                            }}
+                            placeholder="Max"
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

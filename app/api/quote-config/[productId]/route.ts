@@ -249,7 +249,7 @@ export async function GET(
         [actualProductId]
       ),
  query(
-         'SELECT turnaround_option_id as id, custom_price, pricing_type, percentage_value FROM product_turnaround_options WHERE product_id = ?',
+         'SELECT turnaround_option_id as id, custom_price, pricing_type, percentage_value, min_qty, max_qty FROM product_turnaround_options WHERE product_id = ?',
          [actualProductId]
        ),
       query(
@@ -286,6 +286,8 @@ export async function GET(
        turnaroundOptions.map((t: any) => [t.id, {
          pricingType: t.pricing_type || 'flat',
          percentageValue: t.percentage_value != null ? parseFloat(t.percentage_value) : null,
+         minQuantity: t.min_qty != null ? parseInt(t.min_qty) : null,
+         maxQuantity: t.max_qty != null ? parseInt(t.max_qty) : null,
        }])
      );
 
@@ -546,10 +548,12 @@ if (body.colorOptionIds) {
               customPrice,
               turnaroundPricing.pricingType ?? 'flat',
               turnaroundPricing.percentageValue ?? null,
+              turnaroundPricing.minQuantity ?? null,
+              turnaroundPricing.maxQuantity ?? null,
             ];
           });
           await query(
-            'INSERT INTO product_turnaround_options (product_id, turnaround_option_id, custom_price, pricing_type, percentage_value) VALUES ?',
+            'INSERT INTO product_turnaround_options (product_id, turnaround_option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty) VALUES ?',
             [values]
           );
         }
@@ -602,7 +606,7 @@ if (body.colorOptionIds) {
      // Update product pool options (for print_product categories)
      if (body.poolOptions !== undefined) {
        await query('DELETE FROM product_pool_options WHERE product_id = ?', [actualProductId]);
-       const poolOptions = body.poolOptions as Record<string, Array<{ id: string; customPrice?: number | null; pricingType?: string; percentageValue?: number | null }>>;
+       const poolOptions = body.poolOptions as Record<string, Array<{ id: string; customPrice?: number | null; pricingType?: string; percentageValue?: number | null; minQuantity?: number | null; maxQuantity?: number | null }>>;
        if (poolOptions && typeof poolOptions === 'object') {
          for (const [poolId, opts] of Object.entries(poolOptions)) {
            if (!Array.isArray(opts) || opts.length === 0) continue;
@@ -613,11 +617,13 @@ if (body.colorOptionIds) {
              const pricingType = typeof opt === 'object' && opt?.pricingType ? opt.pricingType : 'flat';
              const percentageValue =
                typeof opt === 'object' && opt?.percentageValue != null ? opt.percentageValue : null;
-             return [actualProductId, poolId, optionId, customPrice, pricingType, percentageValue, 1, idx];
+             const minQuantity = typeof opt === 'object' && opt?.minQuantity != null ? opt.minQuantity : null;
+             const maxQuantity = typeof opt === 'object' && opt?.maxQuantity != null ? opt.maxQuantity : null;
+             return [actualProductId, poolId, optionId, customPrice, pricingType, percentageValue, minQuantity, maxQuantity, 1, idx];
            });
            if (values.length > 0) {
              await query(
-               'INSERT INTO product_pool_options (product_id, pool_id, option_id, custom_price, pricing_type, percentage_value, enabled, display_order) VALUES ?',
+               'INSERT INTO product_pool_options (product_id, pool_id, option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty, enabled, display_order) VALUES ?',
                [values]
              );
            }

@@ -46,7 +46,7 @@ export async function getDynamicConfig(
         [pool.id]
       ),
       query(
-        'SELECT option_id, custom_price, pricing_type, percentage_value FROM product_pool_options WHERE product_id = ? AND pool_id = ? AND enabled = TRUE',
+        'SELECT option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty FROM product_pool_options WHERE product_id = ? AND pool_id = ? AND enabled = TRUE',
         [productId, pool.id]
       ),
       query(
@@ -76,6 +76,16 @@ export async function getDynamicConfig(
         .filter((o: any) => o.percentage_value != null)
         .map((o: any) => [o.option_id, parseFloat(o.percentage_value)])
     );
+    const overrideMinQty = Object.fromEntries(
+      overrideRows
+        .filter((o: any) => o.min_qty != null)
+        .map((o: any) => [o.option_id, parseInt(o.min_qty)])
+    );
+    const overrideMaxQty = Object.fromEntries(
+      overrideRows
+        .filter((o: any) => o.max_qty != null)
+        .map((o: any) => [o.option_id, parseInt(o.max_qty)])
+    );
 
     // If product-specific rows exist for this pool, treat them as the allowed options list.
     // Otherwise, expose all enabled pool options (default behavior for new products).
@@ -91,6 +101,8 @@ export async function getDynamicConfig(
           priceModifier: overrideMap[o.id] ?? parseFloat(o.price_modifier || 0),
           pricingType: hasOverride ? (overridePricingType[o.id] || o.pricing_type || 'flat') : (o.pricing_type || 'flat'),
           percentageValue: hasOverride ? (overridePercentageValue[o.id] ?? o.percentage_value ?? null) : (o.percentage_value ?? null),
+          minQuantity: hasOverride ? (overrideMinQty[o.id] ?? null) : null,
+          maxQuantity: hasOverride ? (overrideMaxQty[o.id] ?? null) : null,
           enabled: true,
         };
       });

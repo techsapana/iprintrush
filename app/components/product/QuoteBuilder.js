@@ -764,6 +764,15 @@ const handleDeliveryMethodChange = (method) => {
     if (quantityMin != null && totalQuantity < quantityMin) return `Total quantity must be at least ${quantityMin}.`;
     if (quantityMax != null && totalQuantity > quantityMax) return `Total quantity may not exceed ${quantityMax}.`;
     if (!turnaroundId) return 'Please select a Turnaround Time.';
+    const selectedTurnaroundCustom = productSettings?.customTurnaroundPricing?.[turnaroundId];
+    if (selectedTurnaroundCustom) {
+      if (selectedTurnaroundCustom.minQuantity != null && totalQuantity < selectedTurnaroundCustom.minQuantity) {
+        return `Selected Turnaround Time requires a minimum quantity of ${selectedTurnaroundCustom.minQuantity}.`;
+      }
+      if (selectedTurnaroundCustom.maxQuantity != null && totalQuantity > selectedTurnaroundCustom.maxQuantity) {
+        return `Selected Turnaround Time allows a maximum quantity of ${selectedTurnaroundCustom.maxQuantity}.`;
+      }
+    }
     if (!designerHelpId) return 'Please select a Designer Help option.';
     if (!deliveryMethod) return 'Please select a Delivery Method.';
     if (!artworkReadyChoice) return 'Please select an Artwork option.';
@@ -1089,9 +1098,15 @@ const handleDeliveryMethodChange = (method) => {
   };
 
   const renderTurnaroundStep = () => {
-    const options = config.turnarounds.filter((t) =>
-      (productSettings.turnaroundOptionIds || []).includes(t.id),
-    );
+    const options = config.turnarounds.filter((t) => {
+      if (!(productSettings.turnaroundOptionIds || []).includes(t.id)) return false;
+      const custom = productSettings.customTurnaroundPricing?.[t.id];
+      if (custom) {
+        if (custom.minQuantity != null && totalQuantity < custom.minQuantity) return false;
+        if (custom.maxQuantity != null && totalQuantity > custom.maxQuantity) return false;
+      }
+      return true;
+    });
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">

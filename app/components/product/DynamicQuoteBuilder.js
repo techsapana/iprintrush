@@ -324,6 +324,20 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
 
   const poolMap = useMemo(() => new Map(pools.map((p) => [p.key, p])), [pools]);
 
+  const currentTotalQty = useMemo(() => {
+    if (!schema?.groups || !poolMap.size || !selections) return 0;
+    const quantityPools = schema.groups.filter((g) => {
+      const pool = poolMap.get(g.poolKey);
+      return pool && normalizeSelectionType(pool.selectionType) === 'quantity';
+    });
+    let qty = 0;
+    for (const group of quantityPools) {
+      const val = Number(selections[group.poolKey]);
+      if (!isNaN(val) && val > 0) qty += val;
+    }
+    return qty;
+  }, [schema, poolMap, selections]);
+
   const stepTitles = useMemo(() => {
     if (!schema?.groups) return [];
     
@@ -651,6 +665,27 @@ const handleDeliveryMethodChange = (method) => {
     if (productMax != null && totalQty > productMax) {
       setCalcError(`Quantity may not exceed ${productMax}.`);
       return;
+    }
+
+    for (const group of activeGroups) {
+      const pool = poolMap.get(group.poolKey);
+      if (!pool || normalizeSelectionType(pool.selectionType) === 'quantity') continue;
+      const val = selections[group.poolKey];
+      if (!val || (Array.isArray(val) && val.length === 0)) continue;
+      const selectedIds = Array.isArray(val) ? val : [val];
+      for (const optId of selectedIds) {
+        const opt = pool.options?.find((o) => o.id === optId);
+        if (opt) {
+          if (opt.minQuantity != null && totalQty < opt.minQuantity) {
+            setCalcError(`The option "${opt.label}" requires a minimum quantity of ${opt.minQuantity}.`);
+            return;
+          }
+          if (opt.maxQuantity != null && totalQty > opt.maxQuantity) {
+            setCalcError(`The option "${opt.label}" allows a maximum quantity of ${opt.maxQuantity}.`);
+            return;
+          }
+        }
+      }
     }
 
     const printSizePoolKey = getPrintSizePoolKey();
@@ -1102,7 +1137,15 @@ const handleDeliveryMethodChange = (method) => {
           </p>
         )}
         
-        {useDropdown ? (
+        {(() => {
+          const visibleOptions = pool.options?.filter((opt) => {
+            if (currentTotalQty === 0) return true;
+            if (opt.minQuantity != null && currentTotalQty < opt.minQuantity) return false;
+            if (opt.maxQuantity != null && currentTotalQty > opt.maxQuantity) return false;
+            return true;
+          });
+
+          return useDropdown ? (
           <Select
             value={value || ''}
             onValueChange={(selectedValue) => {
@@ -1117,7 +1160,7 @@ const handleDeliveryMethodChange = (method) => {
               <SelectValue placeholder={`Choose ${pool.name || group.label || 'an option'}`} />
             </SelectTrigger>
             <SelectContent>
-              {pool.options?.map((opt) => (
+              {visibleOptions?.map((opt) => (
                 <SelectItem key={opt.id} value={opt.id} className="cursor-pointer">
                   <div className="flex flex-col">
                     <span className="font-semibold text-gray-900">{opt.label}</span>
@@ -1135,7 +1178,7 @@ const handleDeliveryMethodChange = (method) => {
           </Select>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {pool.options?.map((opt) => {
+            {visibleOptions?.map((opt) => {
               const selected = value === opt.id;
               return (
                 <button
@@ -1170,7 +1213,8 @@ const handleDeliveryMethodChange = (method) => {
               );
             })}
           </div>
-        )}
+        );
+        })()}
       </div>
     );
   };
@@ -1184,7 +1228,14 @@ const handleDeliveryMethodChange = (method) => {
         <p className="text-sm text-gray-600">{pool.description || 'Select one or more options.'}</p>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {pool.options?.map((opt) => {
+          {(() => {
+            const visibleOptions = pool.options?.filter((opt) => {
+              if (currentTotalQty === 0) return true;
+              if (opt.minQuantity != null && currentTotalQty < opt.minQuantity) return false;
+              if (opt.maxQuantity != null && currentTotalQty > opt.maxQuantity) return false;
+              return true;
+            });
+            return visibleOptions?.map((opt) => {
             const selected = selectedValues.includes(opt.id);
             return (
               <button
@@ -1212,7 +1263,8 @@ const handleDeliveryMethodChange = (method) => {
                 ) : null}
               </button>
             );
-          })}
+          });
+          })()}
         </div>
       </div>
     );
