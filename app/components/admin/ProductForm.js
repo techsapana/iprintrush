@@ -2713,7 +2713,7 @@ multi-month discounts.
                       
                       <div className="mt-4">
                         <label className="block text-xs font-medium text-gray-700 mb-2">
-                          Allowed Colors (Leave all unchecked to allow all colors)
+                          Limit to Specific Colors (If none are selected, all colors are allowed)
                         </label>
                         {quoteConfig.colors.filter((c) => selectedColors.includes(c.id)).length > 0 ? (
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
