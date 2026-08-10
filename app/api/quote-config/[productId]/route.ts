@@ -248,10 +248,10 @@ export async function GET(
         'SELECT print_location_option_id as id, custom_price FROM product_print_location_options WHERE product_id = ?',
         [actualProductId]
       ),
- query(
-         'SELECT turnaround_option_id as id, custom_price, pricing_type, percentage_value, min_qty, max_qty FROM product_turnaround_options WHERE product_id = ?',
-         [actualProductId]
-       ),
+      query(
+        'SELECT turnaround_option_id as id, custom_price, pricing_type, percentage_value, min_qty, max_qty, allowed_colors_json FROM product_turnaround_options WHERE product_id = ?',
+        [actualProductId]
+      ),
       query(
         'SELECT designer_help_option_id as id, custom_price FROM product_designer_help_options WHERE product_id = ?',
         [actualProductId]
@@ -283,12 +283,26 @@ export async function GET(
 
      // Build custom turnaround pricing info
      const customTurnaroundPricing = Object.fromEntries(
-       turnaroundOptions.map((t: any) => [t.id, {
-         pricingType: t.pricing_type || 'flat',
-         percentageValue: t.percentage_value != null ? parseFloat(t.percentage_value) : null,
-         minQuantity: t.min_qty != null ? parseInt(t.min_qty) : null,
-         maxQuantity: t.max_qty != null ? parseInt(t.max_qty) : null,
-       }])
+       turnaroundOptions
+         .filter((r: any) => r.pricing_type != null || r.min_qty != null || r.max_qty != null || r.allowed_colors_json != null)
+         .map((r: any) => {
+           let allowedColors = [];
+           try {
+             allowedColors = r.allowed_colors_json 
+               ? (typeof r.allowed_colors_json === 'string' ? JSON.parse(r.allowed_colors_json) : r.allowed_colors_json) 
+               : [];
+           } catch (e) {}
+           return [
+             r.id,
+             {
+               pricingType: r.pricing_type || 'flat',
+               percentageValue: r.percentage_value != null ? parseFloat(r.percentage_value) : null,
+               minQuantity: r.min_qty != null ? parseInt(r.min_qty) : null,
+               maxQuantity: r.max_qty != null ? parseInt(r.max_qty) : null,
+               allowedColors: allowedColors,
+             },
+           ];
+         })
      );
 
     // If no settings exist, create default with all enabled options
@@ -356,7 +370,7 @@ export async function GET(
           .filter((t) => t.enabled)
           .map((t) => t.id.toString()),
         customPrices,
-customQuantityTiers: (customQuantityTiers as any[]).map((t: any) => ({
+        customQuantityTiers: (customQuantityTiers as any[]).map((t: any) => ({
             id: t.id.toString(),
             minQty: t.min_qty,
             maxQty: t.max_qty,
@@ -547,6 +561,10 @@ if (body.colorOptionIds) {
           const values = body.turnaroundOptionIds.map((id: string) => {
             const customPrice = customPrices.turnarounds?.[id] ?? null;
             const turnaroundPricing = body.customTurnaroundPricing?.[id] || {};
+            const allowedColors = Array.isArray(turnaroundPricing.allowedColors) && turnaroundPricing.allowedColors.length > 0 
+              ? JSON.stringify(turnaroundPricing.allowedColors) 
+              : null;
+            
             return [
               actualProductId,
               id,
@@ -555,10 +573,11 @@ if (body.colorOptionIds) {
               turnaroundPricing.percentageValue ?? null,
               turnaroundPricing.minQuantity ?? null,
               turnaroundPricing.maxQuantity ?? null,
+              allowedColors,
             ];
           });
           await query(
-            'INSERT INTO product_turnaround_options (product_id, turnaround_option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty) VALUES ?',
+            'INSERT INTO product_turnaround_options (product_id, turnaround_option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty, allowed_colors_json) VALUES ?',
             [values]
           );
         }
@@ -576,10 +595,10 @@ if (body.colorOptionIds) {
            id,
            customPrices.designerHelp?.[id] ?? null,
          ]);
-         await query(
-           'INSERT INTO product_designer_help_options (product_id, designer_help_option_id, custom_price) VALUES ?',
-           [values]
-         );
+          await query(
+            'INSERT INTO product_designer_help_options (product_id, designer_help_option_id, custom_price) VALUES ?',
+            [values]
+          );
        }
      }
 

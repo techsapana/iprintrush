@@ -1146,6 +1146,12 @@ const handleDeliveryMethodChange = (method) => {
                 disableReason = `(Max: ${custom.maxQuantity})`;
               }
             }
+            if (!isDisabled && custom?.allowedColors && custom.allowedColors.length > 0) {
+              if (!custom.allowedColors.includes(colorId)) {
+                isDisabled = true;
+                disableReason = '(Not available for selected color)';
+              }
+            }
 
             return (
               <button

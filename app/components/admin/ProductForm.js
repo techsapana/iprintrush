@@ -488,6 +488,7 @@ setCustomizationMode('print_product');
                 percentageValue: custom?.percentageValue ?? null,
                 minQuantity: custom?.minQuantity ?? null,
                 maxQuantity: custom?.maxQuantity ?? null,
+                allowedColors: custom?.allowedColors || [],
               };
             })
           );
@@ -1045,7 +1046,7 @@ const productData = {
       const customTurnaroundPricing = Object.fromEntries(
         (selectedTurnarounds || [])
           .filter((t) => t.pricingType)
-          .map((t) => [t.id, { pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null, minQuantity: t.minQuantity ?? null, maxQuantity: t.maxQuantity ?? null }])
+          .map((t) => [t.id, { pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null, minQuantity: t.minQuantity ?? null, maxQuantity: t.maxQuantity ?? null, allowedColors: t.allowedColors || [] }])
       );
 
       // Save quote settings
@@ -2708,6 +2709,46 @@ multi-month discounts.
                             className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
                           />
                         </div>
+                      </div>
+                      
+                      <div className="mt-4">
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
+                          Allowed Colors (Leave all unchecked to allow all colors)
+                        </label>
+                        {quoteConfig.colors.filter((c) => selectedColors.includes(c.id)).length > 0 ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {quoteConfig.colors
+                              .filter((c) => selectedColors.includes(c.id))
+                              .map((color) => {
+                                const isAllowed = (selected.allowedColors || []).includes(color.id);
+                                return (
+                                  <label key={color.id} className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={isAllowed}
+                                      onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setSelectedTurnarounds((prev) =>
+                                          prev.map((item) => {
+                                            if (item.id !== turn.id) return item;
+                                            const currentColors = item.allowedColors || [];
+                                            const newColors = checked 
+                                              ? [...currentColors, color.id]
+                                              : currentColors.filter(cId => cId !== color.id);
+                                            return { ...item, allowedColors: newColors };
+                                          })
+                                        );
+                                      }}
+                                      className="rounded border-gray-300 text-[#29b6f6] focus:ring-[#29b6f6]"
+                                    />
+                                    <span className="text-xs text-gray-600 truncate">{color.name}</span>
+                                  </label>
+                                );
+                              })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500 italic">No colors selected for this product yet.</p>
+                        )}
                       </div>
                     </div>
                   )}
