@@ -1098,15 +1098,9 @@ const handleDeliveryMethodChange = (method) => {
   };
 
   const renderTurnaroundStep = () => {
-    const options = config.turnarounds.filter((t) => {
-      if (!(productSettings.turnaroundOptionIds || []).includes(t.id)) return false;
-      const custom = productSettings.customTurnaroundPricing?.[t.id];
-      if (custom) {
-        if (custom.minQuantity != null && totalQuantity < custom.minQuantity) return false;
-        if (custom.maxQuantity != null && totalQuantity > custom.maxQuantity) return false;
-      }
-      return true;
-    });
+    const options = config.turnarounds.filter((t) =>
+      (productSettings.turnaroundOptionIds || []).includes(t.id)
+    );
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">
@@ -1116,18 +1110,37 @@ const handleDeliveryMethodChange = (method) => {
           {options.map((opt) => {
             const active = turnaroundId === opt.id;
             const effectivePrice = getEffectivePrice('turnarounds', opt.id, opt.priceModifier);
+            const custom = productSettings.customTurnaroundPricing?.[opt.id];
+            let isDisabled = false;
+            let disableReason = '';
+            if (custom && totalQuantity > 0) {
+              if (custom.minQuantity != null && totalQuantity < custom.minQuantity) {
+                isDisabled = true;
+                disableReason = `(Min: ${custom.minQuantity})`;
+              }
+              if (custom.maxQuantity != null && totalQuantity > custom.maxQuantity) {
+                isDisabled = true;
+                disableReason = `(Max: ${custom.maxQuantity})`;
+              }
+            }
+
             return (
               <button
                 key={opt.id}
                 type="button"
+                disabled={isDisabled}
                 onClick={() => handleTurnaroundChange(opt.id)}
                 className={`rounded-xl border px-4 py-3 text-left transition ${
+                  isDisabled ? 'opacity-50 cursor-not-allowed bg-gray-50' :
                   active
                     ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
                     : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
                 }`}
               >
-                <div className="font-semibold text-gray-900">{opt.name}</div>
+                <div className="font-semibold text-gray-900">
+                  {opt.name}
+                  {isDisabled && <span className="text-red-500 text-xs ml-1 block">{disableReason}</span>}
+                </div>
                 {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
                   <div className="text-sm text-gray-600">+{opt.percentageValue}%</div>
                 ) : typeof effectivePrice === 'number' && effectivePrice !== 0 ? (

@@ -1138,12 +1138,7 @@ const handleDeliveryMethodChange = (method) => {
         )}
         
         {(() => {
-          const visibleOptions = pool.options?.filter((opt) => {
-            if (currentTotalQty === 0) return true;
-            if (opt.minQuantity != null && currentTotalQty < opt.minQuantity) return false;
-            if (opt.maxQuantity != null && currentTotalQty > opt.maxQuantity) return false;
-            return true;
-          });
+          const visibleOptions = pool.options || [];
 
           return useDropdown ? (
           <Select
@@ -1160,10 +1155,25 @@ const handleDeliveryMethodChange = (method) => {
               <SelectValue placeholder={`Choose ${pool.name || group.label || 'an option'}`} />
             </SelectTrigger>
             <SelectContent>
-              {visibleOptions?.map((opt) => (
-                <SelectItem key={opt.id} value={String(opt.id)} className="cursor-pointer">
+              {visibleOptions?.map((opt) => {
+                let isDisabled = false;
+                let disableReason = '';
+                if (currentTotalQty > 0) {
+                  if (opt.minQuantity != null && currentTotalQty < opt.minQuantity) {
+                    isDisabled = true;
+                    disableReason = `(Min: ${opt.minQuantity})`;
+                  }
+                  if (opt.maxQuantity != null && currentTotalQty > opt.maxQuantity) {
+                    isDisabled = true;
+                    disableReason = `(Max: ${opt.maxQuantity})`;
+                  }
+                }
+                return (
+                <SelectItem key={opt.id} value={String(opt.id)} disabled={isDisabled} className={`cursor-pointer ${isDisabled ? 'opacity-50' : ''}`}>
                   <div className="flex flex-col">
-                    <span className="font-semibold text-gray-900">{opt.label}</span>
+                    <span className="font-semibold text-gray-900">
+                      {opt.label} {isDisabled && <span className="text-red-500 text-xs ml-1">{disableReason}</span>}
+                    </span>
                     {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
                       <span className="text-sm text-gray-600">+{opt.percentageValue}%</span>
                     ) : opt.priceModifier !== 0 ? (
@@ -1173,17 +1183,30 @@ const handleDeliveryMethodChange = (method) => {
                     ) : null}
                   </div>
                 </SelectItem>
-              ))}
+              )})}
             </SelectContent>
           </Select>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {visibleOptions?.map((opt) => {
               const selected = value === opt.id;
+              let isDisabled = false;
+              let disableReason = '';
+              if (currentTotalQty > 0) {
+                if (opt.minQuantity != null && currentTotalQty < opt.minQuantity) {
+                  isDisabled = true;
+                  disableReason = `(Min: ${opt.minQuantity})`;
+                }
+                if (opt.maxQuantity != null && currentTotalQty > opt.maxQuantity) {
+                  isDisabled = true;
+                  disableReason = `(Max: ${opt.maxQuantity})`;
+                }
+              }
               return (
                 <button
                   key={opt.id}
                   type="button"
+                  disabled={isDisabled}
                   onClick={() => {
                     if (isPrintSizePool) {
                       setWidthIn('');
@@ -1196,12 +1219,16 @@ const handleDeliveryMethodChange = (method) => {
                     }
                   }}
                   className={`rounded-lg border px-4 py-3 text-left transition ${
+                    isDisabled ? 'opacity-50 cursor-not-allowed bg-gray-50' :
                     selected
                       ? 'border-[#29b6f6] bg-[#29b6f6]/5'
                       : 'border-gray-200 hover:border-[#29b6f6]/60'
                   }`}
                 >
-                  <div className="font-semibold text-gray-900">{opt.label}</div>
+                  <div className="font-semibold text-gray-900">
+                    {opt.label}
+                    {isDisabled && <span className="text-red-500 text-xs ml-1 block">{disableReason}</span>}
+                  </div>
                   {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
                     <div className="text-sm text-gray-600">+{opt.percentageValue}%</div>
                   ) : opt.priceModifier !== 0 ? (
@@ -1229,18 +1256,26 @@ const handleDeliveryMethodChange = (method) => {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {(() => {
-            const visibleOptions = pool.options?.filter((opt) => {
-              if (currentTotalQty === 0) return true;
-              if (opt.minQuantity != null && currentTotalQty < opt.minQuantity) return false;
-              if (opt.maxQuantity != null && currentTotalQty > opt.maxQuantity) return false;
-              return true;
-            });
+            const visibleOptions = pool.options || [];
             return visibleOptions?.map((opt) => {
             const selected = selectedValues.includes(opt.id);
+            let isDisabled = false;
+            let disableReason = '';
+            if (currentTotalQty > 0) {
+              if (opt.minQuantity != null && currentTotalQty < opt.minQuantity) {
+                isDisabled = true;
+                disableReason = `(Min: ${opt.minQuantity})`;
+              }
+              if (opt.maxQuantity != null && currentTotalQty > opt.maxQuantity) {
+                isDisabled = true;
+                disableReason = `(Max: ${opt.maxQuantity})`;
+              }
+            }
             return (
               <button
                 key={opt.id}
                 type="button"
+                disabled={isDisabled}
                 onClick={() => {
                   const newValues = selected
                     ? selectedValues.filter(v => v !== opt.id)
@@ -1248,12 +1283,16 @@ const handleDeliveryMethodChange = (method) => {
                   handleSelectionChange(group.poolKey, newValues);
                 }}
                 className={`rounded-lg border px-4 py-3 text-left transition ${
+                  isDisabled ? 'opacity-50 cursor-not-allowed bg-gray-50' :
                   selected
                     ? 'border-[#29b6f6] bg-[#29b6f6]/5'
                     : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
                 }`}
               >
-                <div className="font-semibold text-gray-900">{opt.label}</div>
+                <div className="font-semibold text-gray-900">
+                  {opt.label}
+                  {isDisabled && <span className="text-red-500 text-xs ml-1 block">{disableReason}</span>}
+                </div>
                 {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
                   <div className="text-sm text-gray-600">+{opt.percentageValue}%</div>
                 ) : opt.priceModifier !== 0 ? (
