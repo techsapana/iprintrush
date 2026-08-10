@@ -1147,7 +1147,7 @@ const handleDeliveryMethodChange = (method) => {
 
           return useDropdown ? (
           <Select
-            value={value || ''}
+            value={value != null && value !== '' ? String(value) : ''}
             onValueChange={(selectedValue) => {
               if (isPrintSizePool) {
                 setWidthIn('');
@@ -1161,7 +1161,7 @@ const handleDeliveryMethodChange = (method) => {
             </SelectTrigger>
             <SelectContent>
               {visibleOptions?.map((opt) => (
-                <SelectItem key={opt.id} value={opt.id} className="cursor-pointer">
+                <SelectItem key={opt.id} value={String(opt.id)} className="cursor-pointer">
                   <div className="flex flex-col">
                     <span className="font-semibold text-gray-900">{opt.label}</span>
                     {opt.pricingType === 'percentage' && opt.percentageValue != null && opt.percentageValue !== 0 ? (
