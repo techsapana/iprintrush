@@ -150,6 +150,7 @@ export default function PortfolioPage() {
                     </div>
                     <div className="p-4 flex justify-between items-center bg-white">
                       <h2 className="text-sm font-semibold text-gray-900">{item.label}</h2>
+                      <span className="text-xs font-mono font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">ID: {item.id}</span>
                     </div>
                   </div>
                 );

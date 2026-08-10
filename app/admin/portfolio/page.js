@@ -266,7 +266,10 @@ export default function AdminPortfolioPage() {
                 <div className="space-y-4">
                   {items.map((item) => (
                     <div key={item.id} className="border rounded-lg p-4 grid grid-cols-1 lg:grid-cols-6 gap-3 items-center">
-                      <img src={item.imageUrl} alt={item.label} className="h-20 w-full object-cover rounded border" />
+                      <div className="relative">
+                        <img src={item.imageUrl} alt={item.label} className="h-20 w-full object-cover rounded border" />
+                        <span className="absolute top-1 left-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm backdrop-blur-sm font-mono">ID: {item.id}</span>
+                      </div>
                       <input
                         type="text"
                         value={item.label}
