@@ -1688,12 +1688,7 @@ multi-month discounts.
                 />
               </div>
 
-              {(
-                formData.category === 'Signs & Banners' ||
-                formData.category === 'Marketing Materials' ||
-                formData.category === 'DTF & UV DTF' ||
-                formData.category === 'Labels & Stickers'
-              ) && (
+              {categories.find(c => c.name === formData.category || c.id === formData.category)?.supportsAreaBasedPricing && (
               <div className="md:col-span-2 border-t border-gray-200 pt-4 mt-2">
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">
                   Area-Based Pricing (Custom Sizing)

@@ -13,14 +13,15 @@ export function CategoryForm({ initialCategory = null }) {
   const [formData, setFormData] = useState({
     name: initialCategory?.name || '',
     slug: initialCategory?.slug || '',
-    description: initialCategory?.description || ''
+    description: initialCategory?.description || '',
+    supportsAreaBasedPricing: initialCategory?.supportsAreaBasedPricing || false
   });
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
 
@@ -102,6 +103,26 @@ export function CategoryForm({ initialCategory = null }) {
               rows="4"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
             />
+          </div>
+
+          <div className="pt-4 border-t border-gray-200">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                name="supportsAreaBasedPricing"
+                checked={formData.supportsAreaBasedPricing}
+                onChange={handleChange}
+                className="w-5 h-5 rounded border-gray-300 text-[#29b6f6] focus:ring-[#29b6f6]"
+              />
+              <div>
+                <span className="block text-sm font-medium text-gray-900">
+                  Enable Area-Based Pricing (Custom Sizing)
+                </span>
+                <span className="block text-xs text-gray-500">
+                  Allows products in this category to use custom width/height dimensions.
+                </span>
+              </div>
+            </label>
           </div>
         </div>
       </div>

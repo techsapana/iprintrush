@@ -33,6 +33,7 @@ export async function GET(
         slug: category.slug,
         description: category.description,
         customizationSchema,
+        supportsAreaBasedPricing: !!(category as any).supports_area_based_pricing,
       },
     });
   } catch (error: any) {
@@ -82,6 +83,10 @@ export async function PUT(
           ? null
           : JSON.stringify(body.customizationSchema)
       );
+    }
+    if (body.supportsAreaBasedPricing !== undefined) {
+      updates.push('supports_area_based_pricing = ?');
+      values.push(body.supportsAreaBasedPricing ? 1 : 0);
     }
 
     if (updates.length > 0) {

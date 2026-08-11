@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
           c.nav_position != null && Number.isFinite(Number(c.nav_position))
             ? Number(c.nav_position)
             : Number(c.display_order ?? 0),
+        supportsAreaBasedPricing: !!c.supports_area_based_pricing,
       };
     });
 
@@ -58,21 +59,22 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name, slug, description, displayOrder = 0 } = body;
+    const { id, name, slug, description, displayOrder = 0, supportsAreaBasedPricing = false } = body;
 
     const categoryId = id || `category-${Date.now()}`;
     const categorySlug = slug || name.toLowerCase().replace(/\s+/g, '-');
 
     await query(
-      `INSERT INTO categories (id, name, slug, description, display_order, enabled)
-       VALUES (?, ?, ?, ?, ?, TRUE)
+      `INSERT INTO categories (id, name, slug, description, display_order, supports_area_based_pricing, enabled)
+       VALUES (?, ?, ?, ?, ?, ?, TRUE)
        ON DUPLICATE KEY UPDATE
          name = VALUES(name),
          slug = VALUES(slug),
          description = VALUES(description),
          display_order = VALUES(display_order),
+         supports_area_based_pricing = VALUES(supports_area_based_pricing),
          updated_at = CURRENT_TIMESTAMP`,
-      [categoryId, name, categorySlug, description || '', displayOrder]
+      [categoryId, name, categorySlug, description || '', displayOrder, supportsAreaBasedPricing]
     );
 
     if (await hasDbTable('navbar_category_order')) {
