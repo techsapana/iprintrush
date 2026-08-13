@@ -879,8 +879,19 @@ const handleDeliveryMethodChange = (method) => {
               Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
             }
           : {};
+
+        const artworkNotes = uploadedArtworkDetails
+          .filter(f => f.note?.trim())
+          .map(f => `${f.name}: ${f.note.trim()}`)
+          .join('; ');
+        
+        if (artworkNotes && customizationsDisplay) {
+          customizationsDisplay['Artwork Details'] = artworkNotes;
+        }
+
         onQuoteReady({ 
           mode: 'apparel', 
+
           payload: {
             ...payload,
             customizationsDisplay: {
@@ -1757,19 +1768,32 @@ const renderDeliveryStep = () => {
                 <div className="space-y-2 mt-3">
                   <div className="text-sm font-medium text-gray-700">Uploaded Files:</div>
                   {uploadedArtworkDetails.map((fileInfo) => (
-                    <div key={fileInfo.id} className="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-sm text-emerald-700">
-                      <span className="truncate max-w-[80%]">{fileInfo.name}</span>
-                      <button
-                        onClick={() => {
-                          setTempArtworkFiles(prev => prev.filter(id => id !== fileInfo.id));
-                          setUploadedArtworkDetails(prev => prev.filter(f => f.id !== fileInfo.id));
-                          setTotalArtworkSize(prev => Math.max(0, prev - fileInfo.size));
+                    <div key={fileInfo.id} className="flex flex-col gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                      <div className="flex items-center justify-between text-sm text-emerald-700">
+                        <span className="truncate max-w-[80%]">{fileInfo.name}</span>
+                        <button
+                          onClick={() => {
+                            setTempArtworkFiles(prev => prev.filter(id => id !== fileInfo.id));
+                            setUploadedArtworkDetails(prev => prev.filter(f => f.id !== fileInfo.id));
+                            setTotalArtworkSize(prev => Math.max(0, prev - fileInfo.size));
+                          }}
+                          className="text-emerald-600 hover:text-emerald-800 font-bold ml-2 px-2 py-0.5 rounded hover:bg-emerald-200 transition-colors"
+                          title="Remove file"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Where should this be printed? (e.g., Front, Back, Sleeve)"
+                        className="w-full text-sm border-gray-300 rounded focus:ring-emerald-500 focus:border-emerald-500 text-gray-900 px-2 py-1 placeholder-gray-400"
+                        value={fileInfo.note || ''}
+                        onChange={(e) => {
+                          const newNote = e.target.value;
+                          setUploadedArtworkDetails(prev => prev.map(f => f.id === fileInfo.id ? { ...f, note: newNote } : f));
+                          scheduleRecalculation();
                         }}
-                        className="text-emerald-600 hover:text-emerald-800 font-bold ml-2 px-2 py-0.5 rounded hover:bg-emerald-200 transition-colors"
-                        title="Remove file"
-                      >
-                        ✕
-                      </button>
+                      />
                     </div>
                   ))}
                 </div>
