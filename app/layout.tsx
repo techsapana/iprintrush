@@ -13,6 +13,14 @@ export const metadata: Metadata = {
   generator: 'v0.app',
 }
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "iPrintRush",
+  "url": "https://iprintrush.com",
+  "logo": "https://iprintrush.com/logo.png",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -20,6 +28,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body className="font-sans antialiased">
         <RootLayoutClient>{children}</RootLayoutClient>
       </body>
