@@ -96,7 +96,7 @@ export default function ContactPage() {
                   <h3 className="font-semibold text-lg text-gray-900 mb-2">Phone</h3>
                   <p className="text-gray-700 text-lg">{contactPhone}</p>
                   <p className="text-gray-600">{openingDay} - Friday, {openingTime} - {closingTime}</p>
-                  <p className="text-gray-600 mt-1">Saturday: 10:00 AM - 4:00 PM</p>
+                  <p className="text-gray-600 mt-1">Saturday: 10:00 AM - 2:00 PM</p>
                 </div>
 
                 {/* Email */}

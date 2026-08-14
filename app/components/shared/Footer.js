@@ -105,7 +105,7 @@ export function Footer() {
               <li>Phone: <span className="text-white">{contactPhone}</span></li>
               <li>
                 Store Hours: {openingDay}-Friday {openingTime} - {closingTime}
-                <div className="mt-1">Saturday: 10:00 AM - 4:00 PM</div>
+                <div className="mt-1">Saturday: 10:00 AM - 2:00 PM</div>
               </li>
               <li>Online orders available 24/7</li>
             </ul>
