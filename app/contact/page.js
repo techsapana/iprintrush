@@ -20,6 +20,8 @@ export default function ContactPage() {
   const [closingDay, setClosingDay] = useState('Saturday');
   const [openingTime, setOpeningTime] = useState('8:00 AM');
   const [closingTime, setClosingTime] = useState('6:00 PM');
+  const [weekendOpeningTime, setWeekendOpeningTime] = useState('');
+  const [weekendClosingTime, setWeekendClosingTime] = useState('');
   const [contactPhone, setContactPhone] = useState('1-800-PRINT-24');
   const [contactEmail, setContactEmail] = useState('info@iprintrush.com');
   const [contactFaqs, setContactFaqs] = useState([]);
@@ -43,6 +45,8 @@ export default function ContactPage() {
         if (data.closingDay) setClosingDay(String(data.closingDay));
         if (data.openingTime) setOpeningTime(String(data.openingTime));
         if (data.closingTime) setClosingTime(String(data.closingTime));
+        if (data.weekendOpeningTime) setWeekendOpeningTime(String(data.weekendOpeningTime));
+        if (data.weekendClosingTime) setWeekendClosingTime(String(data.weekendClosingTime));
         if (data.contactPhone) setContactPhone(String(data.contactPhone));
         if (data.contactEmail) setContactEmail(String(data.contactEmail));
         if (Array.isArray(data.contactFaqs)) setContactFaqs(data.contactFaqs);
@@ -91,7 +95,8 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-semibold text-lg text-gray-900 mb-2">Phone</h3>
                   <p className="text-gray-700 text-lg">{contactPhone}</p>
-                  <p className="text-gray-600">{openingDay} - {closingDay}, {openingTime} - {closingTime}</p>
+                  <p className="text-gray-600">{openingDay} - Friday, {openingTime} - {closingTime}</p>
+                  <p className="text-gray-600 mt-1">Saturday: 10:00 AM - 4:00 PM</p>
                 </div>
 
                 {/* Email */}

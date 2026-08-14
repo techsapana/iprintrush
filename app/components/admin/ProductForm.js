@@ -387,7 +387,7 @@ setCustomizationMode('print_product');
             json.config.printLocations.filter((p) => p.enabled).map((p) => ({ id: p.id, customPrice: null }))
           );
           setSelectedTurnarounds(
-            json.config.turnarounds.filter((t) => t.enabled).map((t) => ({ id: t.id, customPrice: null, pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null, minQuantity: t.minQuantity ?? null, maxQuantity: t.maxQuantity ?? null }))
+            json.config.turnarounds.filter((t) => t.enabled).map((t) => ({ id: t.id, customPrice: null, pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null, minQuantity: t.minQuantity ?? null, maxQuantity: t.maxQuantity ?? null, minWidthIn: t.minWidthIn ?? null, maxWidthIn: t.maxWidthIn ?? null, minHeightIn: t.minHeightIn ?? null, maxHeightIn: t.maxHeightIn ?? null }))
           );
           setSelectedDesignerHelp(
             json.config.designerHelp.filter((d) => d.enabled).map((d) => ({ id: d.id, customPrice: null }))
@@ -428,6 +428,10 @@ setCustomizationMode('print_product');
               percentageValue: o.percentageValue ?? null,
               minQuantity: o.minQuantity ?? null,
               maxQuantity: o.maxQuantity ?? null,
+              minWidthIn: o.minWidthIn ?? null,
+              maxWidthIn: o.maxWidthIn ?? null,
+              minHeightIn: o.minHeightIn ?? null,
+              maxHeightIn: o.maxHeightIn ?? null,
             }));
             if (pool.selectionType === 'quantity') {
               quantityTiersByPool[pool.id] = (pool.quantityTiers || []).map(mapQuantityTierFromApi);
@@ -488,6 +492,10 @@ setCustomizationMode('print_product');
                 percentageValue: custom?.percentageValue ?? null,
                 minQuantity: custom?.minQuantity ?? null,
                 maxQuantity: custom?.maxQuantity ?? null,
+                minWidthIn: custom?.minWidthIn ?? null,
+                maxWidthIn: custom?.maxWidthIn ?? null,
+                minHeightIn: custom?.minHeightIn ?? null,
+                maxHeightIn: custom?.maxHeightIn ?? null,
                 allowedColors: custom?.allowedColors || [],
               };
             })
@@ -1046,7 +1054,7 @@ const productData = {
       const customTurnaroundPricing = Object.fromEntries(
         (selectedTurnarounds || [])
           .filter((t) => t.pricingType)
-          .map((t) => [t.id, { pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null, minQuantity: t.minQuantity ?? null, maxQuantity: t.maxQuantity ?? null, allowedColors: t.allowedColors || [] }])
+          .map((t) => [t.id, { pricingType: t.pricingType || 'flat', percentageValue: t.percentageValue ?? null, minQuantity: t.minQuantity ?? null, maxQuantity: t.maxQuantity ?? null, minWidthIn: t.minWidthIn ?? null, maxWidthIn: t.maxWidthIn ?? null, minHeightIn: t.minHeightIn ?? null, maxHeightIn: t.maxHeightIn ?? null, allowedColors: t.allowedColors || [] }])
       );
 
       // Save quote settings
@@ -2343,6 +2351,94 @@ multi-month discounts.
                                     </div>
                                   </div>
                                 )}
+                                {pool.key === 'production_time' && formData.allow_custom_dimensions === true && (
+                                  <div className="grid grid-cols-2 gap-2 mt-2">
+                                    <div>
+                                      <label className="block text-xs text-gray-600 mb-1">Min Width (in)</label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={sel?.minWidthIn ?? ''}
+                                        disabled={disabledPoolIds.includes(pool.id)}
+                                        onChange={(e) => {
+                                          const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                                          setPoolSelections((prev) => ({
+                                            ...prev,
+                                            [pool.id]: (prev[pool.id] || []).map((item) =>
+                                              item.id === opt.id ? { ...item, minWidthIn: val } : item
+                                            ),
+                                          }));
+                                        }}
+                                        placeholder="Min W"
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-600 mb-1">Max Width (in)</label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={sel?.maxWidthIn ?? ''}
+                                        disabled={disabledPoolIds.includes(pool.id)}
+                                        onChange={(e) => {
+                                          const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                                          setPoolSelections((prev) => ({
+                                            ...prev,
+                                            [pool.id]: (prev[pool.id] || []).map((item) =>
+                                              item.id === opt.id ? { ...item, maxWidthIn: val } : item
+                                            ),
+                                          }));
+                                        }}
+                                        placeholder="Max W"
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-600 mb-1">Min Height (in)</label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={sel?.minHeightIn ?? ''}
+                                        disabled={disabledPoolIds.includes(pool.id)}
+                                        onChange={(e) => {
+                                          const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                                          setPoolSelections((prev) => ({
+                                            ...prev,
+                                            [pool.id]: (prev[pool.id] || []).map((item) =>
+                                              item.id === opt.id ? { ...item, minHeightIn: val } : item
+                                            ),
+                                          }));
+                                        }}
+                                        placeholder="Min H"
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-600 mb-1">Max Height (in)</label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={sel?.maxHeightIn ?? ''}
+                                        disabled={disabledPoolIds.includes(pool.id)}
+                                        onChange={(e) => {
+                                          const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                                          setPoolSelections((prev) => ({
+                                            ...prev,
+                                            [pool.id]: (prev[pool.id] || []).map((item) =>
+                                              item.id === opt.id ? { ...item, maxHeightIn: val } : item
+                                            ),
+                                          }));
+                                        }}
+                                        placeholder="Max H"
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -2705,6 +2801,88 @@ multi-month discounts.
                           />
                         </div>
                       </div>
+
+                      {/* Dimension Limits for Turnaround */}
+                      {formData.allow_custom_dimensions === true && (
+                        <div className="grid grid-cols-4 gap-4 mt-4">
+                          <div>
+                          <label className="block text-xs text-gray-600 mb-1">Min Width (in)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={selected.minWidthIn ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                              setSelectedTurnarounds((prev) =>
+                                prev.map((item) =>
+                                  item.id === turn.id ? { ...item, minWidthIn: val } : item
+                                )
+                              );
+                            }}
+                            placeholder="Min W"
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Max Width (in)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={selected.maxWidthIn ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                              setSelectedTurnarounds((prev) =>
+                                prev.map((item) =>
+                                  item.id === turn.id ? { ...item, maxWidthIn: val } : item
+                                )
+                              );
+                            }}
+                            placeholder="Max W"
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Min Height (in)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={selected.minHeightIn ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                              setSelectedTurnarounds((prev) =>
+                                prev.map((item) =>
+                                  item.id === turn.id ? { ...item, minHeightIn: val } : item
+                                )
+                              );
+                            }}
+                            placeholder="Min H"
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Max Height (in)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={selected.maxHeightIn ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                              setSelectedTurnarounds((prev) =>
+                                prev.map((item) =>
+                                  item.id === turn.id ? { ...item, maxHeightIn: val } : item
+                                )
+                              );
+                            }}
+                            placeholder="Max H"
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                      )}
                       
                       <div className="mt-4">
                         <label className="block text-xs font-medium text-gray-700 mb-2">

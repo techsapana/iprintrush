@@ -32,6 +32,10 @@ export async function GET(
         displayOrder: turnaround.display_order,
         pricingType: turnaround.pricing_type || 'flat',
         percentageValue: turnaround.percentage_value != null ? parseFloat(turnaround.percentage_value) : null,
+        minWidthIn: turnaround.min_width_in != null ? parseFloat(turnaround.min_width_in) : null,
+        maxWidthIn: turnaround.max_width_in != null ? parseFloat(turnaround.max_width_in) : null,
+        minHeightIn: turnaround.min_height_in != null ? parseFloat(turnaround.min_height_in) : null,
+        maxHeightIn: turnaround.max_height_in != null ? parseFloat(turnaround.max_height_in) : null,
       },
     });
   } catch (error: any) {
@@ -81,6 +85,22 @@ export async function PUT(
     if (body.displayOrder !== undefined) {
       updates.push('display_order = ?');
       values.push(body.displayOrder);
+    }
+    if (body.minWidthIn !== undefined) {
+      updates.push('min_width_in = ?');
+      values.push(body.minWidthIn);
+    }
+    if (body.maxWidthIn !== undefined) {
+      updates.push('max_width_in = ?');
+      values.push(body.maxWidthIn);
+    }
+    if (body.minHeightIn !== undefined) {
+      updates.push('min_height_in = ?');
+      values.push(body.minHeightIn);
+    }
+    if (body.maxHeightIn !== undefined) {
+      updates.push('max_height_in = ?');
+      values.push(body.maxHeightIn);
     }
 
     if (updates.length > 0) {

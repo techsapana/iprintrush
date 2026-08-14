@@ -46,7 +46,7 @@ export async function getDynamicConfig(
         [pool.id]
       ),
       query(
-        'SELECT option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty FROM product_pool_options WHERE product_id = ? AND pool_id = ? AND enabled = TRUE',
+        'SELECT option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty, min_width_in, max_width_in, min_height_in, max_height_in FROM product_pool_options WHERE product_id = ? AND pool_id = ? AND enabled = TRUE',
         [productId, pool.id]
       ),
       query(
@@ -86,6 +86,26 @@ export async function getDynamicConfig(
         .filter((o: any) => o.max_qty != null)
         .map((o: any) => [o.option_id, parseInt(o.max_qty)])
     );
+    const overrideMinWidthIn = Object.fromEntries(
+      overrideRows
+        .filter((o: any) => o.min_width_in != null)
+        .map((o: any) => [o.option_id, parseFloat(o.min_width_in)])
+    );
+    const overrideMaxWidthIn = Object.fromEntries(
+      overrideRows
+        .filter((o: any) => o.max_width_in != null)
+        .map((o: any) => [o.option_id, parseFloat(o.max_width_in)])
+    );
+    const overrideMinHeightIn = Object.fromEntries(
+      overrideRows
+        .filter((o: any) => o.min_height_in != null)
+        .map((o: any) => [o.option_id, parseFloat(o.min_height_in)])
+    );
+    const overrideMaxHeightIn = Object.fromEntries(
+      overrideRows
+        .filter((o: any) => o.max_height_in != null)
+        .map((o: any) => [o.option_id, parseFloat(o.max_height_in)])
+    );
 
     // If product-specific rows exist for this pool, treat them as the allowed options list.
     // Otherwise, expose all enabled pool options (default behavior for new products).
@@ -103,6 +123,10 @@ export async function getDynamicConfig(
           percentageValue: hasOverride ? (overridePercentageValue[o.id] ?? o.percentage_value ?? null) : (o.percentage_value ?? null),
           minQuantity: hasOverride ? (overrideMinQty[o.id] ?? null) : null,
           maxQuantity: hasOverride ? (overrideMaxQty[o.id] ?? null) : null,
+          minWidthIn: hasOverride ? (overrideMinWidthIn[o.id] ?? null) : (o.min_width_in != null ? parseFloat(o.min_width_in) : null),
+          maxWidthIn: hasOverride ? (overrideMaxWidthIn[o.id] ?? null) : (o.max_width_in != null ? parseFloat(o.max_width_in) : null),
+          minHeightIn: hasOverride ? (overrideMinHeightIn[o.id] ?? null) : (o.min_height_in != null ? parseFloat(o.min_height_in) : null),
+          maxHeightIn: hasOverride ? (overrideMaxHeightIn[o.id] ?? null) : (o.max_height_in != null ? parseFloat(o.max_height_in) : null),
           enabled: true,
         };
       });

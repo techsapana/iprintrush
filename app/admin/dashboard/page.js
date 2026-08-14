@@ -36,6 +36,8 @@ export default function AdminDashboardPage() {
   const [closingDay, setClosingDay] = useState('');
   const [openingTime, setOpeningTime] = useState('');
   const [closingTime, setClosingTime] = useState('');
+  const [weekendOpeningTime, setWeekendOpeningTime] = useState('');
+  const [weekendClosingTime, setWeekendClosingTime] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactFaqs, setContactFaqs] = useState([
@@ -96,6 +98,8 @@ useEffect(() => {
         setClosingDay(data.closingDay || '');
         setOpeningTime(data.openingTime || '');
         setClosingTime(data.closingTime || '');
+        setWeekendOpeningTime(data.weekendOpeningTime || '');
+        setWeekendClosingTime(data.weekendClosingTime || '');
         setContactPhone(data.contactPhone || '');
         setContactEmail(data.contactEmail || '');
         setContactFaqs(
@@ -167,6 +171,8 @@ useEffect(() => {
           closingDay,
           openingTime,
           closingTime,
+          weekendOpeningTime,
+          weekendClosingTime,
           contactPhone,
           contactEmail,
           contactFaqs,
@@ -560,6 +566,7 @@ useEffect(() => {
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm text-gray-700 mb-1">Contact Phone</label>
                   <input

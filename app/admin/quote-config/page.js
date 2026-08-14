@@ -546,6 +546,10 @@ function TurnaroundsSection({ items, editing, formData, onEdit, onSave, onDelete
         { key: 'pricingType', label: 'Pricing Type', type: 'select', options: ['flat', 'percentage'] },
         { key: 'priceModifier', label: 'Price Modifier ($)', type: 'number', step: '0.01', show: pricingType === 'flat' },
         { key: 'percentageValue', label: 'Percentage Value (%)', type: 'number', step: '0.01', show: pricingType === 'percentage' },
+        { key: 'minWidthIn', label: 'Min Width (in)', type: 'number', step: '0.01' },
+        { key: 'maxWidthIn', label: 'Max Width (in)', type: 'number', step: '0.01' },
+        { key: 'minHeightIn', label: 'Min Height (in)', type: 'number', step: '0.01' },
+        { key: 'maxHeightIn', label: 'Max Height (in)', type: 'number', step: '0.01' },
         { key: 'enabled', label: 'Enabled', type: 'checkbox' },
         { key: 'displayOrder', label: 'Display Order', type: 'number' },
       ]}

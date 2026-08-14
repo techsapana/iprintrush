@@ -249,7 +249,7 @@ export async function GET(
         [actualProductId]
       ),
       query(
-        'SELECT turnaround_option_id as id, custom_price, pricing_type, percentage_value, min_qty, max_qty, allowed_colors_json FROM product_turnaround_options WHERE product_id = ?',
+        'SELECT turnaround_option_id as id, custom_price, pricing_type, percentage_value, min_qty, max_qty, min_width_in, max_width_in, min_height_in, max_height_in, allowed_colors_json FROM product_turnaround_options WHERE product_id = ?',
         [actualProductId]
       ),
       query(
@@ -299,6 +299,10 @@ export async function GET(
                percentageValue: r.percentage_value != null ? parseFloat(r.percentage_value) : null,
                minQuantity: r.min_qty != null ? parseInt(r.min_qty) : null,
                maxQuantity: r.max_qty != null ? parseInt(r.max_qty) : null,
+               minWidthIn: r.min_width_in != null ? parseFloat(r.min_width_in) : null,
+               maxWidthIn: r.max_width_in != null ? parseFloat(r.max_width_in) : null,
+               minHeightIn: r.min_height_in != null ? parseFloat(r.min_height_in) : null,
+               maxHeightIn: r.max_height_in != null ? parseFloat(r.max_height_in) : null,
                allowedColors: allowedColors,
              },
            ];
@@ -573,11 +577,15 @@ if (body.colorOptionIds) {
               turnaroundPricing.percentageValue ?? null,
               turnaroundPricing.minQuantity ?? null,
               turnaroundPricing.maxQuantity ?? null,
+              turnaroundPricing.minWidthIn ?? null,
+              turnaroundPricing.maxWidthIn ?? null,
+              turnaroundPricing.minHeightIn ?? null,
+              turnaroundPricing.maxHeightIn ?? null,
               allowedColors,
             ];
           });
           await query(
-            'INSERT INTO product_turnaround_options (product_id, turnaround_option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty, allowed_colors_json) VALUES ?',
+            'INSERT INTO product_turnaround_options (product_id, turnaround_option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty, min_width_in, max_width_in, min_height_in, max_height_in, allowed_colors_json) VALUES ?',
             [values]
           );
         }
@@ -643,11 +651,15 @@ if (body.colorOptionIds) {
                typeof opt === 'object' && opt?.percentageValue != null ? opt.percentageValue : null;
              const minQuantity = typeof opt === 'object' && opt?.minQuantity != null ? opt.minQuantity : null;
              const maxQuantity = typeof opt === 'object' && opt?.maxQuantity != null ? opt.maxQuantity : null;
-             return [actualProductId, poolId, optionId, customPrice, pricingType, percentageValue, minQuantity, maxQuantity, 1, idx];
+             const minWidthIn = typeof opt === 'object' && opt?.minWidthIn != null ? opt.minWidthIn : null;
+             const maxWidthIn = typeof opt === 'object' && opt?.maxWidthIn != null ? opt.maxWidthIn : null;
+             const minHeightIn = typeof opt === 'object' && opt?.minHeightIn != null ? opt.minHeightIn : null;
+             const maxHeightIn = typeof opt === 'object' && opt?.maxHeightIn != null ? opt.maxHeightIn : null;
+             return [actualProductId, poolId, optionId, customPrice, pricingType, percentageValue, minQuantity, maxQuantity, minWidthIn, maxWidthIn, minHeightIn, maxHeightIn, 1, idx];
            });
            if (values.length > 0) {
              await query(
-               'INSERT INTO product_pool_options (product_id, pool_id, option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty, enabled, display_order) VALUES ?',
+               'INSERT INTO product_pool_options (product_id, pool_id, option_id, custom_price, pricing_type, percentage_value, min_qty, max_qty, min_width_in, max_width_in, min_height_in, max_height_in, enabled, display_order) VALUES ?',
                [values]
              );
            }

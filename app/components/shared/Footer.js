@@ -8,6 +8,12 @@ export function Footer() {
   const [logoImageUrl, setLogoImageUrl] = useState('');
   const [contactPhone, setContactPhone] = useState('+19164581139');
   const [contactEmail, setContactEmail] = useState('info@iprintrush.com');
+  const [openingDay, setOpeningDay] = useState('Monday');
+  const [closingDay, setClosingDay] = useState('Friday');
+  const [openingTime, setOpeningTime] = useState('10:00 AM');
+  const [closingTime, setClosingTime] = useState('5:00 PM');
+  const [weekendOpeningTime, setWeekendOpeningTime] = useState('');
+  const [weekendClosingTime, setWeekendClosingTime] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -21,6 +27,12 @@ export function Footer() {
         setLogoImageUrl(typeof data.logoImageUrl === 'string' ? data.logoImageUrl.trim() : '');
         if (data.contactPhone) setContactPhone(data.contactPhone);
         if (data.contactEmail) setContactEmail(data.contactEmail);
+        if (data.openingDay) setOpeningDay(data.openingDay);
+        if (data.closingDay) setClosingDay(data.closingDay);
+        if (data.openingTime) setOpeningTime(data.openingTime);
+        if (data.closingTime) setClosingTime(data.closingTime);
+        if (data.weekendOpeningTime) setWeekendOpeningTime(data.weekendOpeningTime);
+        if (data.weekendClosingTime) setWeekendClosingTime(data.weekendClosingTime);
       } catch {
         // keep static fallback
       }
@@ -89,9 +101,12 @@ export function Footer() {
           <div>
             <h4 className="font-semibold mb-4">Contact Info</h4>
             <ul className="space-y-2 text-sm text-gray-400 mb-4">
-              <li>Email: <span className="text-white">info@iprintrush.com</span></li>
-              <li>Phone: <span className="text-white">916-458-1139</span></li>
-              <li>Store Hours: Mon-Fri 10am - 5pm (Pacific)</li>
+              <li>Email: <span className="text-white">{contactEmail}</span></li>
+              <li>Phone: <span className="text-white">{contactPhone}</span></li>
+              <li>
+                Store Hours: {openingDay}-Friday {openingTime} - {closingTime}
+                <div className="mt-1">Saturday: 10:00 AM - 4:00 PM</div>
+              </li>
               <li>Online orders available 24/7</li>
             </ul>
 

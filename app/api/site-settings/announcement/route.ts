@@ -35,6 +35,8 @@ async function ensureSiteSettingsColumns() {
     ['closing_day', 'VARCHAR(32) NULL'],
     ['opening_time', 'VARCHAR(64) NULL'],
     ['closing_time', 'VARCHAR(64) NULL'],
+    ['weekend_opening_time', 'VARCHAR(64) NULL'],
+    ['weekend_closing_time', 'VARCHAR(64) NULL'],
     ['contact_phone', 'VARCHAR(64) NULL'],
     ['contact_email', 'VARCHAR(191) NULL'],
     ['contact_faqs_json', 'LONGTEXT NULL'],
@@ -104,6 +106,8 @@ export async function GET() {
       closingDay: row?.closing_day || DEFAULT_CLOSING_DAY,
       openingTime: row?.opening_time || DEFAULT_OPENING_TIME,
       closingTime: row?.closing_time || DEFAULT_CLOSING_TIME,
+      weekendOpeningTime: row?.weekend_opening_time || '',
+      weekendClosingTime: row?.weekend_closing_time || '',
       contactPhone: row?.contact_phone || DEFAULT_CONTACT_PHONE,
       contactEmail: row?.contact_email || DEFAULT_CONTACT_EMAIL,
       contactFaqs: faqs,
@@ -139,6 +143,8 @@ export async function GET() {
       closingDay: DEFAULT_CLOSING_DAY,
       openingTime: DEFAULT_OPENING_TIME,
       closingTime: DEFAULT_CLOSING_TIME,
+      weekendOpeningTime: '',
+      weekendClosingTime: '',
       contactPhone: DEFAULT_CONTACT_PHONE,
       contactEmail: DEFAULT_CONTACT_EMAIL,
       contactFaqs: DEFAULT_CONTACT_FAQS,
@@ -189,6 +195,8 @@ export async function PUT(req: NextRequest) {
     const closingDay = String(body.closingDay || '').trim();
     const openingTime = String(body.openingTime || '').trim();
     const closingTime = String(body.closingTime || '').trim();
+    const weekendOpeningTime = String(body.weekendOpeningTime || '').trim();
+    const weekendClosingTime = String(body.weekendClosingTime || '').trim();
     const contactPhone = String(body.contactPhone || '').trim();
     const contactEmail = String(body.contactEmail || '').trim();
     const contactFaqs = Array.isArray(body.contactFaqs)
@@ -209,8 +217,8 @@ export async function PUT(req: NextRequest) {
     const samedayCustomMessage = String(body.samedayCustomMessage || '').trim();
 
     await query(
-      `INSERT INTO site_settings (id, announcement_text, announcement_enabled, announcement_discount_enabled, announcement_discount_type, announcement_discount_value, announcement_discount_condition, bar_discount_enabled, bar_discount_type, bar_discount_value, bar_discount_start_date, bar_discount_end_date, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color, sameday_enabled, sameday_deadline_time, sameday_custom_message)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO site_settings (id, announcement_text, announcement_enabled, announcement_discount_enabled, announcement_discount_type, announcement_discount_value, announcement_discount_condition, bar_discount_enabled, bar_discount_type, bar_discount_value, bar_discount_start_date, bar_discount_end_date, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, weekend_opening_time, weekend_closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color, sameday_enabled, sameday_deadline_time, sameday_custom_message)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          announcement_text = VALUES(announcement_text),
          announcement_enabled = VALUES(announcement_enabled),
@@ -236,6 +244,8 @@ export async function PUT(req: NextRequest) {
          closing_day = VALUES(closing_day),
          opening_time = VALUES(opening_time),
          closing_time = VALUES(closing_time),
+         weekend_opening_time = VALUES(weekend_opening_time),
+         weekend_closing_time = VALUES(weekend_closing_time),
          contact_phone = VALUES(contact_phone),
          contact_email = VALUES(contact_email),
          contact_faqs_json = VALUES(contact_faqs_json),
@@ -272,6 +282,8 @@ export async function PUT(req: NextRequest) {
         closingDay || null,
         openingTime || null,
         closingTime || null,
+        weekendOpeningTime || null,
+        weekendClosingTime || null,
         contactPhone || null,
         contactEmail || null,
         JSON.stringify(contactFaqs),

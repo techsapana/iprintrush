@@ -684,6 +684,26 @@ const handleDeliveryMethodChange = (method) => {
             setCalcError(`The option "${opt.label}" allows a maximum quantity of ${opt.maxQuantity}.`);
             return;
           }
+          const currentW = parseFloat(widthIn) || 0;
+          const currentH = parseFloat(heightIn) || 0;
+          if (currentW > 0 || currentH > 0) {
+            if (opt.minWidthIn != null && currentW < opt.minWidthIn) {
+              setCalcError(`The option "${opt.label}" requires a minimum width of ${opt.minWidthIn}".`);
+              return;
+            }
+            if (opt.maxWidthIn != null && currentW > opt.maxWidthIn) {
+              setCalcError(`The option "${opt.label}" allows a maximum width of ${opt.maxWidthIn}".`);
+              return;
+            }
+            if (opt.minHeightIn != null && currentH < opt.minHeightIn) {
+              setCalcError(`The option "${opt.label}" requires a minimum height of ${opt.minHeightIn}".`);
+              return;
+            }
+            if (opt.maxHeightIn != null && currentH > opt.maxHeightIn) {
+              setCalcError(`The option "${opt.label}" allows a maximum height of ${opt.maxHeightIn}".`);
+              return;
+            }
+          }
         }
       }
     }
@@ -1177,6 +1197,23 @@ const handleDeliveryMethodChange = (method) => {
                     disableReason = `(Max: ${opt.maxQuantity})`;
                   }
                 }
+                const currentW = parseFloat(widthIn) || 0;
+                const currentH = parseFloat(heightIn) || 0;
+                if (!isDisabled && (currentW > 0 || currentH > 0)) {
+                  if (opt.minWidthIn != null && currentW < opt.minWidthIn) {
+                    isDisabled = true;
+                    disableReason = `(Min Width: ${opt.minWidthIn}")`;
+                  } else if (opt.maxWidthIn != null && currentW > opt.maxWidthIn) {
+                    isDisabled = true;
+                    disableReason = `(Max Width: ${opt.maxWidthIn}")`;
+                  } else if (opt.minHeightIn != null && currentH < opt.minHeightIn) {
+                    isDisabled = true;
+                    disableReason = `(Min Height: ${opt.minHeightIn}")`;
+                  } else if (opt.maxHeightIn != null && currentH > opt.maxHeightIn) {
+                    isDisabled = true;
+                    disableReason = `(Max Height: ${opt.maxHeightIn}")`;
+                  }
+                }
                 return (
                 <SelectItem key={opt.id} value={String(opt.id)} disabled={isDisabled} className={`cursor-pointer ${isDisabled ? 'opacity-50' : ''}`}>
                   <div className="flex flex-col">
@@ -1209,6 +1246,23 @@ const handleDeliveryMethodChange = (method) => {
                 if (opt.maxQuantity != null && currentTotalQty > opt.maxQuantity) {
                   isDisabled = true;
                   disableReason = `(Max: ${opt.maxQuantity})`;
+                }
+              }
+              const currentW = parseFloat(widthIn) || 0;
+              const currentH = parseFloat(heightIn) || 0;
+              if (!isDisabled && (currentW > 0 || currentH > 0)) {
+                if (opt.minWidthIn != null && currentW < opt.minWidthIn) {
+                  isDisabled = true;
+                  disableReason = `(Min Width: ${opt.minWidthIn}")`;
+                } else if (opt.maxWidthIn != null && currentW > opt.maxWidthIn) {
+                  isDisabled = true;
+                  disableReason = `(Max Width: ${opt.maxWidthIn}")`;
+                } else if (opt.minHeightIn != null && currentH < opt.minHeightIn) {
+                  isDisabled = true;
+                  disableReason = `(Min Height: ${opt.minHeightIn}")`;
+                } else if (opt.maxHeightIn != null && currentH > opt.maxHeightIn) {
+                  isDisabled = true;
+                  disableReason = `(Max Height: ${opt.maxHeightIn}")`;
                 }
               }
               return (
@@ -1278,6 +1332,23 @@ const handleDeliveryMethodChange = (method) => {
               if (opt.maxQuantity != null && currentTotalQty > opt.maxQuantity) {
                 isDisabled = true;
                 disableReason = `(Max: ${opt.maxQuantity})`;
+              }
+            }
+            const currentW = parseFloat(widthIn) || 0;
+            const currentH = parseFloat(heightIn) || 0;
+            if (!isDisabled && (currentW > 0 || currentH > 0)) {
+              if (opt.minWidthIn != null && currentW < opt.minWidthIn) {
+                isDisabled = true;
+                disableReason = `(Min Width: ${opt.minWidthIn}")`;
+              } else if (opt.maxWidthIn != null && currentW > opt.maxWidthIn) {
+                isDisabled = true;
+                disableReason = `(Max Width: ${opt.maxWidthIn}")`;
+              } else if (opt.minHeightIn != null && currentH < opt.minHeightIn) {
+                isDisabled = true;
+                disableReason = `(Min Height: ${opt.minHeightIn}")`;
+              } else if (opt.maxHeightIn != null && currentH > opt.maxHeightIn) {
+                isDisabled = true;
+                disableReason = `(Max Height: ${opt.maxHeightIn}")`;
               }
             }
             return (
