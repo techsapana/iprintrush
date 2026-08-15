@@ -83,6 +83,7 @@ export default function AdminOrdersPage() {
       artwork_pending: 'Pending Artwork Approval',
       artwork_approved: 'Artwork Approved',
       in_production: 'On Production',
+      ready_for_pickup: 'Ready for Store Pickup',
       ready_for_shipping: 'Ready for Shipping',
       shipped: 'Shipped',
     };
@@ -95,6 +96,7 @@ export default function AdminOrdersPage() {
       artwork_pending: 'bg-orange-100 text-orange-800',
       artwork_approved: 'bg-blue-100 text-blue-800',
       in_production: 'bg-indigo-100 text-indigo-800',
+      ready_for_pickup: 'bg-emerald-100 text-emerald-800',
       ready_for_shipping: 'bg-teal-100 text-teal-800',
       shipped: 'bg-green-100 text-green-800',
     };
@@ -134,6 +136,7 @@ export default function AdminOrdersPage() {
               <option value="artwork_pending">Pending Artwork Approval</option>
               <option value="artwork_approved">Artwork Approved</option>
               <option value="in_production">On Production</option>
+              <option value="ready_for_pickup">Ready for Store Pickup</option>
               <option value="ready_for_shipping">Ready for Shipping</option>
               <option value="shipped">Shipped</option>
             </select>

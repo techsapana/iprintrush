@@ -3,6 +3,7 @@ export const ORDER_WORKFLOW_OPTIONS = [
   'artwork_pending',
   'artwork_approved',
   'in_production',
+  'ready_for_pickup',
   'ready_for_shipping',
   'shipped',
 ] as const;
@@ -18,6 +19,7 @@ const READ_NORMALIZE_MAP: Record<string, OrderWorkflowStatus> = {
   artwork_approved: 'artwork_approved',
   proof_approved: 'artwork_approved',
   in_production: 'in_production',
+  ready_for_pickup: 'ready_for_pickup',
   ready_for_shipping: 'ready_for_shipping',
   completed: 'ready_for_shipping',
   shipped: 'shipped',
@@ -28,6 +30,7 @@ const WRITE_FALLBACK_MAP: Record<OrderWorkflowStatus, string[]> = {
   artwork_pending: ['artwork_approval_pending', 'proof_pending'],
   artwork_approved: ['proof_approved'],
   in_production: [],
+  ready_for_pickup: [],
   ready_for_shipping: ['completed'],
   shipped: [],
 };

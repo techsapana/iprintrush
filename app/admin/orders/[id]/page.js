@@ -318,6 +318,7 @@ export default function AdminOrderDetailPage() {
                 <option value="artwork_pending">Pending Artwork Approval</option>
                 <option value="artwork_approved">Artwork Approved</option>
                 <option value="in_production">On Production</option>
+                <option value="ready_for_pickup">Ready for Store Pickup</option>
                 <option value="ready_for_shipping">Ready for Shipping</option>
                 <option value="shipped">Shipped</option>
               </select>
