@@ -129,6 +129,21 @@ Questions? Contact us at support@iprintrush.com
       text,
       html,
     });
+
+    // Notify Admin
+    const adminEmail = process.env.MAIL_FROM || 'orders@iprintrush.com';
+    await sendEmail({
+      to: adminEmail,
+      subject: `NEW ORDER RECEIVED: ${order.order_number}`,
+      text: `A new order has been placed by ${order.customer_name || order.customer_email}.\n\nOrder Number: ${order.order_number}\nTotal: ${formatCurrency(order.amount_total)}\n\nPlease log in to the admin dashboard to view the details.`,
+      html: `<div style="font-family:sans-serif;padding:20px;">
+        <h2 style="color:#d97706;">New Order Received!</h2>
+        <p><strong>Customer:</strong> ${order.customer_name || order.customer_email}</p>
+        <p><strong>Order Number:</strong> ${order.order_number}</p>
+        <p><strong>Total Paid:</strong> ${formatCurrency(order.amount_total)}</p>
+        <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://iprintrush.com'}/admin/orders" style="display:inline-block;padding:10px 15px;background:#29b6f6;color:#fff;text-decoration:none;border-radius:4px;margin-top:10px;">View Order in Admin Panel</a></p>
+      </div>`
+    });
   } catch (err) {
     // Don't fail the webhook if email sending fails — just log it
     console.error('Failed to send order confirmation email:', err);

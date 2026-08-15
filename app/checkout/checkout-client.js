@@ -716,12 +716,27 @@ const handleApplyCoupon = (e) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Checkout</h1>
         {isBuyNow ? (
-          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-8">
+          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
             Paying for this product only — your cart is not included in this checkout.
           </p>
         ) : (
-          <p className="text-sm text-gray-600 mb-8">All items in your shopping cart are included below.</p>
+          <p className="text-sm text-gray-600 mb-4">All items in your shopping cart are included below.</p>
         )}
+
+        <div className="flex flex-col gap-3 mb-8">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <p className="text-sm text-blue-800">
+              <strong>After-Hours Orders:</strong> Same-Day & Urgent orders placed while our store is closed will be prioritized when we reopen.
+            </p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-3">
+            <svg className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <p className="text-sm text-amber-800">
+              We start printing only <strong>after you approve the design</strong>. The production time starts from that approval.
+            </p>
+          </div>
+        </div>
 
         {/* Mobile-first: 1 col, desktop: 3-col with form left, summary right */}
         <div className="flex flex-col-reverse lg:grid lg:grid-cols-3 gap-6">
