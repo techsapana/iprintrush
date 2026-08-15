@@ -131,7 +131,7 @@ Questions? Contact us at support@iprintrush.com
     });
 
     // Notify Admin
-    const adminEmail = process.env.MAIL_FROM || 'orders@iprintrush.com';
+    const adminEmail = process.env.MAIL_FROM || 'order@iprintrush.com';
     await sendEmail({
       to: adminEmail,
       subject: `NEW ORDER RECEIVED: ${order.order_number}`,

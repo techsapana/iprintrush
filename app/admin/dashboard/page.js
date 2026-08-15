@@ -568,6 +568,27 @@ useEffect(() => {
                 </div>
 
                 <div>
+                  <label className="block text-sm text-gray-700 mb-1">Weekend Opening Time (Sat)</label>
+                  <input
+                    type="text"
+                    value={weekendOpeningTime}
+                    onChange={(e) => setWeekendOpeningTime(e.target.value)}
+                    placeholder="10:00 AM"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Weekend Closing Time (Sat)</label>
+                  <input
+                    type="text"
+                    value={weekendClosingTime}
+                    onChange={(e) => setWeekendClosingTime(e.target.value)}
+                    placeholder="2:00 PM"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-sm text-gray-700 mb-1">Contact Phone</label>
                   <input
                     type="text"
@@ -583,7 +604,7 @@ useEffect(() => {
                     type="email"
                     value={contactEmail}
                     onChange={(e) => setContactEmail(e.target.value)}
-                    placeholder="info@iprintrush.com"
+                    placeholder="support@iprintrush.com"
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
                   />
                 </div>
@@ -796,6 +817,26 @@ useEffect(() => {
                   className="block w-full bg-green-600 text-white text-center py-2 rounded-lg hover:bg-green-700 transition font-medium"
                 >
                   Add New Product
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Reviews Management */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-indigo-600 text-white p-6">
+              <h2 className="text-xl font-bold">Reviews Management</h2>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                Approve, reject, or delete customer product reviews.
+              </p>
+              <div className="space-y-3">
+                <Link
+                  href="/admin/reviews"
+                  className="block w-full bg-indigo-600 text-white text-center py-2 rounded-lg hover:bg-indigo-700 transition font-medium"
+                >
+                  Manage Reviews
                 </Link>
               </div>
             </div>

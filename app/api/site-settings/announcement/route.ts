@@ -9,7 +9,7 @@ const DEFAULT_TEXT =
   'Get it by Christmas: Up to 40% off select last-minute gifts | Ends Dec. 22';
 
 const DEFAULT_CONTACT_PHONE = '1-800-PRINT-24';
-const DEFAULT_CONTACT_EMAIL = 'info@iprintrush.com';
+const DEFAULT_CONTACT_EMAIL = 'support@iprintrush.com';
 const DEFAULT_OPENING_DAY = 'Monday';
 const DEFAULT_CLOSING_DAY = 'Saturday';
 const DEFAULT_OPENING_TIME = '8:00 AM';
@@ -61,7 +61,7 @@ export async function GET() {
   try {
     await ensureSiteSettingsColumns();
     const row: any = await queryOne(
-      'SELECT announcement_text, announcement_enabled, announcement_discount_enabled, announcement_discount_type, announcement_discount_value, announcement_discount_condition, bar_discount_enabled, bar_discount_type, bar_discount_value, bar_discount_start_date, bar_discount_end_date, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color, sameday_enabled, sameday_deadline_time, sameday_custom_message FROM site_settings ORDER BY id ASC LIMIT 1',
+      'SELECT announcement_text, announcement_enabled, announcement_discount_enabled, announcement_discount_type, announcement_discount_value, announcement_discount_condition, bar_discount_enabled, bar_discount_type, bar_discount_value, bar_discount_start_date, bar_discount_end_date, tax_rate_percent, promo_headline, promo_subheadline, promo_banner_image_url, notary_image_url, mailbox_image_url, logo_image_url, hero_desktop_image_url, hero_mobile_image_url, opening_day, closing_day, opening_time, closing_time, weekend_opening_time, weekend_closing_time, contact_phone, contact_email, contact_faqs_json, popup_enabled, popup_title, popup_message, popup_image_url, popup_color, sameday_enabled, sameday_deadline_time, sameday_custom_message FROM site_settings ORDER BY id ASC LIMIT 1',
     );
     let faqs = DEFAULT_CONTACT_FAQS;
     if (row?.contact_faqs_json) {

@@ -16,6 +16,7 @@ import { SimpleQuoteBuilder } from '../../components/product/SimpleQuoteBuilder'
 import { MailboxQuoteBuilder } from '../../components/product/MailboxQuoteBuilder';
 import { NotaryPricingChart } from '../../components/product/NotaryPricingChart';
 import { MailboxPricingChart } from '../../components/product/MailboxPricingChart';
+import ProductReviews from '../../components/product/ProductReviews';
 import { OurProcess } from '../../components/sections/OurProcess';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -449,6 +450,11 @@ const canProceedToPayment = Boolean(
         {/* Same-Day Notice */}
         <div className="mt-12 mb-12">
           <SameDayNotice />
+        </div>
+
+        {/* Product Reviews */}
+        <div className="mb-12">
+          <ProductReviews productId={product.id} />
         </div>
 
         {/* Related Products */}

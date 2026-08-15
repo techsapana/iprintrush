@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { StoreHours } from './StoreHours';
 
 export function Footer() {
   const [logoImageUrl, setLogoImageUrl] = useState('');
   const [contactPhone, setContactPhone] = useState('+19164581139');
-  const [contactEmail, setContactEmail] = useState('info@iprintrush.com');
+  const [contactEmail, setContactEmail] = useState('support@iprintrush.com');
   const [openingDay, setOpeningDay] = useState('Monday');
   const [closingDay, setClosingDay] = useState('Friday');
   const [openingTime, setOpeningTime] = useState('10:00 AM');
@@ -47,7 +48,7 @@ export function Footer() {
     <footer className="bg-gray-900 text-white pt-12 pb-8 print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -103,10 +104,6 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-gray-400 mb-4">
               <li>Email: <span className="text-white">{contactEmail}</span></li>
               <li>Phone: <span className="text-white">{contactPhone}</span></li>
-              <li>
-                Store Hours: {openingDay}-Friday {openingTime} - {closingTime}
-                <div className="mt-1">Saturday: 10:00 AM - 2:00 PM</div>
-              </li>
               <li>Online orders available 24/7</li>
             </ul>
 
@@ -162,6 +159,17 @@ export function Footer() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Store Hours (4th Column) */}
+          <div>
+            <StoreHours 
+              openingTime={openingTime} 
+              closingTime={closingTime} 
+              weekendOpeningTime={weekendOpeningTime} 
+              weekendClosingTime={weekendClosingTime}
+              theme="dark"
+            />
           </div>
         </div>
 

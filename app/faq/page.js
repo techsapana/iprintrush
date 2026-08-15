@@ -193,7 +193,7 @@ export default function FAQPage() {
             <a href="/contact" className="inline-block bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-semibold py-3 px-8 rounded-lg transition">
               Contact Us
             </a>
-            <a href="mailto:info@iprintrush.com" className="inline-block border border-[#29b6f6] text-[#29b6f6] hover:bg-[rgba(41,182,246,0.1)] font-semibold py-3 px-8 rounded-lg transition">
+            <a href="mailto:support@iprintrush.com" className="inline-block border border-[#29b6f6] text-[#29b6f6] hover:bg-[rgba(41,182,246,0.1)] font-semibold py-3 px-8 rounded-lg transition">
               Email Us
             </a>
           </div>

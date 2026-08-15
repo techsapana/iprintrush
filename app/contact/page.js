@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { StoreHours } from '../components/shared/StoreHours';
 
 const DEFAULT_FAQS = [
   {
@@ -23,7 +24,7 @@ export default function ContactPage() {
   const [weekendOpeningTime, setWeekendOpeningTime] = useState('');
   const [weekendClosingTime, setWeekendClosingTime] = useState('');
   const [contactPhone, setContactPhone] = useState('1-800-PRINT-24');
-  const [contactEmail, setContactEmail] = useState('info@iprintrush.com');
+  const [contactEmail, setContactEmail] = useState('support@iprintrush.com');
   const [contactFaqs, setContactFaqs] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
@@ -95,8 +96,6 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-semibold text-lg text-gray-900 mb-2">Phone</h3>
                   <p className="text-gray-700 text-lg">{contactPhone}</p>
-                  <p className="text-gray-600">{openingDay} - Friday, {openingTime} - {closingTime}</p>
-                  <p className="text-gray-600 mt-1">Saturday: 10:00 AM - 2:00 PM</p>
                 </div>
 
                 {/* Email */}
@@ -123,10 +122,13 @@ export default function ContactPage() {
 
                 {/* Hours */}
                 <div>
-                  <h3 className="font-semibold text-lg text-gray-900 mb-2">Business Hours</h3>
-                  <ul className="space-y-1 text-gray-700">
-                    <li>{openingDay} - {closingDay}: {openingTime} - {closingTime}</li>
-                  </ul>
+                  <StoreHours 
+                    openingTime={openingTime} 
+                    closingTime={closingTime} 
+                    weekendOpeningTime={weekendOpeningTime} 
+                    weekendClosingTime={weekendClosingTime}
+                    theme="light"
+                  />
                 </div>
               </div>
             </div>

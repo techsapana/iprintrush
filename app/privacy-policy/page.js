@@ -97,7 +97,7 @@ export default function PrivacyPolicyPage() {
             <p>If you have any questions about this Privacy Policy, please contact us at:</p>
             <div className="mt-4 pl-4">
               <p>Email: privacy@iprintrush.com</p>
-              <p>Phone: 1-800-PRINT-24</p>
+              <p>Phone: 916-458-1139</p>
               <p>Address: 8506 Madison Ave, Fair Oaks, CA 95628</p>
             </div>
           </section>

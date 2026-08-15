@@ -45,6 +45,34 @@ export async function GET() {
     await ensureColumn('site_settings', 'weekend_opening_time', 'VARCHAR(64) NULL');
     await ensureColumn('site_settings', 'weekend_closing_time', 'VARCHAR(64) NULL');
 
+    // 5. orders table ENUM update for workflow_status
+    try {
+      await query(`ALTER TABLE orders MODIFY COLUMN workflow_status ENUM('pending','in_production','proof_pending','proof_approved','artwork_approval_pending','completed','shipped','cancelled','on_hold','order_review','artwork_pending','artwork_approved','ready_for_pickup','ready_for_shipping') NOT NULL DEFAULT 'order_review'`);
+      log.push("Updated orders.workflow_status ENUM to include 'ready_for_pickup'");
+    } catch (e: any) {
+      log.push(`Error updating workflow_status ENUM: ${e.message}`);
+    }
+
+    // 6. product_reviews table
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS product_reviews (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          product_id INT NOT NULL,
+          customer_name VARCHAR(255) NOT NULL,
+          customer_email VARCHAR(255) NULL,
+          rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+          review_text TEXT NOT NULL,
+          status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+      `);
+      log.push("Ensured product_reviews table exists.");
+    } catch (e: any) {
+      log.push(`Error creating product_reviews table: ${e.message}`);
+    }
+
   } catch (err: any) {
     success = false;
     log.push(`General Error: ${err.message}`);

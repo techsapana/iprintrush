@@ -179,6 +179,24 @@ export async function PATCH(
         } catch (e) {
           console.error('Failed to send artwork notification email:', e);
         }
+      } else if (uploaderRole === 'customer') {
+        try {
+          const content = `
+            <h2>New Artwork Uploaded</h2>
+            <p>Customer ${current.customer_email} has uploaded new artwork for Order #${current.order_id}.</p>
+            <p>Please log in to the admin dashboard to review and approve the artwork.</p>
+            <br/>
+            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://iprintrush.com'}/admin/orders/${current.order_id}">View Order in Admin</a></p>
+          `;
+          await sendEmail({
+            to: 'design@iprintrush.com',
+            subject: `New Artwork Uploaded - Order #${current.order_id}`,
+            text: `Customer ${current.customer_email} has uploaded new artwork for Order #${current.order_id}. Please review in the admin dashboard.`,
+            html: content
+          });
+        } catch (e) {
+          console.error('Failed to send design notification email:', e);
+        }
       }
     }
 
