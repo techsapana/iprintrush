@@ -58,7 +58,7 @@ export async function GET() {
       await query(`
         CREATE TABLE IF NOT EXISTS product_reviews (
           id INT AUTO_INCREMENT PRIMARY KEY,
-          product_id INT NOT NULL,
+          product_id VARCHAR(50) NOT NULL,
           customer_name VARCHAR(255) NOT NULL,
           customer_email VARCHAR(255) NULL,
           rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),

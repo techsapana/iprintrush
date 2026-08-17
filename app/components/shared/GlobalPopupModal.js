@@ -63,42 +63,38 @@ export function GlobalPopupModal() {
             {/* Close button */}
             <button 
               onClick={handleClose}
-              className="absolute top-4 right-4 z-20 w-10 h-10 flex items-center justify-center rounded-full bg-white/40 hover:bg-white/80 hover:rotate-90 text-gray-900 shadow-lg backdrop-blur-md transition-all duration-300 ease-in-out"
+              className="absolute top-3 right-3 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-black/10 hover:bg-black/20 text-gray-900 transition-colors duration-200"
               aria-label="Close"
             >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
             {/* Left side: Image */}
             {data.popupImageUrl && (
-              <div className="w-full md:w-1/2 min-h-[250px] md:min-h-[400px] bg-white/10 flex items-center justify-center overflow-hidden relative group">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent z-0 pointer-events-none" />
+              <div className="w-full md:w-1/2 min-h-[250px] md:min-h-[400px] relative overflow-hidden bg-black/5">
                 <img 
                   src={data.popupImageUrl} 
                   alt="Promo" 
-                  className="w-full h-full object-cover md:object-contain object-center drop-shadow-2xl z-10 p-6 sm:p-8 transform group-hover:scale-105 transition-transform duration-700 ease-out"
+                  className="absolute inset-0 w-full h-full object-cover"
                 />
               </div>
             )}
 
             {/* Right side: Content */}
-            <div className={`w-full ${data.popupImageUrl ? 'md:w-1/2' : ''} p-8 md:p-14 flex flex-col items-center justify-center text-center relative z-10`}>
+            <div className={`w-full ${data.popupImageUrl ? 'md:w-1/2' : ''} p-8 md:p-12 flex flex-col items-center justify-center text-center relative z-10`}>
               {data.popupTitle && (
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-gray-900 mb-6 tracking-tighter leading-none drop-shadow-sm uppercase">
+                <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-5 tracking-tight leading-tight">
                   {data.popupTitle}
                 </h2>
               )}
               
               {data.popupMessage && (
-                <p className="text-lg md:text-xl lg:text-2xl font-bold text-gray-800 whitespace-pre-line drop-shadow-sm leading-snug">
+                <p className="text-base md:text-lg text-gray-800 font-medium whitespace-pre-line leading-relaxed max-w-md">
                   {data.popupMessage}
                 </p>
               )}
-              
-              {/* Small decorative line */}
-              <div className="mt-8 w-16 h-1.5 bg-gray-900 rounded-full opacity-20"></div>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export function StoreHours({ 
   openingTime = '10:00 AM', 
@@ -10,6 +11,7 @@ export function StoreHours({
   theme = 'dark' // 'dark' for footer, 'light' for contact page if needed, but screenshot is dark
 }) {
   const [schedule, setSchedule] = useState([]);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     // Generate the next 7 days starting from today
@@ -62,6 +64,8 @@ export function StoreHours({
         dayName,
         dateStr: `${month} ${dayNum}`,
         isClosed,
+        rawOpen: open,
+        rawClose: close,
         openFormatted: formatTime(open),
         closeFormatted: formatTime(close),
         isToday: i === 0
@@ -75,34 +79,46 @@ export function StoreHours({
   const mutedColor = theme === 'dark' ? 'text-gray-400' : 'text-gray-500';
   const highlightColor = theme === 'dark' ? 'text-[#29b6f6]' : 'text-[#29b6f6]';
 
-  const boxBg = theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200 shadow-sm';
-  const dividerColor = theme === 'dark' ? 'border-white/10' : 'border-gray-100';
+  const boxBg = theme === 'dark' ? 'bg-transparent border-[#29b6f6]/40' : 'bg-transparent border-[#29b6f6]/40 shadow-sm';
+  const dividerColor = theme === 'dark' ? 'border-[#29b6f6]/40' : 'border-[#29b6f6]/40';
 
   return (
-    <div className={`w-full mx-auto mt-2 mb-2 rounded-lg border ${boxBg} overflow-hidden`}>
-      <div className={`px-4 py-2.5 border-b ${dividerColor} bg-[#29b6f6]/10`}>
-        <h3 className={`text-lg font-semibold text-center tracking-wide ${highlightColor} m-0`}>
-          Store Hours
-        </h3>
-      </div>
+    <div className={`w-full mx-auto mt-2 mb-2 rounded-lg border ${boxBg} overflow-hidden transition-all duration-300`}>
+      <button 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`w-full relative px-4 py-3 flex items-center justify-between ${isExpanded ? `border-b ${dividerColor}` : ''} bg-transparent hover:bg-white/5 transition-colors cursor-pointer focus:outline-none`}
+      >
+        <div className="flex items-center text-left pl-2">
+          <h3 className={`text-lg font-semibold tracking-wide ${highlightColor} m-0`}>
+            Store Hours
+          </h3>
+        </div>
+        <div className="absolute right-4">
+          {isExpanded ? (
+            <ChevronUp className={`w-5 h-5 ${highlightColor}`} />
+          ) : (
+            <ChevronDown className={`w-5 h-5 ${highlightColor}`} />
+          )}
+        </div>
+      </button>
       
       <div className="p-3 sm:p-4">
         <table className="w-full border-collapse">
           <thead>
             <tr>
               <th className="pb-2"></th>
-              <th className={`pb-2 text-[11px] font-bold uppercase tracking-wider text-center ${textColor}`}>Open</th>
-              <th className={`pb-2 text-[11px] font-bold uppercase tracking-wider text-center ${textColor}`}>Close</th>
+              <th className={`pb-2 text-[12px] lowercase font-medium tracking-wide text-center ${textColor}`}>open</th>
+              <th className={`pb-2 text-[12px] lowercase font-medium tracking-wide text-center ${textColor}`}>close</th>
               <th className="pb-2"></th>
             </tr>
           </thead>
           <tbody>
-            {schedule.map((day, idx) => (
-              <tr key={day.id} className={idx !== schedule.length - 1 ? `border-b ${dividerColor}` : ''}>
+            {(isExpanded ? schedule : schedule.slice(0, 1)).map((day, idx, arr) => (
+              <tr key={day.id} className={idx !== arr.length - 1 ? `border-b ${dividerColor}` : ''}>
                 {/* Day & Date */}
-                <td className="py-1.5 pr-1 text-right whitespace-nowrap align-middle">
-                  <span className={`font-bold uppercase text-[11px] ${highlightColor} mr-1`}>{day.dayName}</span>
-                  <span className={`font-medium text-[11px] ${textColor}`}>{day.dateStr}</span>
+                <td className="py-1.5 pr-2 text-left whitespace-nowrap align-middle">
+                  <span className={`font-medium capitalize text-[11px] ${highlightColor} mr-1`}>{day.dayName.toLowerCase()}</span>
+                  <span className={`font-medium capitalize text-[11px] ${textColor}`}>{day.dateStr.toLowerCase()}</span>
                 </td>
                 
                 {/* Times */}
@@ -124,8 +140,8 @@ export function StoreHours({
                 {/* Badge */}
                 <td className="py-1.5 pl-1 align-middle text-left w-[1%] whitespace-nowrap">
                   {day.isToday && (
-                    <span className="bg-[#29b6f6] text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase inline-block">
-                      Today
+                    <span className={`text-[11px] lowercase ${highlightColor}`}>
+                      today
                     </span>
                   )}
                 </td>
