@@ -66,7 +66,7 @@ export async function GET() {
           status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
           created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
-        )
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
       `);
       log.push("Ensured product_reviews table exists.");
     } catch (e: any) {

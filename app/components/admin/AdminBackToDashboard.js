@@ -17,7 +17,15 @@ export function AdminBackToDashboard() {
           <span aria-hidden>←</span>
           Go Back
         </button>
-        <span className="text-xs text-slate-400 hidden sm:inline">Admin</span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.push('/admin/dashboard')}
+            className="inline-flex items-center gap-1.5 rounded-md bg-slate-700/50 hover:bg-slate-700 text-slate-200 px-3 py-1.5 text-xs font-medium transition cursor-pointer border border-slate-600"
+          >
+            Dashboard
+          </button>
+          <span className="text-xs text-slate-400 hidden sm:inline">Admin</span>
+        </div>
       </div>
     </div>
   );
