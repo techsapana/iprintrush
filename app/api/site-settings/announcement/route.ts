@@ -189,8 +189,12 @@ export async function PUT(req: NextRequest) {
     const notaryImageUrl = String(body.notaryImageUrl || '').trim();
     const mailboxImageUrl = String(body.mailboxImageUrl || '').trim();
     const logoImageUrl = String(body.logoImageUrl || '').trim();
-    const heroDesktopImageUrl = String(body.heroDesktopImageUrl || '').trim();
-    const heroMobileImageUrl = String(body.heroMobileImageUrl || '').trim();
+    const heroDesktopImageUrl = typeof body.heroDesktopImageUrl === 'string' 
+      ? body.heroDesktopImageUrl.trim() 
+      : (Array.isArray(body.heroDesktopImageUrl) ? JSON.stringify(body.heroDesktopImageUrl) : '');
+    const heroMobileImageUrl = typeof body.heroMobileImageUrl === 'string' 
+      ? body.heroMobileImageUrl.trim() 
+      : (Array.isArray(body.heroMobileImageUrl) ? JSON.stringify(body.heroMobileImageUrl) : '');
     const openingDay = String(body.openingDay || '').trim();
     const closingDay = String(body.closingDay || '').trim();
     const openingTime = String(body.openingTime || '').trim();

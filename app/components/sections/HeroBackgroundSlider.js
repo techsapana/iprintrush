@@ -12,8 +12,8 @@ export function HeroBackgroundSlider({
   className = '',
 }) {
   const [isMobile, setIsMobile] = useState(false);
-  const [heroDesktopImageUrl, setHeroDesktopImageUrl] = useState('');
-  const [heroMobileImageUrl, setHeroMobileImageUrl] = useState('');
+  const [heroDesktopImages, setHeroDesktopImages] = useState([]);
+  const [heroMobileImages, setHeroMobileImages] = useState([]);
   
   useEffect(() => {
     const checkMobile = () => {
@@ -33,8 +33,18 @@ export function HeroBackgroundSlider({
         if (!res.ok) return;
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
-        setHeroDesktopImageUrl(typeof data.heroDesktopImageUrl === 'string' ? data.heroDesktopImageUrl.trim() : '');
-        setHeroMobileImageUrl(typeof data.heroMobileImageUrl === 'string' ? data.heroMobileImageUrl.trim() : '');
+
+        const parseImages = (val) => {
+          if (!val || typeof val !== 'string') return [];
+          const str = val.trim();
+          if (str.startsWith('[') && str.endsWith(']')) {
+            try { return JSON.parse(str); } catch { return [str]; }
+          }
+          return [str];
+        };
+
+        setHeroDesktopImages(parseImages(data.heroDesktopImageUrl));
+        setHeroMobileImages(parseImages(data.heroMobileImageUrl));
       } catch {
         // ignore and keep static fallback images
       }
@@ -49,14 +59,14 @@ export function HeroBackgroundSlider({
     if (Array.isArray(images) && images.length > 0) {
       return images;
     }
-    if (isMobile && heroMobileImageUrl) {
-      return [heroMobileImageUrl];
+    if (isMobile && heroMobileImages.length > 0) {
+      return heroMobileImages;
     }
-    if (!isMobile && heroDesktopImageUrl) {
-      return [heroDesktopImageUrl];
+    if (!isMobile && heroDesktopImages.length > 0) {
+      return heroDesktopImages;
     }
     return isMobile ? MOBILE_IMAGES : DESKTOP_IMAGES;
-  }, [heroDesktopImageUrl, heroMobileImageUrl, images, isMobile]);
+  }, [heroDesktopImages, heroMobileImages, images, isMobile]);
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);

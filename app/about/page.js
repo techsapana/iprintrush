@@ -1,101 +1,120 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import { Clock, Printer, MapPin, Award, CheckCircle } from 'lucide-react';
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="bg-[rgba(41,182,246,0.1)] py-16 md:py-24">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-            About iPrintRush
+      <section className="bg-gray-50 py-20 md:py-32 border-b border-gray-200">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight mb-6">
+            Print exactly what you need, <br className="hidden md:block" />
+            <span className="text-[#29b6f6]">exactly when you need it.</span>
           </h1>
-          <p className="text-xl text-gray-600">
-            Fast, reliable, professional printing solutions for businesses of all sizes
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            iPrintRush was built on a simple premise: commercial-grade printing shouldn't take weeks. We combine modern digital print technology with streamlined fulfillment to deliver your materials on schedule, every time.
           </p>
         </div>
       </section>
 
-      {/* Mission Section */}
+      {/* Our Story / Who we are */}
       <section className="py-16 md:py-24">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Mission</h2>
-          <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-            At iPrintRush, we believe that time is money. That's why we've made it our mission to deliver
-            high-quality printing solutions on the same day you need them. Whether you're a small business
-            owner, marketing professional, or event planner, we understand the pressure of tight deadlines.
-          </p>
-          <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-            Founded in 2023, iPrintRush has grown to become a trusted partner for businesses across multiple
-            industries. We invest in the latest printing technology and employ expert craftspeople to ensure
-            every product meets our high standards of quality.
-          </p>
-          <p className="text-lg text-gray-700 leading-relaxed">
-            Our commitment to speed, quality, and customer service has made us the go-to choice for same-day
-            printing in the region.
-          </p>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8">Our Story</h2>
+          <div className="space-y-6 text-lg text-gray-600 text-left">
+            <p>
+              We started iPrintRush because we saw a gap in the printing industry. Traditional print shops often had long turnaround times, while online giants lacked the personal touch and urgency required by local businesses.
+            </p>
+            <p>
+              By investing heavily in state-of-the-art digital presses and building an efficient, local production workflow, we cut out the middleman. This means tighter quality control, faster production cycles, and the ability to confidently offer same-day printing without compromising on the final product.
+            </p>
+            <p>
+              Today, we handle everything from emergency business cards for a sudden networking event to full-scale marketing collateral for corporate trade shows. 
+            </p>
+          </div>
         </div>
       </section>
 
-      {/* Why Choose Us Section */}
-      <section className="bg-gray-50 py-16 md:py-24">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8 tracking-tight">
-            WHY CHOOSE US
-          </h2>
-          <ul className="space-y-5 text-xl md:text-2xl text-gray-900">
-            <li className="flex items-start gap-3">
-              <span className="text-3xl leading-none">⚡</span>
-              <span>Fast Turnaround</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-3xl leading-none">🎯</span>
-              <span>Premium Print Quality</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-3xl leading-none">📍</span>
-              <span>Local &amp; Reliable</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-3xl leading-none">🖨️</span>
-              <span>One-Stop Print Solution</span>
-            </li>
-          </ul>
+      {/* Value Proposition Grid */}
+      <section className="bg-gray-50 py-16 md:py-24 border-y border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">The iPrintRush Standard</h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              We hold ourselves to strict operational standards to ensure your projects are handled properly from file upload to final delivery.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+            <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
+              <div className="w-12 h-12 bg-[#29b6f6]/10 text-[#29b6f6] rounded-lg flex items-center justify-center mb-6">
+                <Clock className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Uncompromising Speed</h3>
+              <p className="text-gray-600">
+                Our facility is optimized for rapid job turnaround. Same-day orders aren't just an afterthought—they are the core of our production schedule.
+              </p>
+            </div>
+            
+            <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
+              <div className="w-12 h-12 bg-[#29b6f6]/10 text-[#29b6f6] rounded-lg flex items-center justify-center mb-6">
+                <Award className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Commercial Quality</h3>
+              <p className="text-gray-600">
+                Speed doesn't mean cutting corners. We run industry-leading digital presses on premium paper stocks to ensure rich colors and crisp text on every print.
+              </p>
+            </div>
+
+            <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
+              <div className="w-12 h-12 bg-[#29b6f6]/10 text-[#29b6f6] rounded-lg flex items-center justify-center mb-6">
+                <MapPin className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Local Fulfillment</h3>
+              <p className="text-gray-600">
+                Because we produce locally, you aren't waiting on cross-country shipping. Pick up your orders directly or rely on our fast local delivery network.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="bg-[#29b6f6] text-white py-16 md:py-24">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div>
-              <div className="text-5xl font-bold mb-2">5000+</div>
-              <p className="text-lg opacity-90">Happy Customers</p>
+      {/* Trust Indicators */}
+      <section className="py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 text-gray-500">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <span className="font-medium text-gray-700">In-house Production</span>
             </div>
-            <div>
-              <div className="text-5xl font-bold mb-2">50K+</div>
-              <p className="text-lg opacity-90">Orders Completed</p>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <span className="font-medium text-gray-700">Dedicated Support</span>
             </div>
-            <div>
-              <div className="text-5xl font-bold mb-2">99%</div>
-              <p className="text-lg opacity-90">Satisfaction Rate</p>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <span className="font-medium text-gray-700">Secure File Processing</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 md:py-24">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-6">Ready to Experience the Difference?</h2>
-          <p className="text-lg text-gray-700 mb-8">
-            Join thousands of satisfied customers who trust iPrintRush for their printing needs.
+      <section className="bg-gray-900 text-white py-20">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to start your next project?</h2>
+          <p className="text-lg text-gray-300 mb-10">
+            Upload your files today and let us handle the heavy lifting.
           </p>
-          <Link href="/products">
-            <Button className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-semibold py-3 px-8 text-lg">
-              Shop Now
-            </Button>
-          </Link>
+          <div className="flex justify-center gap-4">
+            <Link href="/products">
+              <Button className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-semibold py-6 px-10 text-lg rounded-xl h-auto">
+                Browse Products
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
     </div>

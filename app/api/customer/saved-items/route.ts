@@ -30,9 +30,11 @@ export async function GET(req: NextRequest) {
 
     // Parse saved items or return empty array
     let savedItems = [];
-    if (user.saved_items) {
+    if (user?.saved_items) {
       try {
-        savedItems = JSON.parse(user.saved_items);
+        savedItems = typeof user.saved_items === 'string' 
+          ? JSON.parse(user.saved_items) 
+          : user.saved_items;
       } catch (e) {
         console.error('Error parsing saved items:', e);
         savedItems = [];
@@ -80,7 +82,9 @@ export async function POST(req: NextRequest) {
     let savedItems = [];
     if (user?.saved_items) {
       try {
-        savedItems = JSON.parse(user.saved_items);
+        savedItems = typeof user.saved_items === 'string' 
+          ? JSON.parse(user.saved_items) 
+          : user.saved_items;
       } catch (e) {
         console.error('Error parsing saved items:', e);
         savedItems = [];

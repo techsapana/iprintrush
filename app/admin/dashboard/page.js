@@ -30,8 +30,8 @@ export default function AdminDashboardPage() {
   const [notaryImageUrl, setNotaryImageUrl] = useState('');
   const [mailboxImageUrl, setMailboxImageUrl] = useState('');
   const [logoImageUrl, setLogoImageUrl] = useState('');
-  const [heroDesktopImageUrl, setHeroDesktopImageUrl] = useState('');
-  const [heroMobileImageUrl, setHeroMobileImageUrl] = useState('');
+  const [heroDesktopImages, setHeroDesktopImages] = useState([]);
+  const [heroMobileImages, setHeroMobileImages] = useState([]);
   const [openingDay, setOpeningDay] = useState('');
   const [closingDay, setClosingDay] = useState('');
   const [openingTime, setOpeningTime] = useState('');
@@ -92,8 +92,16 @@ useEffect(() => {
         setNotaryImageUrl(data.notaryImageUrl || '');
         setMailboxImageUrl(data.mailboxImageUrl || '');
         setLogoImageUrl(data.logoImageUrl || '');
-        setHeroDesktopImageUrl(data.heroDesktopImageUrl || '');
-        setHeroMobileImageUrl(data.heroMobileImageUrl || '');
+        const parseImages = (val) => {
+          if (!val || typeof val !== 'string') return [];
+          const str = val.trim();
+          if (str.startsWith('[') && str.endsWith(']')) {
+            try { return JSON.parse(str); } catch { return [str]; }
+          }
+          return [str];
+        };
+        setHeroDesktopImages(parseImages(data.heroDesktopImageUrl));
+        setHeroMobileImages(parseImages(data.heroMobileImageUrl));
         setOpeningDay(data.openingDay || '');
         setClosingDay(data.closingDay || '');
         setOpeningTime(data.openingTime || '');
@@ -139,6 +147,24 @@ useEffect(() => {
     targetSetter(json.url);
   };
 
+  const uploadMultipleSiteImages = async (files, arraySetter, folder = 'site-settings') => {
+    if (!files || files.length === 0) return;
+    setAnnouncementMessage('Uploading images...');
+    const newUrls = [];
+    for (let i = 0; i < files.length; i++) {
+      const fd = new FormData();
+      fd.append('file', files[i]);
+      fd.append('folder', folder);
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.url) {
+        newUrls.push(json.url);
+      }
+    }
+    arraySetter((prev) => [...prev, ...newUrls]);
+    setAnnouncementMessage('');
+  };
+
   const saveAnnouncement = async () => {
     try {
       setAnnouncementLoading(true);
@@ -165,8 +191,8 @@ useEffect(() => {
           notaryImageUrl,
           mailboxImageUrl,
           logoImageUrl,
-          heroDesktopImageUrl,
-          heroMobileImageUrl,
+          heroDesktopImageUrl: JSON.stringify(heroDesktopImages),
+          heroMobileImageUrl: JSON.stringify(heroMobileImages),
           openingDay,
           closingDay,
           openingTime,
@@ -404,36 +430,64 @@ useEffect(() => {
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
+                      const files = Array.from(e.target.files || []);
+                      if (!files.length) return;
                       try {
-                        await uploadSiteImage(file, setHeroDesktopImageUrl);
+                        await uploadMultipleSiteImages(files, setHeroDesktopImages);
                       } catch (err) {
-                        setAnnouncementMessage(err?.message || 'Failed to upload image');
+                        setAnnouncementMessage(err?.message || 'Failed to upload images');
                       }
                     }}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   />
-                  {heroDesktopImageUrl && <img src={heroDesktopImageUrl} alt="Hero desktop" className="mt-2 h-20 w-full rounded object-cover border" />}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {heroDesktopImages.map((img, idx) => (
+                      <div key={idx} className="relative group">
+                        <img src={img} alt="Hero desktop" className="h-16 rounded object-cover border" />
+                        <button
+                          type="button"
+                          onClick={() => setHeroDesktopImages(prev => prev.filter((_, i) => i !== idx))}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-700 mb-1">Hero Image (Mobile)</label>
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
+                      const files = Array.from(e.target.files || []);
+                      if (!files.length) return;
                       try {
-                        await uploadSiteImage(file, setHeroMobileImageUrl);
+                        await uploadMultipleSiteImages(files, setHeroMobileImages);
                       } catch (err) {
-                        setAnnouncementMessage(err?.message || 'Failed to upload image');
+                        setAnnouncementMessage(err?.message || 'Failed to upload images');
                       }
                     }}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   />
-                  {heroMobileImageUrl && <img src={heroMobileImageUrl} alt="Hero mobile" className="mt-2 h-20 w-full rounded object-cover border" />}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {heroMobileImages.map((img, idx) => (
+                      <div key={idx} className="relative group">
+                        <img src={img} alt="Hero mobile" className="h-16 rounded object-cover border" />
+                        <button
+                          type="button"
+                          onClick={() => setHeroMobileImages(prev => prev.filter((_, i) => i !== idx))}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
