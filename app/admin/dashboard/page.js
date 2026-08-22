@@ -997,6 +997,23 @@ useEffect(() => {
           </div>
 
           <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-sky-500 text-white p-6">
+              <h2 className="text-xl font-bold">Custom Quotes</h2>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                View quote requests for products not in the store catalog.
+              </p>
+              <Link
+                href="/admin/custom-quotes"
+                className="block w-full bg-sky-500 text-white text-center py-2 rounded-lg hover:bg-sky-600 transition font-medium"
+              >
+                View Custom Quotes
+              </Link>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="bg-pink-600 text-white p-6">
               <h2 className="text-xl font-bold">Analytics & Statistics</h2>
             </div>

@@ -69,26 +69,8 @@ export function HeroBackgroundSlider({
   }, [heroDesktopImages, heroMobileImages, images, isMobile]);
 
   const [activeIndex, setActiveIndex] = useState(0);
-  const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
-    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    if (!media) return;
-
-    const onChange = () => setReduceMotion(Boolean(media.matches));
-    onChange();
-
-    if (typeof media.addEventListener === 'function') {
-      media.addEventListener('change', onChange);
-      return () => media.removeEventListener('change', onChange);
-    }
-
-    media.addListener(onChange);
-    return () => media.removeListener(onChange);
-  }, []);
-
-  useEffect(() => {
-    if (reduceMotion) return;
     if (safeImages.length <= 1) return;
 
     const id = window.setInterval(() => {
@@ -96,7 +78,7 @@ export function HeroBackgroundSlider({
     }, intervalMs);
 
     return () => window.clearInterval(id);
-  }, [intervalMs, reduceMotion, safeImages.length]);
+  }, [intervalMs, safeImages.length]);
 
   return (
     <div
@@ -121,7 +103,7 @@ export function HeroBackgroundSlider({
             className="absolute inset-0 w-full h-full object-cover"
             style={{
               opacity: isActive ? 1 : 0,
-              transition: reduceMotion ? undefined : `opacity ${fadeMs}ms ease-in-out`,
+              transition: `opacity ${fadeMs}ms ease-in-out`,
             }}
           />
         );
