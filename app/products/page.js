@@ -337,8 +337,8 @@ function ProductsContent() {
             ) : null}
           </>
         ) : (
-          <div className="bg-white p-12 rounded-lg text-center">
-            <p className="text-gray-600 text-lg">
+          <div className="bg-white p-12 rounded-lg text-center shadow-sm">
+            <p className="text-gray-600 text-lg mb-4">
               {isSameDayPrintingView
                 ? 'No same-day products found.'
                 : qParam
@@ -346,17 +346,27 @@ function ProductsContent() {
                   : 'No products found in this category.'}
             </p>
             {isSameDayPrintingView ? (
-              <Link href="/products" className="mt-4 inline-block text-[#29b6f6] hover:underline font-semibold">
+              <Link href="/products" className="inline-block text-[#29b6f6] hover:underline font-semibold mb-6">
                 View All Products
               </Link>
             ) : (
               <button
                 onClick={() => { setSelectedCategory('all'); setPriceRange([0, 200]); }}
-                className="mt-4 text-[#29b6f6] hover:underline font-semibold"
+                className="inline-block text-[#29b6f6] hover:underline font-semibold mb-6"
               >
                 View All Products
               </button>
             )}
+            
+            <div className="mt-8 pt-8 border-t border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Can't Find What You Need?</h3>
+              <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                We offer custom sourcing and printing for products not listed in our standard catalog. Send us the details and we'll get you a custom quote.
+              </p>
+              <Link href="/request-quote" className="inline-block bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-semibold py-3 px-8 rounded-lg transition shadow-md">
+                Request a Custom Quote
+              </Link>
+            </div>
           </div>
         )}
         
