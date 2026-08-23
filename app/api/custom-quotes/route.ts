@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/app/lib/db';
 import { getAdminFromRequest } from '@/app/lib/adminAuth';
+import { sendEmail } from '@/app/lib/mailer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,42 @@ export async function POST(req: NextRequest) {
     ];
 
     await query(sql, values);
+
+    // Send email to admin
+    try {
+      const adminEmail = process.env.MAIL_FROM || 'info@iprintrush.com';
+      await sendEmail({
+        to: adminEmail,
+        subject: `New Custom Quote Request: ${data.product_category}`,
+        text: `You have received a new custom quote request from ${data.full_name} (${data.email}).\n\nProduct: ${data.product_category}\nQuantity: ${data.quantity}\n\nPlease check the admin dashboard for full details.`,
+        html: `<div style="font-family:sans-serif;padding:20px;border:1px solid #ddd;border-radius:8px;">
+                 <h2 style="color:#29b6f6;">New Custom Quote Request</h2>
+                 <p><strong>Customer:</strong> ${data.full_name} (${data.email})</p>
+                 <p><strong>Phone:</strong> ${data.phone}</p>
+                 <p><strong>Product Category:</strong> ${data.product_category}</p>
+                 <p><strong>Quantity:</strong> ${data.quantity}</p>
+                 <br/>
+                 <p>Please log in to the admin dashboard to view the full specifications and attached files.</p>
+               </div>`
+      });
+
+      // Send confirmation to customer
+      await sendEmail({
+        to: data.email,
+        subject: `We received your quote request - iPrintRush`,
+        text: `Hi ${data.full_name},\n\nThank you for requesting a custom quote! Our team is reviewing your requirements for ${data.product_category} and will get back to you shortly.\n\nBest,\nThe iPrintRush Team`,
+        html: `<div style="font-family:sans-serif;padding:20px;">
+                 <h2>Thank you for your request, ${data.full_name}!</h2>
+                 <p>Our team has received your custom quote request for <strong>${data.product_category}</strong>.</p>
+                 <p>We are currently reviewing your specifications and will get back to you shortly with pricing and availability.</p>
+                 <br/>
+                 <p>Best regards,<br/><strong>The iPrintRush Team</strong></p>
+               </div>`
+      });
+    } catch (emailErr) {
+      console.error('Failed to send quote emails:', emailErr);
+      // We don't fail the request if email fails, because the quote is saved.
+    }
 
     return NextResponse.json({ success: true, message: 'Quote request submitted successfully' });
   } catch (error: any) {
