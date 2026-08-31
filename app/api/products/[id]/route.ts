@@ -187,6 +187,8 @@ const transformed: any = {
         shippingCategory: product.shipping_category || 'standard',
         pdfTemplateUrl: product.pdf_template_url || null,
         aiTemplateUrl: product.ai_template_url || null,
+        fileSetup: product.file_setup || null,
+        applicationTips: product.application_tips || null,
         createdAt: product.created_at || null,
         features: product.features ? product.features.split(',') : [],
         sizes: sizes.map((s: any) => s.label),
@@ -266,8 +268,8 @@ if (!existingProductId) {
       // Product doesn't exist - create it (upsert behavior)
       
       await query(
-`INSERT INTO products (id, name, slug, description, price, min_quantity, max_quantity, min_order_value, max_order_value, min_width_in, max_width_in, min_height_in, max_height_in, price_per_sq_inch, mailbox_price_per_month, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, pdf_template_url, ai_template_url, enabled)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`INSERT INTO products (id, name, slug, description, price, min_quantity, max_quantity, min_order_value, max_order_value, min_width_in, max_width_in, min_height_in, max_height_in, price_per_sq_inch, mailbox_price_per_month, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, pdf_template_url, ai_template_url, file_setup, application_tips, enabled)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            name = VALUES(name),
            slug = VALUES(slug),
@@ -300,6 +302,8 @@ if (!existingProductId) {
            shipping_category = VALUES(shipping_category),
            pdf_template_url = VALUES(pdf_template_url),
            ai_template_url = VALUES(ai_template_url),
+           file_setup = VALUES(file_setup),
+           application_tips = VALUES(application_tips),
            updated_at = CURRENT_TIMESTAMP`,
  [
            productId,
@@ -334,6 +338,8 @@ if (!existingProductId) {
            body.shippingCategory || 'standard',
            body.pdfTemplateUrl || null,
            body.aiTemplateUrl || null,
+           body.fileSetup || null,
+           body.applicationTips || null,
            1
 ]
        );
@@ -475,6 +481,14 @@ if (!existingProductId) {
         if (body.aiTemplateUrl !== undefined) {
           updates.push('ai_template_url = ?');
           values.push(body.aiTemplateUrl || null);
+        }
+        if (body.fileSetup !== undefined) {
+          updates.push('file_setup = ?');
+          values.push(body.fileSetup || null);
+        }
+        if (body.applicationTips !== undefined) {
+          updates.push('application_tips = ?');
+          values.push(body.applicationTips || null);
         }
 
       if (updates.length > 0) {

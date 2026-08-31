@@ -220,6 +220,10 @@ if (switchedProduct) {
            : (snap.features || prev.features || ''),
          featured: snap.featured ?? false,
          couponCodes: snap.couponCodes || [],
+         pdfTemplateUrl: snap.pdfTemplateUrl || '',
+         aiTemplateUrl: snap.aiTemplateUrl || '',
+         fileSetup: snap.fileSetup || '',
+         applicationTips: snap.applicationTips || '',
        }));
      }
     // First mount for this id: useState already seeded from initialProduct — do not set image/gallery/videos from snap here (would race uploads).
@@ -1678,6 +1682,36 @@ multi-month discounts.
                 value={formData.description}
                 onChange={handleChange}
                 placeholder="Product description..."
+                rows="3"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                File Setup (Optional)
+                <span className="block text-xs text-gray-500 font-normal">Leave blank to use the default text.</span>
+              </label>
+              <textarea
+                name="fileSetup"
+                value={formData.fileSetup}
+                onChange={handleChange}
+                placeholder="Custom file setup instructions..."
+                rows="3"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Application / Use Tips (Optional)
+                <span className="block text-xs text-gray-500 font-normal">Leave blank to use the default text.</span>
+              </label>
+              <textarea
+                name="applicationTips"
+                value={formData.applicationTips}
+                onChange={handleChange}
+                placeholder="Custom application or use tips..."
                 rows="3"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
               />

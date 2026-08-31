@@ -102,16 +102,7 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
             {product.description}
           </p>
 
-          <div className="pt-4 flex flex-wrap gap-1.5 mt-auto">
-            {(product.features || []).slice(0, 2).map((feature, idx) => (
-              <span
-                key={idx}
-                className="text-[10px] font-medium tracking-wide bg-[rgba(41,182,246,0.12)] text-[#1a7ba3] px-2 py-1 rounded-md"
-              >
-                {feature}
-              </span>
-            ))}
-          </div>
+          <div className="mt-auto" />
         </CardContent>
       </Link>
 

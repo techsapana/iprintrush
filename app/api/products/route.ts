@@ -172,6 +172,8 @@ export async function GET(request: NextRequest) {
         shippingCategory: p.shipping_category || 'standard',
         pdfTemplateUrl: p.pdf_template_url || null,
         aiTemplateUrl: p.ai_template_url || null,
+        fileSetup: p.file_setup || null,
+        applicationTips: p.application_tips || null,
         createdAt: p.created_at || null,
         features: p.features ? p.features.split(',') : [],
         galleryImages: p.gallery_images
@@ -265,6 +267,8 @@ const {
         couponCodes = [],
         pdfTemplateUrl,
         aiTemplateUrl,
+        fileSetup,
+        applicationTips,
       } = body;
 
     // Get category ID from slug or name
@@ -286,8 +290,8 @@ const productId = id || `product-${Date.now()}`;
     console.log('Product name:', name);
     
       await query(
-        `INSERT INTO products (id, name, slug, description, price, min_quantity, max_quantity, min_order_value, max_order_value, min_width_in, max_width_in, min_height_in, max_height_in, price_per_sq_inch, mailbox_price_per_month, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, pdf_template_url, ai_template_url, enabled)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO products (id, name, slug, description, price, min_quantity, max_quantity, min_order_value, max_order_value, min_width_in, max_width_in, min_height_in, max_height_in, price_per_sq_inch, mailbox_price_per_month, old_price, weight_lb, package_length_in, package_width_in, package_height_in, category_id, l_category, image, same_day_eligible, out_of_stock, featured, allow_custom_dimensions, shipping_enabled, local_delivery_eligible, shipping_category, pdf_template_url, ai_template_url, file_setup, application_tips, enabled)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           name = VALUES(name),
           slug = VALUES(slug),
@@ -320,6 +324,8 @@ const productId = id || `product-${Date.now()}`;
          shipping_category = VALUES(shipping_category),
          pdf_template_url = VALUES(pdf_template_url),
          ai_template_url = VALUES(ai_template_url),
+         file_setup = VALUES(file_setup),
+         application_tips = VALUES(application_tips),
          updated_at = CURRENT_TIMESTAMP`,
       [
         productId,
@@ -354,6 +360,8 @@ const productId = id || `product-${Date.now()}`;
         shippingCategory || 'standard',
         pdfTemplateUrl || null,
         aiTemplateUrl || null,
+        fileSetup || null,
+        applicationTips || null,
         1 // enabled
       ]
     );
