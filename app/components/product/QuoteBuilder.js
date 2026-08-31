@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { DynamicQuoteBuilder } from './DynamicQuoteBuilder';
 import { scrollCustomizationSectionIntoView } from '../../lib/scrollCustomizationSection';
@@ -2090,6 +2091,25 @@ case 7:
               )}
             </div>
           </div>
+
+          {/* Custom Apparels Notice - Rendered fully below the action bar */}
+          {isCustomApparels && showNextStep && (
+            <div className="mt-4 p-5 bg-white border border-gray-200 shadow-sm rounded-xl w-full">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <h4 className="font-semibold text-gray-900 mb-1.5 text-[15px]">Looking for a Different Brand, Color, or Style—or Bringing Your Own Apparel?</h4>
+                  <p className="text-gray-600 text-[14px] leading-snug">We can help source the right garment—or print on apparel you provide.</p>
+                </div>
+                <div className="flex-shrink-0">
+                  <Link href="/request-quote" className="inline-block w-full sm:w-auto">
+                    <Button type="button" variant="outline" className="w-full text-[#29b6f6] border-[#29b6f6] hover:bg-[#29b6f6] hover:text-white transition-colors bg-white">
+                      Request an Apparel Quote
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
