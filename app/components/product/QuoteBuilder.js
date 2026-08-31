@@ -1676,9 +1676,37 @@ const renderDeliveryStep = () => {
   };
 
   const renderStepContent = () => {
+    const isDTFGangSheet = productName && (productName.toLowerCase().includes('gang sheet') || productName.toLowerCase().includes('dtf'));
+
     const artworkStep = (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Upload Artwork</h3>
+
+        {/* DTF Gang Sheet Maker CTA */}
+        {isDTFGangSheet && (
+          <div className="bg-[#f0f9ff] border border-[#29b6f6] rounded-xl p-5 mb-4 shadow-sm">
+            <h4 className="font-semibold text-gray-900 text-[15px] mb-2 flex items-center gap-2">
+              <svg className="w-5 h-5 text-[#29b6f6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Need to build your Gang Sheet?
+            </h4>
+            <ol className="list-decimal ml-5 text-gray-700 text-[14px] space-y-1 mb-4">
+              <li>Click the button below to use the free Gang Sheet Maker.</li>
+              <li>Auto-pack your designs and click <b>Download</b>.</li>
+              <li>Come back here and upload the downloaded file below!</li>
+            </ol>
+            <a href="https://freegangsheetmaker.com/" target="_blank" rel="noopener noreferrer" className="inline-block">
+              <Button type="button" className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white">
+                Open Free Gang Sheet Maker
+                <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </Button>
+            </a>
+          </div>
+        )}
+
         <div className="space-y-3">
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
