@@ -4,6 +4,12 @@ import { useState, useEffect, use, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { useAdmin } from '../../hooks/useAdmin';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
@@ -342,28 +348,14 @@ const canProceedToPayment = Boolean(
               </div>
             </div>
 
-            <p className="text-lg text-gray-600 mb-6">{product.description}</p>
-
             {outOfStock ? (
               <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 This product is currently out of stock.
               </div>
             ) : null}
 
-            {/* Features */}
-            <div className="mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3">Features</h3>
-              <ul className="grid grid-cols-2 gap-2">
-                {product.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-center gap-2 text-gray-700">
-                    <span className="text-[#29b6f6]">✓</span> {feature}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
             {/* Customizer */}
-{isMailboxNotaryCategory ? (
+            {isMailboxNotaryCategory ? (
                 <MailboxQuoteBuilder
                   productId={product.id}
                   productName={product.name}
@@ -404,6 +396,56 @@ const canProceedToPayment = Boolean(
                    onColorSelect={setActiveColorImage}
                  />
               )}
+
+            {/* Accordion for Details & Instructions */}
+            <div className="mt-8 mb-8 bg-white rounded-lg border border-gray-200 shadow-sm">
+              <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
+                <AccordionItem value="item-1" className="px-4 border-b border-gray-100">
+                  <AccordionTrigger className="text-base font-semibold text-gray-800 hover:text-[#29b6f6] py-4">Product Details</AccordionTrigger>
+                  <AccordionContent className="text-gray-600 pb-4">
+                    <p className="mb-4 text-[15px] leading-relaxed">{product.description}</p>
+                    {product.features && product.features.length > 0 && (
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 bg-gray-50 p-4 rounded-md">
+                        {product.features.map((feature, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-[14px] text-gray-700">
+                            <span className="text-[#29b6f6] font-bold mt-0.5">✓</span> 
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-2" className="px-4 border-b border-gray-100">
+                  <AccordionTrigger className="text-base font-semibold text-gray-800 hover:text-[#29b6f6] py-4">File Setup</AccordionTrigger>
+                  <AccordionContent className="text-gray-600 text-[15px] leading-relaxed pb-4">
+                    {product.fileSetup || "Please provide your artwork in CMYK color mode at 300 DPI. Ensure all fonts are outlined and embed any linked images. We recommend saving your file as a high-quality PDF with a 0.125-inch bleed on all sides."}
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-3" className="px-4 border-b border-gray-100">
+                  <AccordionTrigger className="text-base font-semibold text-gray-800 hover:text-[#29b6f6] py-4">Application / Use Tips</AccordionTrigger>
+                  <AccordionContent className="text-gray-600 text-[15px] leading-relaxed pb-4">
+                    {product.applicationTips || "For best results, store in a cool, dry place before use. Follow the provided instructions carefully during application to ensure maximum durability and longevity."}
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-4" className="px-4 border-none">
+                  <AccordionTrigger className="text-base font-semibold text-gray-800 hover:text-[#29b6f6] py-4">Templates</AccordionTrigger>
+                  <AccordionContent className="text-gray-600 text-[15px] leading-relaxed pb-4">
+                    {product.templates || "Download our free templates below to ensure your design is perfectly sized and formatted for this product."}
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Button variant="outline" size="sm" className="text-[#29b6f6] border-[#29b6f6] hover:bg-[#29b6f6] hover:text-white">
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        PDF Template
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-[#29b6f6] border-[#29b6f6] hover:bg-[#29b6f6] hover:text-white">
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        AI Template
+                      </Button>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
 
             {/* Notary pricing chart (separate from mailbox rental) */}
             {isMailboxNotaryCategory && (
