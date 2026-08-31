@@ -102,7 +102,7 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
             {product.description}
           </p>
 
-          <div className="mt-auto pt-4 flex flex-wrap gap-1.5">
+          <div className="pt-4 flex flex-wrap gap-1.5 mt-auto">
             {(product.features || []).slice(0, 2).map((feature, idx) => (
               <span
                 key={idx}
@@ -115,7 +115,7 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
         </CardContent>
       </Link>
 
-      <CardFooter className="flex flex-row items-end justify-between gap-2 px-4 pb-4 pt-2 border-t border-gray-50 mt-auto">
+      <CardFooter className="flex flex-row items-end justify-between gap-2 px-4 pb-4 pt-2 border-t border-gray-50 mt-0">
         <div className="leading-tight">
           {hasPrice ? (
             <>
@@ -139,7 +139,7 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
             </div>
           )}
         </div>
-        <Link href={`/products/${product.slug}`} className="flex-shrink-0">
+        <Link href={`/products/${product.slug}`} className="flex-shrink-0 mt-auto">
           <Button
             size={compact ? "sm" : "default"}
             disabled={outOfStock}
