@@ -428,22 +428,32 @@ const canProceedToPayment = Boolean(
                     {product.applicationTips || "For best results, store in a cool, dry place before use. Follow the provided instructions carefully during application to ensure maximum durability and longevity."}
                   </AccordionContent>
                 </AccordionItem>
-                <AccordionItem value="item-4" className="px-4 border-none">
-                  <AccordionTrigger className="text-base font-semibold text-gray-800 hover:text-[#29b6f6] py-4">Templates</AccordionTrigger>
-                  <AccordionContent className="text-gray-600 text-[15px] leading-relaxed pb-4">
-                    {product.templates || "Download our free templates below to ensure your design is perfectly sized and formatted for this product."}
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <Button variant="outline" size="sm" className="text-[#29b6f6] border-[#29b6f6] hover:bg-[#29b6f6] hover:text-white">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        PDF Template
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-[#29b6f6] border-[#29b6f6] hover:bg-[#29b6f6] hover:text-white">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        AI Template
-                      </Button>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
+                {(product.pdfTemplateUrl || product.aiTemplateUrl) && (
+                  <AccordionItem value="item-4" className="px-4 border-none">
+                    <AccordionTrigger className="text-base font-semibold text-gray-800 hover:text-[#29b6f6] py-4">Templates</AccordionTrigger>
+                    <AccordionContent className="text-gray-600 text-[15px] leading-relaxed pb-4">
+                      {product.templates || "Download our free templates below to ensure your design is perfectly sized and formatted for this product."}
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        {product.pdfTemplateUrl && (
+                          <a href={product.pdfTemplateUrl} download target="_blank" rel="noopener noreferrer">
+                            <Button variant="outline" size="sm" className="text-[#29b6f6] border-[#29b6f6] hover:bg-[#29b6f6] hover:text-white">
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                              PDF Template
+                            </Button>
+                          </a>
+                        )}
+                        {product.aiTemplateUrl && (
+                          <a href={product.aiTemplateUrl} download target="_blank" rel="noopener noreferrer">
+                            <Button variant="outline" size="sm" className="text-[#29b6f6] border-[#29b6f6] hover:bg-[#29b6f6] hover:text-white">
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                              AI Template
+                            </Button>
+                          </a>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
               </Accordion>
             </div>
 

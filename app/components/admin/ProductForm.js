@@ -130,6 +130,8 @@ const [formData, setFormData] = useState({
      features: initialProduct?.features?.join(', ') || '',
      featured: initialProduct?.featured ?? false,
      couponCodes: initialProduct?.couponCodes || [],
+     pdfTemplateUrl: initialProduct?.pdfTemplateUrl || '',
+     aiTemplateUrl: initialProduct?.aiTemplateUrl || '',
    });
 
   // Quote settings state
@@ -1692,6 +1694,34 @@ multi-month discounts.
                   value={formData.features}
                   onChange={handleChange}
                   placeholder="e.g., Full Color, Waterproof"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  PDF Template URL
+                </label>
+                <input
+                  type="text"
+                  name="pdfTemplateUrl"
+                  value={formData.pdfTemplateUrl}
+                  onChange={handleChange}
+                  placeholder="https://example.com/template.pdf"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  AI Template URL
+                </label>
+                <input
+                  type="text"
+                  name="aiTemplateUrl"
+                  value={formData.aiTemplateUrl}
+                  onChange={handleChange}
+                  placeholder="https://example.com/template.ai"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
                 />
               </div>
