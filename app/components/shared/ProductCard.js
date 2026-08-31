@@ -40,34 +40,43 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
     <Card
       className={`flex flex-col h-full rounded-2xl border border-gray-200 bg-white hover:shadow-xl hover:-translate-y-1 transition-all ${className}`}
     >
-      <Link href={`/products/${product.slug}`}>
+      <Link href={`/products/${product.slug}`} className="flex flex-col flex-1">
         <CardContent
-          className={`pt-4 flex-1 ${compact ? 'pb-2' : 'pb-4'} cursor-pointer`}
+          className={`pt-4 flex flex-col flex-1 ${compact ? 'pb-2' : 'pb-4'} cursor-pointer`}
         >
-          <div className="relative mb-4 overflow-hidden rounded-xl">
-            <img
-              src={product.image}
-              alt={product.name}
-              className={`w-full object-cover transition-transform duration-300 ${
-                compact ? 'h-48 md:h-52' : 'h-56 md:h-64'
-              } group-hover:scale-105`}
-            />
+          <div className={`relative mb-4 overflow-hidden rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center ${compact ? 'h-48 md:h-52' : 'h-56 md:h-64'}`}>
+            {product.image ? (
+              <img
+                src={product.image}
+                alt={product.name}
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 z-0"
+                onError={(e) => { 
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.parentElement.insertAdjacentHTML('beforeend', '<div class="z-0 text-gray-400 text-sm font-medium">Image Not Available</div>');
+                }}
+              />
+            ) : (
+              <div className="text-gray-400 text-sm font-medium z-0">
+                No Image
+              </div>
+            )}
+            
             {isSameDayPrintingProduct(product) && (
-              <div className="absolute bottom-2 left-2">
+              <div className="absolute bottom-2 left-2 z-10">
                 <SameDayBadge />
               </div>
             )}
             {isNewProduct && (
-              <div className="absolute top-2 left-2 px-2 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold">
+              <div className="absolute top-2 left-2 z-10 px-2 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold shadow-sm">
                 New
               </div>
             )}
             <button
               onClick={handleWishlistToggle}
-              className={`absolute top-2 right-2 w-9 h-9 rounded-full flex items-center justify-center shadow-sm transition-all ${
+              className={`absolute top-2 right-2 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-sm transition-all ${
                 inWishlist
                   ? 'bg-red-500 text-white'
-                  : 'bg-white/95 text-gray-600 hover:bg-white'
+                  : 'bg-white/95 text-gray-600 hover:bg-gray-50'
               }`}
               title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
             >
@@ -78,7 +87,7 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
           </div>
 
           <h3
-            className={`font-semibold text-gray-900 hover:text-[#29b6f6] transition-colors ${
+            className={`font-semibold text-gray-900 leading-tight hover:text-[#29b6f6] transition-colors line-clamp-2 ${
               compact ? 'text-sm' : 'text-lg'
             }`}
           >
@@ -93,11 +102,11 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
             {product.description}
           </p>
 
-          <div className="mt-3 flex flex-wrap gap-1">
+          <div className="mt-auto pt-4 flex flex-wrap gap-1.5">
             {(product.features || []).slice(0, 2).map((feature, idx) => (
               <span
                 key={idx}
-                className="text-[11px] bg-[rgba(41,182,246,0.12)] text-[#1a7ba3] px-2 py-0.5 rounded-full"
+                className="text-[10px] font-medium tracking-wide bg-[rgba(41,182,246,0.12)] text-[#1a7ba3] px-2 py-1 rounded-md"
               >
                 {feature}
               </span>
@@ -106,25 +115,23 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
         </CardContent>
       </Link>
 
-      <CardFooter className="flex items-center justify-between gap-2 px-4 pb-4 pt-0">
+      <CardFooter className="flex flex-row items-end justify-between gap-2 px-4 pb-4 pt-2 border-t border-gray-50 mt-auto">
         <div className="leading-tight">
           {hasPrice ? (
             <>
-              <div className={`text-[10px] uppercase tracking-wide text-gray-500 ${compact ? '' : 'mb-0.5'}`}>
+              <div className={`text-[10px] font-medium uppercase tracking-wide text-gray-400 ${compact ? '' : 'mb-1'}`}>
                 Starting price
               </div>
-              {showOldPrice && (
-                <div className={`flex items-baseline gap-1 text-gray-600 ${compact ? 'text-xs' : 'text-sm'}`}>
-                  <span className="line-through text-red-600">${oldPrice.toFixed(2)}</span>
-                </div>
-              )}
-              <div className={`font-bold text-[#29b6f6] flex flex-wrap items-baseline gap-x-2 ${compact ? 'text-base' : 'text-xl'}`}>
+              <div className={`font-bold text-[#29b6f6] flex flex-col sm:flex-row items-start sm:items-baseline sm:gap-x-2 ${compact ? 'text-base' : 'text-xl'}`}>
                 <span>
                   ${price.toFixed(2)}
                   {isMailbox && (
-                    <span className="ml-1 text-xs text-gray-600">/month</span>
+                    <span className="ml-1 text-xs text-gray-500 font-normal">/mo</span>
                   )}
                 </span>
+                {showOldPrice && (
+                  <span className="line-through text-red-500/70 text-xs sm:text-sm font-medium mt-0.5 sm:mt-0">${oldPrice.toFixed(2)}</span>
+                )}
               </div>
             </>
           ) : (
@@ -132,13 +139,13 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
             </div>
           )}
         </div>
-        <Link href={`/products/${product.slug}`}>
+        <Link href={`/products/${product.slug}`} className="flex-shrink-0">
           <Button
-            size="sm"
+            size={compact ? "sm" : "default"}
             disabled={outOfStock}
-            className={`text-white ${outOfStock ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#29b6f6] hover:bg-[#1e8fc4]'}`}
+            className={`text-white font-semibold rounded-lg shadow-sm ${outOfStock ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#29b6f6] hover:bg-[#1e8fc4] hover:shadow'}`}
           >
-            {outOfStock ? 'Out of stock' : 'Buy'}
+            {outOfStock ? 'Out of stock' : 'Buy Now'}
           </Button>
         </Link>
       </CardFooter>
