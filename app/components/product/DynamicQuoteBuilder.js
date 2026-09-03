@@ -166,33 +166,73 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
           }
         }
         const prefillPayload = prefillQuote?.payload;
+        let mergedSelections = { ...initial };
         if (prefillPayload?.selections && typeof prefillPayload.selections === 'object') {
-          setSelections({ ...initial, ...prefillPayload.selections });
+          mergedSelections = { ...mergedSelections, ...prefillPayload.selections };
           if (prefillPayload.selections.width_in != null) {
             setWidthIn(String(prefillPayload.selections.width_in));
           }
           if (prefillPayload.selections.height_in != null) {
             setHeightIn(String(prefillPayload.selections.height_in));
           }
-        } else {
-          setSelections(initial);
         }
+
+        // Apply URL parameters on top for Gang Sheet integration
+        const gsSize = searchParams.get('gs_size');
+        if (gsSize) {
+           const printSizeGroup = (json.schema?.groups || []).find(g => {
+             const poolKeyLower = g.poolKey.toLowerCase();
+             const poolName = (g.name || '').toLowerCase();
+             return poolKeyLower.includes('size') || poolName.includes('size');
+           });
+           if (printSizeGroup) {
+             const pool = (json.pools || []).find(p => p.key === printSizeGroup.poolKey);
+             if (pool && pool.options) {
+               const normalize = str => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+               const option = pool.options.find(o => normalize(o.label) === normalize(gsSize));
+               if (option) {
+                 const selectionType = normalizeSelectionType(pool.selectionType);
+                 mergedSelections[printSizeGroup.poolKey] = selectionType === 'multi' ? [option.id] : option.id;
+               }
+             }
+           }
+        }
+        
+        setSelections(mergedSelections);
+
         if (prefillPayload?.deliveryMethod) setDeliveryMethod(prefillPayload.deliveryMethod);
-        if (prefillPayload?.artworkReady) setArtworkReadyChoice('ready');
-        else if (prefillPayload?.artworkReady === false) setArtworkReadyChoice('not_ready');
-        if (Array.isArray(prefillPayload?.tempArtworkFiles)) {
-          setTempArtworkFiles(prefillPayload.tempArtworkFiles);
-        }
-        if (Array.isArray(prefillPayload?.artworkFiles)) {
-          setArtworkFiles(prefillPayload.artworkFiles);
-          if (!artworkReadyChoice) setArtworkReadyChoice('ready');
-        }
-        if (
-          (Array.isArray(prefillPayload?.tempArtworkFiles) && prefillPayload.tempArtworkFiles.length > 0) ||
-          (Array.isArray(prefillPayload?.artworkFiles) && prefillPayload.artworkFiles.length > 0)
-        ) {
+        
+        const gsUrl = searchParams.get('gs_url');
+        if (gsUrl) {
+          setArtworkReadyChoice('link');
+          setArtworkLink(gsUrl);
           setArtworkConfirmed(true);
+          // Jump to the Artwork step automatically
+          const groupsCount = (json.schema?.groups || []).filter((g) => (json.pools || []).some((pl) => pl.key === g.poolKey)).length;
+          setStep(groupsCount);
+        } else {
+          if (prefillPayload?.artworkReady) setArtworkReadyChoice('ready');
+          else if (prefillPayload?.artworkReady === false) setArtworkReadyChoice('not_ready');
+          else if (prefillPayload?.artworkLink) {
+            setArtworkReadyChoice('link');
+            setArtworkLink(prefillPayload.artworkLink);
+          }
+          if (Array.isArray(prefillPayload?.tempArtworkFiles)) {
+            setTempArtworkFiles(prefillPayload.tempArtworkFiles);
+          }
+          if (Array.isArray(prefillPayload?.artworkFiles)) {
+            setArtworkFiles(prefillPayload.artworkFiles);
+            if (!artworkReadyChoice) setArtworkReadyChoice('ready');
+          }
+          if (
+            (Array.isArray(prefillPayload?.tempArtworkFiles) && prefillPayload.tempArtworkFiles.length > 0) ||
+            (Array.isArray(prefillPayload?.artworkFiles) && prefillPayload.artworkFiles.length > 0) ||
+            prefillPayload?.artworkLink
+          ) {
+            setArtworkConfirmed(true);
+          }
         }
+
         if (typeof prefillPayload?.customSizeNote === 'string') {
           setCustomSizeNote(prefillPayload.customSizeNote);
         }
@@ -1768,21 +1808,24 @@ const renderDimensionStep = (group, pool, value) => {
 
         {/* DTF Gang Sheet Maker CTA */}
         {isDTFGangSheet && (
-          <div className="bg-[#f0f9ff] border border-[#29b6f6] rounded-xl p-5 mb-4 shadow-sm">
-            <h4 className="font-semibold text-gray-900 text-[15px] mb-2 flex items-center gap-2">
-              <svg className="w-5 h-5 text-[#29b6f6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Need to build your Gang Sheet?
-            </h4>
-            <ol className="list-decimal ml-5 text-gray-700 text-[14px] space-y-1 mb-4">
-              <li>Click the button below to use the free Gang Sheet Maker.</li>
-              <li>Auto-pack your designs and click <b>Download</b>.</li>
-              <li>Come back here and upload the downloaded file below!</li>
-            </ol>
-            <a href="https://freegangsheetmaker.com/" target="_blank" rel="noopener noreferrer" className="inline-block">
+          <div className="bg-[#f0f9ff] border border-[#29b6f6] rounded-xl p-5 mb-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h4 className="font-semibold text-gray-900 text-[15px] mb-1 flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#29b6f6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Need to build your Gang Sheet?
+              </h4>
+              <p className="text-sm text-gray-600">
+                Use our interactive tool to layout multiple designs and maximize your space.
+              </p>
+            </div>
+            <a 
+              href={`/dtf-builder?returnUrl=${typeof window !== 'undefined' ? encodeURIComponent(window.location.href) : ''}`} 
+              className="inline-block shrink-0"
+            >
               <Button type="button" className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white">
-                Open Free Gang Sheet Maker
+                Build Gang Sheet
                 <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
