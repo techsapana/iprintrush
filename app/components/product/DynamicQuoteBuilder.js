@@ -1081,6 +1081,11 @@ const handleDeliveryMethodChange = (method) => {
      return (
        <div className="space-y-4">
          {content}
+         <div className="flex items-center space-x-4 my-6">
+           <div className="flex-1 border-t border-gray-200"></div>
+           <span className="text-gray-400 font-semibold uppercase tracking-wider text-sm">OR</span>
+           <div className="flex-1 border-t border-gray-200"></div>
+         </div>
          <div>
            <div className="text-sm font-semibold text-gray-900 mb-2">Enter custom width and height</div>
            {renderDimensionFields()}
@@ -1447,7 +1452,16 @@ const renderDimensionStep = (group, pool, value) => {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Width (inches)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Width (inches)
+            {dimensionConfig?.minWidthIn != null || dimensionConfig?.maxWidthIn != null ? (
+              <span className="text-gray-500 font-normal ml-1">
+                ({dimensionConfig.minWidthIn != null ? `Min: ${dimensionConfig.minWidthIn}"` : ''} 
+                 {dimensionConfig.minWidthIn != null && dimensionConfig.maxWidthIn != null ? ' - ' : ''}
+                 {dimensionConfig.maxWidthIn != null ? `Max: ${dimensionConfig.maxWidthIn}"` : ''})
+              </span>
+            ) : null}
+          </label>
           <input
             type="text"
             inputMode="decimal"
@@ -1457,7 +1471,16 @@ const renderDimensionStep = (group, pool, value) => {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Height (inches)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Height (inches)
+            {dimensionConfig?.minHeightIn != null || dimensionConfig?.maxHeightIn != null ? (
+              <span className="text-gray-500 font-normal ml-1">
+                ({dimensionConfig.minHeightIn != null ? `Min: ${dimensionConfig.minHeightIn}"` : ''} 
+                 {dimensionConfig.minHeightIn != null && dimensionConfig.maxHeightIn != null ? ' - ' : ''}
+                 {dimensionConfig.maxHeightIn != null ? `Max: ${dimensionConfig.maxHeightIn}"` : ''})
+              </span>
+            ) : null}
+          </label>
           <input
             type="text"
             inputMode="decimal"
