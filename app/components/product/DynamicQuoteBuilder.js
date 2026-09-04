@@ -1865,7 +1865,7 @@ const renderDimensionStep = (group, pool, value) => {
           <input
             type="radio"
             name="dq-artwork-ready"
-            checked={artworkReadyChoice === 'ready'}
+            checked={artworkReadyChoice === 'ready' || artworkReadyChoice === 'link'}
             onChange={() => handleArtworkReadyChange('ready')}
           />
           Upload file now
@@ -1885,13 +1885,23 @@ const renderDimensionStep = (group, pool, value) => {
           Upload file later
         </label>
       </div>
-      {artworkReadyChoice === 'ready' && (
+      {(artworkReadyChoice === 'ready' || artworkReadyChoice === 'link') && (
           <div className="space-y-4">
-            <div className="text-sm text-gray-600 bg-blue-50 border border-blue-100 p-3 rounded-lg">
-              <p><strong>Maximum file size:</strong> 100 MB per file and 300 MB per order.</p>
-              <p className="mt-1"><strong>Accepted formats:</strong> JPG, JPEG, PNG, PDF, PSD, TIF, TIFF, AI, EPS, and ZIP.</p>
-            </div>
+            
+            {artworkReadyChoice === 'link' && artworkLink ? (
+              <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
+                <strong>✓ Gang Sheet Attached Successfully</strong>
+                <p className="mt-1">Your gang sheet layout has been saved and attached to this order.</p>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-600 bg-blue-50 border border-blue-100 p-3 rounded-lg">
+                <p><strong>Maximum file size:</strong> 100 MB per file and 300 MB per order.</p>
+                <p className="mt-1"><strong>Accepted formats:</strong> JPG, JPEG, PNG, PDF, PSD, TIF, TIFF, AI, EPS, and ZIP.</p>
+              </div>
+            )}
+            
             <div className="space-y-2">
+              {artworkReadyChoice !== 'link' && (
               <label className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">
                 <span>{artworkUploading ? 'Uploading...' : 'Choose File'}</span>
                 <input
@@ -1936,6 +1946,7 @@ const renderDimensionStep = (group, pool, value) => {
                   }}
                 />
               </label>
+              )}
               {artworkError && (
                 <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                   {artworkError}
@@ -1979,7 +1990,7 @@ const renderDimensionStep = (group, pool, value) => {
                   ✓ {tempArtworkFiles.length} artwork file(s) uploaded successfully.
                 </div>
               ) : null}
-              {artworkReadyChoice === 'ready' && (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && (
+              {(tempArtworkFiles.length > 0 || artworkFiles.length > 0 || Boolean(artworkLink)) && (
                 <label className="flex items-center gap-2 text-sm text-gray-700 mt-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -2116,7 +2127,9 @@ return (
     if (step === artworkStepIndex) {
       return (
         Boolean(artworkReadyChoice) &&
-        (artworkReadyChoice === 'not_ready' || (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && artworkConfirmed)
+        (artworkReadyChoice === 'not_ready' || 
+         (artworkReadyChoice === 'link' && Boolean(artworkLink)) || 
+         ((tempArtworkFiles.length > 0 || artworkFiles.length > 0 || Boolean(artworkLink)) && artworkConfirmed))
       );
     }
 
