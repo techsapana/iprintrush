@@ -137,7 +137,9 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
             className={`text-white font-semibold rounded-lg shadow-sm ${outOfStock ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#29b6f6] hover:bg-[#1e8fc4] hover:shadow'}`}
           >
             {(() => {
-              const isPrintedReady = product?.categorySlug?.includes('printed') || product?.category?.toLowerCase().includes('printed ready');
+              const catSlug = product?.categorySlug?.toLowerCase() || '';
+              const catName = product?.category?.toLowerCase() || '';
+              const isPrintedReady = catSlug === 'printed-ready' || catName === 'printed ready';
               return outOfStock ? 'Out of stock' : (isPrintedReady ? 'Buy Now' : 'Customize Now');
             })()}
           </Button>

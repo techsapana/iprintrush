@@ -284,6 +284,12 @@ export function Navbar() {
             </div>
 
             <div className="flex items-center gap-4 flex-shrink-0">
+              <Link
+                href="/request-quote"
+                className="flex items-center justify-center bg-[#ffffff] hover:bg-gray-100 text-[#29b6f6] font-bold text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded-full shadow-sm transition-all hover:scale-105 whitespace-nowrap"
+              >
+                Request a Quote
+              </Link>
               <a
                 href="tel:+19164581139"
                 className="hidden lg:flex items-center gap-1 text-white font-semibold hover:scale-105 transition-transform whitespace-nowrap text-sm"

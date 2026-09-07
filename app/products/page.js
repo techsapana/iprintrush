@@ -440,15 +440,7 @@ function ProductsPageInner() {
   const isSameDayPrintingCategory = categoryParam === SAME_DAY_PRINTING_CATEGORY_SLUG;
   return (
     <>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <ProductsPageTitle isSameDayPrintingCategory={isSameDayPrintingCategory} />
-        <Link 
-          href="/request-quote" 
-          className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all text-center w-full sm:w-auto"
-        >
-          Request a Custom Quote
-        </Link>
-      </div>
+      <ProductsPageTitle isSameDayPrintingCategory={isSameDayPrintingCategory} />
       <ProductsContent />
     </>
   );
