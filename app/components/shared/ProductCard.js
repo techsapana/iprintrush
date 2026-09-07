@@ -136,7 +136,10 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
             disabled={outOfStock}
             className={`text-white font-semibold rounded-lg shadow-sm ${outOfStock ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#29b6f6] hover:bg-[#1e8fc4] hover:shadow'}`}
           >
-            {outOfStock ? 'Out of stock' : 'Buy Now'}
+            {(() => {
+              const isPrintedReady = product?.categorySlug?.includes('printed') || product?.category?.toLowerCase().includes('printed ready');
+              return outOfStock ? 'Out of stock' : (isPrintedReady ? 'Buy Now' : 'Customize Now');
+            })()}
           </Button>
         </Link>
       </CardFooter>

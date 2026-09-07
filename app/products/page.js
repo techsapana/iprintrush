@@ -416,7 +416,7 @@ function ProductsLoading() {
 
 function ProductsPageTitle({ isSameDayPrintingCategory }) {
   return (
-    <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">
+    <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-0">
       {isSameDayPrintingCategory ? 'Same Day Printing' : 'All Products'}
     </h1>
   );
@@ -440,7 +440,15 @@ function ProductsPageInner() {
   const isSameDayPrintingCategory = categoryParam === SAME_DAY_PRINTING_CATEGORY_SLUG;
   return (
     <>
-      <ProductsPageTitle isSameDayPrintingCategory={isSameDayPrintingCategory} />
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <ProductsPageTitle isSameDayPrintingCategory={isSameDayPrintingCategory} />
+        <Link 
+          href="/request-quote" 
+          className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all text-center w-full sm:w-auto"
+        >
+          Request a Custom Quote
+        </Link>
+      </div>
       <ProductsContent />
     </>
   );
