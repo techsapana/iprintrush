@@ -68,12 +68,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const validated = await assertCustomApparelProductIds(unique);
-    if (validated.length !== unique.length) {
-      return NextResponse.json(
-        { error: 'One or more products are not in Custom Apparels or are disabled.' },
-        { status: 400 },
-      );
-    }
+    // Removed strict validation block to allow saving the valid items even if some are invalid
 
     await query('DELETE FROM home_custom_apparel_products');
     let order = 0;
