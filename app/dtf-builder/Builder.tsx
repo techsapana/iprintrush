@@ -229,6 +229,7 @@ export default function Builder() {
     [zoom, setZoom] = useState(1),
     [gap, setGap] = useState(0.25),
     [busy, setBusy] = useState(false),
+    [maxLength, setMaxLength] = useState<number | null>(null),
     [history, setHistory] = useState<Art[][]>([]),
     [dark, setDark] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
@@ -259,6 +260,20 @@ export default function Builder() {
     for (const origin of SHOP_ORIGINS)
       window.parent.postMessage({ type: "iprintrush:ready" }, origin);
     return () => window.removeEventListener("message", receive);
+  }, []);
+  
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlMaxHeight = params.get("max_height");
+      if (urlMaxHeight) {
+        const parsed = Number(urlMaxHeight);
+        if (!isNaN(parsed) && parsed > 0) {
+          setMaxLength(parsed);
+          setLength(parsed);
+        }
+      }
+    }
   }, []);
   const exportAbort = useRef<AbortController | null>(null);
   const input = useRef<HTMLInputElement>(null),
@@ -379,7 +394,7 @@ export default function Builder() {
       )
     ) {
       toast.error(
-        "Not enough space. Choose a longer sheet or reduce artwork size.",
+        maxLength ? "Your size is not enough for your graphic. Please click '< Back' to select a larger size." : "Not enough space. Choose a longer sheet or reduce artwork size.",
       );
       return;
     }
@@ -402,8 +417,11 @@ export default function Builder() {
         toast.success(`${Number(draft)} copies of this artwork size.`);
       }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not update quantity.";
       toast.error(
-        e instanceof Error ? e.message : "Could not update quantity.",
+        msg.includes('do not fit') && maxLength 
+          ? "Your size is not enough for your graphic. Please click '< Back' to select a larger size." 
+          : msg
       );
     }
   }
@@ -960,7 +978,7 @@ export default function Builder() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SHEET_LENGTHS.map((n) => (
+              {SHEET_LENGTHS.filter(n => !maxLength || n <= maxLength).map((n) => (
                 <SelectItem key={n} value={String(n)}>
                   23″ × {n}″
                 </SelectItem>

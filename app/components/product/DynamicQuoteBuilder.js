@@ -1825,6 +1825,33 @@ const renderDimensionStep = (group, pool, value) => {
   const renderArtworkStep = () => {
     const isDTFGangSheet = productName && (productName.toLowerCase().includes('gang sheet') || productName.toLowerCase().includes('dtf'));
 
+    let builderW = parseFloat(widthIn);
+    let builderH = parseFloat(heightIn);
+    const printSizePoolKey = getPrintSizePoolKey();
+    if (printSizePoolKey) {
+      const selectedPrintSize = selections[printSizePoolKey];
+      if (selectedPrintSize !== undefined && selectedPrintSize !== null && selectedPrintSize !== '') {
+        const printSizePool = (pools || []).find((p) => p.key === printSizePoolKey);
+        if (printSizePool) {
+          const selectedOptionId = Array.isArray(selectedPrintSize) ? selectedPrintSize[0] : selectedPrintSize;
+          const selectedOption = printSizePool.options?.find((o) => o.id === selectedOptionId);
+          if (selectedOption) {
+            const dimSource = selectedOption.value || selectedOption.label;
+            const dims = parseDimensionsFromValue(dimSource);
+            if (dims) {
+              builderW = dims.width;
+              builderH = dims.height;
+            }
+          }
+        }
+      }
+    }
+    
+    let builderUrl = `/dtf-builder?returnUrl=${typeof window !== 'undefined' ? encodeURIComponent(window.location.href) : ''}`;
+    if (Number.isFinite(builderW) && builderW > 0 && Number.isFinite(builderH) && builderH > 0) {
+      builderUrl += `&max_width=${builderW}&max_height=${builderH}`;
+    }
+
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Upload Artwork</h3>
@@ -1844,7 +1871,7 @@ const renderDimensionStep = (group, pool, value) => {
               </p>
             </div>
             <a 
-              href={`/dtf-builder?returnUrl=${typeof window !== 'undefined' ? encodeURIComponent(window.location.href) : ''}`} 
+              href={builderUrl} 
               className="inline-block shrink-0"
             >
               <Button type="button" className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white">
