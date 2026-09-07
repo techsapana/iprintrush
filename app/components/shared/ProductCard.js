@@ -106,7 +106,7 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
         </CardContent>
       </Link>
 
-      <CardFooter className="flex flex-row items-end justify-between gap-2 px-4 pb-4 pt-2 border-t border-gray-50 mt-0">
+      <CardFooter className="flex flex-wrap lg:flex-nowrap items-end justify-between gap-1 sm:gap-2 px-2 sm:px-3 pb-4 pt-2 border-t border-gray-50 mt-0">
         <div className="leading-tight">
           {hasPrice ? (
             <>
@@ -134,7 +134,7 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
           <Button
             size={compact ? "sm" : "default"}
             disabled={outOfStock}
-            className={`text-white font-semibold rounded-lg shadow-sm ${outOfStock ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#29b6f6] hover:bg-[#1e8fc4] hover:shadow'}`}
+            className={`text-white font-semibold rounded-lg shadow-sm px-2 sm:px-3 text-[11px] sm:text-xs whitespace-nowrap w-full lg:w-auto ${outOfStock ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#29b6f6] hover:bg-[#1e8fc4] hover:shadow'}`}
           >
             {(() => {
               const catSlug = product?.categorySlug?.toLowerCase() || '';

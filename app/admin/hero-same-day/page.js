@@ -22,9 +22,9 @@ export default function AdminHeroSameDayPage() {
 
    const idToProduct = useMemo(() => {
      const m = new Map();
-     for (const p of sameDayPool) m.set(String(p.id), p);
+     for (const p of (products || [])) m.set(String(p.id), p);
      return m;
-   }, [sameDayPool]);
+   }, [products]);
 
    useEffect(() => {
      if (!adminLoading && !adminUser) router.push('/admin/login');
@@ -140,7 +140,7 @@ export default function AdminHeroSameDayPage() {
                   <div key={id} className="flex flex-wrap items-center gap-2 p-3">
                     <span className="text-sm text-gray-500 w-6">{index + 1}.</span>
                     <span className="flex-1 min-w-[160px] text-sm font-medium text-gray-900">
-                      {p ? p.name : `Unknown (${id})`}
+                      {p ? (p.enabled === false ? `[Disabled] ${p.name}` : p.name) : `Unknown (${id})`}
                     </span>
                     <div className="flex gap-1">
                       <button
