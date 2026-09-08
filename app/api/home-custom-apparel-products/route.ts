@@ -39,9 +39,7 @@ export async function GET() {
          FROM home_custom_apparel_products h
          INNER JOIN products p ON p.id = h.product_id AND p.enabled = TRUE
          LEFT JOIN categories c ON p.category_id = c.id
-         WHERE c.slug = ? OR c.name = 'Custom Apparels'
-         ORDER BY h.sort_order ASC, h.id ASC`,
-        [CUSTOM_APPAREL_SLUG],
+         ORDER BY h.sort_order ASC, h.id ASC`
       )) as any[];
       const products = rows.map(mapProductRow);
       if (products.length > 0) {

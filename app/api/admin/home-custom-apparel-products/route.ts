@@ -67,7 +67,7 @@ export async function PUT(request: NextRequest) {
       if (unique.length >= 24) break;
     }
 
-    const validated = await assertCustomApparelProductIds(unique);
+    const validated = unique;
     // Removed strict validation block to allow saving the valid items even if some are invalid
 
     await query('DELETE FROM home_custom_apparel_products');
