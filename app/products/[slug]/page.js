@@ -403,7 +403,16 @@ const canProceedToPayment = Boolean(
                 <AccordionItem value="item-1" className="px-4 border-b border-gray-100">
                   <AccordionTrigger className="text-base font-semibold text-gray-800 hover:text-[#29b6f6] py-4">Product Details</AccordionTrigger>
                   <AccordionContent className="text-gray-600 pb-4">
-                    <p className="mb-4 text-[15px] leading-relaxed">{product.description}</p>
+                    <div className="mb-4 text-[15px] leading-relaxed">
+                      {(() => {
+                        const text = product.description || '';
+                        return text.split('\n').map((line, i) => {
+                          const t = line.trim();
+                          if (t.startsWith('-')) return <li key={i} className="ml-5 list-disc mt-1">{t.substring(1).trim()}</li>;
+                          return <p key={i} className={i > 0 ? "mt-2" : ""}>{line}</p>;
+                        });
+                      })()}
+                    </div>
                     {product.features && product.features.length > 0 && (
                       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 bg-gray-50 p-4 rounded-md">
                         {product.features.map((feature, idx) => (
@@ -419,13 +428,27 @@ const canProceedToPayment = Boolean(
                 <AccordionItem value="item-2" className="px-4 border-b border-gray-100">
                   <AccordionTrigger className="text-base font-semibold text-gray-800 hover:text-[#29b6f6] py-4">File Setup</AccordionTrigger>
                   <AccordionContent className="text-gray-600 text-[15px] leading-relaxed pb-4">
-                    {product.fileSetup || "Please provide your artwork in CMYK color mode at 300 DPI. Ensure all fonts are outlined and embed any linked images. We recommend saving your file as a high-quality PDF with a 0.125-inch bleed on all sides."}
+                    {(() => {
+                      const text = product.fileSetup || "For the best print quality:\n- Preferred: PNG with transparent background\n- Accepted: PNG, PDF, TIFF, JPG/JPEG\n- Recommended Resolution: 300 DPI\n- Vector artwork is recommended for logos, names, numbers, and line artwork\n- Submit artwork at or close to the intended print size\n- Avoid blurry, pixelated, screenshot, or low-resolution artwork\n\nArtwork can be uploaded directly using the File Upload option on this product page. Before submitting your order, please review your artwork and check the confirmation box to verify the design, spelling, colors, size, and other artwork information.\n\nIf your artwork is not ready at checkout, files may also be submitted after payment using the artwork submission link associated with your order. Note: Production will not begin until the artwork/design has been reviewed and approved.";
+                      return text.split('\n').map((line, i) => {
+                        const t = line.trim();
+                        if (t.startsWith('-')) return <li key={i} className="ml-5 list-disc mt-1">{t.substring(1).trim()}</li>;
+                        return <p key={i} className={i > 0 ? "mt-2" : ""}>{line}</p>;
+                      });
+                    })()}
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="item-3" className="px-4 border-b border-gray-100">
                   <AccordionTrigger className="text-base font-semibold text-gray-800 hover:text-[#29b6f6] py-4">Application / Use Tips</AccordionTrigger>
                   <AccordionContent className="text-gray-600 text-[15px] leading-relaxed pb-4">
-                    {product.applicationTips || "For best results, store in a cool, dry place before use. Follow the provided instructions carefully during application to ensure maximum durability and longevity."}
+                    {(() => {
+                      const text = product.applicationTips || "For best results, store in a cool, dry place before use.\nFollow the provided instructions carefully during application to ensure maximum durability and longevity.";
+                      return text.split('\n').map((line, i) => {
+                        const t = line.trim();
+                        if (t.startsWith('-')) return <li key={i} className="ml-5 list-disc mt-1">{t.substring(1).trim()}</li>;
+                        return <p key={i} className={i > 0 ? "mt-2" : ""}>{line}</p>;
+                      });
+                    })()}
                   </AccordionContent>
                 </AccordionItem>
                 {(product.pdfTemplateUrl || product.aiTemplateUrl) && (

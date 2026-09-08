@@ -63,6 +63,17 @@ async function ensureShippingColumns() {
   }
 }
 
+async function ensureCustomInstructionsColumns() {
+  const fileSetup: any = await queryOne("SHOW COLUMNS FROM products LIKE 'file_setup'");
+  if (!fileSetup) {
+    await query("ALTER TABLE products ADD COLUMN file_setup TEXT NULL AFTER shipping_category");
+  }
+  const appTips: any = await queryOne("SHOW COLUMNS FROM products LIKE 'application_tips'");
+  if (!appTips) {
+    await query("ALTER TABLE products ADD COLUMN application_tips TEXT NULL AFTER file_setup");
+  }
+}
+
 async function verifyProductIdOrSlug(productId: string, productSlug: string) {
   const dbVerifiedProduct = await queryOne(
     'SELECT id FROM products WHERE id = ? OR slug = ? LIMIT 1',
@@ -80,6 +91,7 @@ export async function GET(request: NextRequest) {
      await ensureOutOfStockColumn();
      await ensureAllowCustomDimensionsColumn();
      await ensureShippingColumns();
+     await ensureCustomInstructionsColumns();
     const searchParams = request.nextUrl.searchParams;
     const category = searchParams.get('category');
     const enabled = searchParams.get('enabled') !== 'false';
@@ -228,6 +240,7 @@ export async function POST(request: NextRequest) {
      await ensureOutOfStockColumn();
      await ensureAllowCustomDimensionsColumn();
      await ensureShippingColumns();
+     await ensureCustomInstructionsColumns();
      const body = await request.json();
 const {
         id,
