@@ -139,7 +139,7 @@ export function ProductCard({ product, onAddToCart, compact = false, className =
             {(() => {
               const catSlug = product?.categorySlug?.toLowerCase() || '';
               const catName = product?.category?.toLowerCase() || '';
-              const isPrintedReady = catSlug === 'printed-ready' || catName === 'printed ready';
+              const isPrintedReady = catSlug === 'printed-ready' || catSlug === 'printed-&-ready' || catName === 'printed ready' || catName === 'printed & ready';
               return outOfStock ? 'Out of stock' : (isPrintedReady ? 'Buy Now' : 'Customize Now');
             })()}
           </Button>
