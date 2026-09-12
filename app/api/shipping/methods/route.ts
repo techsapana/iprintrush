@@ -10,8 +10,31 @@ import {
 } from "@/app/lib/shippingEngine";
 import { lookupZoneByZip } from "@/app/lib/shipping/zipZoneService";
 
+async function ensureShippingConfigTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS shipping_config (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      enabled BOOLEAN DEFAULT TRUE,
+      default_flat_rate DECIMAL(10,2) DEFAULT 0,
+      oversized_width_threshold_in DECIMAL(10,2) DEFAULT 48.00,
+      oversized_weight_threshold_lb DECIMAL(10,2) DEFAULT 50.00,
+      under_100_rate DECIMAL(10,2) DEFAULT 0,
+      between_100_199_rate DECIMAL(10,2) DEFAULT 0,
+      over_200_rate DECIMAL(10,2) DEFAULT 0,
+      local_under_100_rate DECIMAL(10,2) DEFAULT 0,
+      local_between_100_199_rate DECIMAL(10,2) DEFAULT 0,
+      local_over_200_rate DECIMAL(10,2) DEFAULT 0
+    )
+  `);
+  const rows = await query('SELECT COUNT(*) as count FROM shipping_config');
+  if (rows[0].count === 0) {
+    await query('INSERT INTO shipping_config (enabled) VALUES (true)');
+  }
+}
+
 export async function POST(req: Request) {
   try {
+    await ensureShippingConfigTable();
     const body = await req.json();
     const items = Array.isArray(body.items)
       ? body.items

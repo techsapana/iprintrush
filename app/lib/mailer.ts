@@ -3,14 +3,14 @@ import nodemailer from 'nodemailer';
 export const runtime = 'nodejs';
 
 function getTransport() {
-  const host = process.env.BREVO_SMTP_HOST || 'smtp-relay.brevo.com';
-  const port = Number(process.env.BREVO_SMTP_PORT || 587);
-  const secure = String(process.env.BREVO_SMTP_SECURE || 'false') === 'true';
-  const user = process.env.BREVO_SMTP_USER;
-  const pass = process.env.BREVO_SMTP_PASS;
+  const host = process.env.SMTP_HOST || process.env.BREVO_SMTP_HOST || 'smtp-relay.brevo.com';
+  const port = Number(process.env.SMTP_PORT || process.env.BREVO_SMTP_PORT || 587);
+  const secure = process.env.SMTP_SECURE === 'true' || process.env.BREVO_SMTP_SECURE === 'true' || port === 465;
+  const user = process.env.SMTP_USER || process.env.BREVO_SMTP_USER;
+  const pass = process.env.SMTP_PASS || process.env.BREVO_SMTP_PASS;
 
   if (!user || !pass) {
-    throw new Error('Missing Brevo SMTP credentials');
+    throw new Error('Missing SMTP credentials (SMTP_USER / SMTP_PASS)');
   }
 
   return nodemailer.createTransport({

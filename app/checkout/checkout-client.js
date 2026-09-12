@@ -203,7 +203,7 @@ export default function CheckoutClient() {
   const [appliedCoupon, setAppliedCoupon] = useState('');
   const [couponMessage, setCouponMessage] = useState('');
 const [oversizedDetails, setOversizedDetails] = useState(null);
-  const [shippingMethods, setShippingMethods] = useState([]);
+  const [shippingMethods, setShippingMethods] = useState(null);
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [zipCheckStatus, setZipCheckStatus] = useState('idle');
   const [zipCheckResult, setZipCheckResult] = useState(null);

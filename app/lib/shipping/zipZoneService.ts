@@ -31,7 +31,31 @@ function isCacheValid(entry: CacheEntry): boolean {
   return Date.now() < entry.expiresAt;
 }
 
+async function ensureShippingZonesTables() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS shipping_zones (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      zone_name VARCHAR(255) NOT NULL,
+      delivery_fee DECIMAL(10,2) DEFAULT 0,
+      free_delivery_minimum DECIMAL(10,2) DEFAULT 0,
+      enabled BOOLEAN DEFAULT TRUE,
+      same_day_delivery BOOLEAN DEFAULT FALSE,
+      cutoff_time VARCHAR(255) NULL,
+      delivery_window VARCHAR(255) NULL,
+      display_order INT DEFAULT 0
+    )
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS shipping_zone_zips (
+      zone_id INT,
+      zip_code VARCHAR(10),
+      PRIMARY KEY (zone_id, zip_code)
+    )
+  `);
+}
+
 async function loadZonesFromDb(): Promise<Map<string, ShippingZoneRow>> {
+  await ensureShippingZonesTables();
   const rows: any[] = await query(`
     SELECT z.id, z.zone_name, z.delivery_fee, z.free_delivery_minimum,
            z.enabled, z.same_day_delivery, z.cutoff_time, z.delivery_window, z.display_order,
