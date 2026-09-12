@@ -475,7 +475,7 @@ useEffect(() => {
 
   useEffect(() => {
     if (
-      shippingMethods.length > 0 &&
+      shippingMethods?.length > 0 &&
       selectedMethod !== null &&
       !shippingMethods.some((m) => m.type === selectedMethod) &&
       shippingMethods.some((m) => m.type === 'pickup')
@@ -487,7 +487,7 @@ useEffect(() => {
 
   useEffect(() => {
     if (
-      shippingMethods.length > 0 &&
+      shippingMethods?.length > 0 &&
       selectedMethod === null &&
       shippingMethods.some((m) => m.type === 'pickup')
     ) {

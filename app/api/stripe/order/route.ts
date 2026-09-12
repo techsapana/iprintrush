@@ -150,7 +150,7 @@ export async function GET(req: NextRequest) {
             });
 
             // Notify Admin
-            const adminEmail = process.env.MAIL_FROM || 'order@iprintrush.com';
+            const adminEmail = process.env.ADMIN_EMAIL || 'order@iprintrush.com';
             await sendEmail({
               to: adminEmail,
               subject: `NEW ORDER RECEIVED: ${order.order_number}`,

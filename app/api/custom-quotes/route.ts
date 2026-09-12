@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     // Send email to admin
     try {
-      const adminEmail = process.env.MAIL_FROM || 'info@iprintrush.com';
+      const adminEmail = process.env.ADMIN_EMAIL || 'support@iprintrush.com';
       await sendEmail({
         to: adminEmail,
         subject: `New Custom Quote Request: ${data.product_category}`,
