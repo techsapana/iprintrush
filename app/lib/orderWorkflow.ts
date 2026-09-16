@@ -6,6 +6,7 @@ export const ORDER_WORKFLOW_OPTIONS = [
   'ready_for_pickup',
   'ready_for_shipping',
   'shipped',
+  'delivered',
 ] as const;
 
 export type OrderWorkflowStatus = (typeof ORDER_WORKFLOW_OPTIONS)[number];
@@ -23,6 +24,7 @@ const READ_NORMALIZE_MAP: Record<string, OrderWorkflowStatus> = {
   ready_for_shipping: 'ready_for_shipping',
   completed: 'ready_for_shipping',
   shipped: 'shipped',
+  delivered: 'delivered',
 };
 
 const WRITE_FALLBACK_MAP: Record<OrderWorkflowStatus, string[]> = {
@@ -33,6 +35,7 @@ const WRITE_FALLBACK_MAP: Record<OrderWorkflowStatus, string[]> = {
   ready_for_pickup: [],
   ready_for_shipping: ['completed'],
   shipped: [],
+  delivered: [],
 };
 
 export function normalizeWorkflowStatus(status: unknown): OrderWorkflowStatus {

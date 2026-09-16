@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-export function SizeSelector({ sizes, quantities, onQuantityChange, minQuantity = null, maxQuantity = null, stepNumber = null }) {
+export function SizeSelector({ sizes, quantities, onQuantityChange, minQuantity = null, maxQuantity = null, stepNumber = null, presetQuantities = null }) {
   const [selectedSizeId, setSelectedSizeId] = useState(sizes.length > 0 ? sizes[0].id : null);
 
   const adultSizes = sizes.filter(
@@ -36,29 +36,46 @@ export function SizeSelector({ sizes, quantities, onQuantityChange, minQuantity 
             )}
 
             <div className="mt-2 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onQuantityChange(size.id, -1)}
-                className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100"
-              >
-                −
-              </button>
+              {presetQuantities ? (
+                <select
+                  value={qty}
+                  onChange={(e) => onQuantityChange(size.id, 0, e.target.value)}
+                  className="w-full text-center text-sm font-medium text-gray-900 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                >
+                  {qty === 0 && <option value="0">0</option>}
+                  {presetQuantities.map((q) => (
+                    <option key={q} value={q}>
+                      {q}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onQuantityChange(size.id, -1)}
+                    className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  >
+                    −
+                  </button>
 
-              <input
-                type="number"
-                min="0"
-                value={qty}
-                onChange={(e) => onQuantityChange(size.id, 0, e.target.value)}
-                className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
-              />
+                  <input
+                    type="number"
+                    min="0"
+                    value={qty}
+                    onChange={(e) => onQuantityChange(size.id, 0, e.target.value)}
+                    className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                  />
 
-              <button
-                type="button"
-                onClick={() => onQuantityChange(size.id, 1)}
-                className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100"
-              >
-                +
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => onQuantityChange(size.id, 1)}
+                    className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  >
+                    +
+                  </button>
+                </>
+              )}
             </div>
           </div>
         );
@@ -130,27 +147,44 @@ export function SizeSelector({ sizes, quantities, onQuantityChange, minQuantity 
               <div className="w-full sm:w-auto flex flex-col">
                 <label className="block text-sm font-semibold text-gray-700 mb-2 text-center sm:text-left">Quantity</label>
                 <div className="flex items-center justify-center sm:justify-start gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onQuantityChange(selectedSize.id, -1)}
-                    className="h-12 w-12 flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 bg-white font-bold text-lg transition-colors"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    min="0"
-                    value={quantities[selectedSize.id] || 0}
-                    onChange={(e) => onQuantityChange(selectedSize.id, 0, e.target.value)}
-                    className="w-24 h-12 text-center text-lg font-bold text-gray-900 border border-gray-300 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onQuantityChange(selectedSize.id, 1)}
-                    className="h-12 w-12 flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 bg-white font-bold text-lg transition-colors"
-                  >
-                    +
-                  </button>
+                  {presetQuantities ? (
+                    <select
+                      value={quantities[selectedSize.id] || 0}
+                      onChange={(e) => onQuantityChange(selectedSize.id, 0, e.target.value)}
+                      className="w-full h-12 text-center text-lg font-bold text-gray-900 border border-gray-300 rounded-lg px-4 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                    >
+                      {(!quantities[selectedSize.id] || quantities[selectedSize.id] === 0) && <option value="0">0</option>}
+                      {presetQuantities.map((q) => (
+                        <option key={q} value={q}>
+                          {q}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onQuantityChange(selectedSize.id, -1)}
+                        className="h-12 w-12 flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 bg-white font-bold text-lg transition-colors"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        value={quantities[selectedSize.id] || 0}
+                        onChange={(e) => onQuantityChange(selectedSize.id, 0, e.target.value)}
+                        className="w-24 h-12 text-center text-lg font-bold text-gray-900 border border-gray-300 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => onQuantityChange(selectedSize.id, 1)}
+                        className="h-12 w-12 flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 bg-white font-bold text-lg transition-colors"
+                      >
+                        +
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -173,27 +207,43 @@ export function SizeSelector({ sizes, quantities, onQuantityChange, minQuantity 
                       )}
                     </div>
                     <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => onQuantityChange(size.id, -1)}
-                        className="h-10 w-10 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 flex items-center justify-center font-bold transition-colors"
-                      >
-                        −
-                      </button>
-                      <input
-                        type="number"
-                        min="0"
-                        value={quantities[size.id] || 0}
-                        onChange={(e) => onQuantityChange(size.id, 0, e.target.value)}
-                        className="w-16 h-10 text-center text-base font-bold text-gray-900 border border-gray-300 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => onQuantityChange(size.id, 1)}
-                        className="h-10 w-10 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 flex items-center justify-center font-bold transition-colors"
-                      >
-                        +
-                      </button>
+                      {presetQuantities ? (
+                        <select
+                          value={quantities[size.id] || 0}
+                          onChange={(e) => onQuantityChange(size.id, 0, e.target.value)}
+                          className="w-full text-center text-base font-bold text-gray-900 border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                        >
+                          {presetQuantities.map((q) => (
+                            <option key={q} value={q}>
+                              {q}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onQuantityChange(size.id, -1)}
+                            className="h-10 w-10 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 flex items-center justify-center font-bold transition-colors"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min="0"
+                            value={quantities[size.id] || 0}
+                            onChange={(e) => onQuantityChange(size.id, 0, e.target.value)}
+                            className="w-16 h-10 text-center text-base font-bold text-gray-900 border border-gray-300 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-[#29b6f6]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => onQuantityChange(size.id, 1)}
+                            className="h-10 w-10 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 flex items-center justify-center font-bold transition-colors"
+                          >
+                            +
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}

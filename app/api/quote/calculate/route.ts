@@ -346,7 +346,7 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
   const qtyBounds = await getProductQuantityBounds(String(payload.productId));
 
   const productWithCat = await queryOne(
-    'SELECT p.id, p.price, p.min_width_in, p.max_width_in, p.min_height_in, p.max_height_in, p.price_per_sq_inch, c.customization_schema FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?',
+    'SELECT p.id, p.price, p.min_width_in, p.max_width_in, p.min_height_in, p.max_height_in, p.price_per_sq_inch, c.customization_schema, c.slug as category_slug FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?',
     [payload.productId],
   );
 
@@ -402,8 +402,18 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
       }
     : undefined;
 
+  const isBusinessCard = productWithCat?.category_slug === 'business-cards' || productWithCat?.category_slug === 'business-card';
+
   // Use the unified engine - shipping is calculated from DB config
-    const summary = calculateUnifiedQuote(config, pools, unifiedRequest, dimensionPricing, payload.shippingState, payload.shippingZip);
+    const summary = calculateUnifiedQuote(
+      config, 
+      pools, 
+      unifiedRequest, 
+      dimensionPricing, 
+      payload.shippingState, 
+      payload.shippingZip,
+      { isBusinessCard }
+    );
 
   const shippingDecision = resolveShippingDecisionForQuote({
     productId: payload.productId,

@@ -1081,6 +1081,9 @@ const handleDeliveryMethodChange = (method) => {
       priceAddon: useMyCloth ? 0 : s.priceAddon
     }));
 
+    const isBusinessCard = (productCategory === 'business-cards' || productCategory === 'business-card' || String(productName).toLowerCase().includes('business card'));
+    const businessCardQuantities = [20, 50, 100, 250, 500, 750, 1000, 1500, 2000, 2500, 3500, 5000, 7500, 10000];
+
     return (
       <div className="space-y-6">
         <SizeSelector
@@ -1088,6 +1091,7 @@ const handleDeliveryMethodChange = (method) => {
           quantities={quantities}
           minQuantity={quantityMin}
           maxQuantity={quantityMax}
+          presetQuantities={isBusinessCard ? businessCardQuantities : null}
           stepNumber={isCustomApparels ? 4 : 3}
           onQuantityChange={(sizeId, delta, absoluteValue = null) => {
             if (absoluteValue !== null) {
@@ -1495,30 +1499,48 @@ const renderDeliveryStep = () => {
                       >
                         <span className="text-sm font-medium text-gray-900">{size.label}</span>
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleSummaryQtyChange(size.id, -1)}
-                            disabled={calculating}
-                            className="h-7 w-7 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm font-medium"
-                          >
-                            −
-                          </button>
-                          <input
-                            type="number"
-                            min="0"
-                            value={qty}
-                            onChange={(e) => handleSummaryQtyInput(size.id, e.target.value)}
-                            disabled={calculating}
-                            className="w-16 text-center text-sm font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#29b6f6] disabled:opacity-50 disabled:cursor-not-allowed"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSummaryQtyChange(size.id, 1)}
-                            disabled={calculating}
-                            className="h-7 w-7 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm font-medium"
-                          >
-                            +
-                          </button>
+                          {isBusinessCard ? (
+                            <select
+                              value={qty}
+                              onChange={(e) => handleSummaryQtyInput(size.id, e.target.value)}
+                              disabled={calculating}
+                              className="w-full text-center text-sm font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#29b6f6] disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {qty === 0 && <option value="0">0</option>}
+                              {businessCardQuantities.map((q) => (
+                                <option key={q} value={q}>
+                                  {q}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleSummaryQtyChange(size.id, -1)}
+                                disabled={calculating}
+                                className="h-7 w-7 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm font-medium"
+                              >
+                                −
+                              </button>
+                              <input
+                                type="number"
+                                min="0"
+                                value={qty}
+                                onChange={(e) => handleSummaryQtyInput(size.id, e.target.value)}
+                                disabled={calculating}
+                                className="w-16 text-center text-sm font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#29b6f6] disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSummaryQtyChange(size.id, 1)}
+                                disabled={calculating}
+                                className="h-7 w-7 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm font-medium"
+                              >
+                                +
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     );

@@ -928,7 +928,7 @@ export function calculateUnifiedQuote(
   },
   state?: string,
   zip?: string,
-  options: { allowZeroQuote?: boolean } = {},
+  options: { allowZeroQuote?: boolean; isBusinessCard?: boolean } = {},
   ): QuoteSummary {
   const __t0 = Date.now();
   try {
@@ -993,11 +993,19 @@ export function calculateUnifiedQuote(
   } else if (mode === 'print_product') {
     // Print product: base printing cost
     if (config.baseUnitPrice != null && config.baseUnitPrice > 0) {
-      garmentSubtotal = config.baseUnitPrice * totalQuantity;
-      garmentLineItems.push({
-        label: `Base printing (${totalQuantity} pcs × $${Number(config.baseUnitPrice).toFixed(2)} / pc)`,
-        amount: garmentSubtotal,
-      });
+      if (options.isBusinessCard) {
+        garmentSubtotal = config.baseUnitPrice;
+        garmentLineItems.push({
+          label: `Base printing setup (Flat fee)`,
+          amount: garmentSubtotal,
+        });
+      } else {
+        garmentSubtotal = config.baseUnitPrice * totalQuantity;
+        garmentLineItems.push({
+          label: `Base printing (${totalQuantity} pcs × $${Number(config.baseUnitPrice).toFixed(2)} / pc)`,
+          amount: garmentSubtotal,
+        });
+      }
     }
   } else if (mode === 'simple') {
     // Simple product: base cost from product price
