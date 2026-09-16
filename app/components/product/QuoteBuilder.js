@@ -1027,51 +1027,50 @@ const handleDeliveryMethodChange = (method) => {
     const options = config.colors.filter((c) =>
       (productSettings.colorOptionIds || []).includes(c.id),
     );
+
+    const selectedColor = options.find((o) => o.id === colorId);
+
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Step 3 – Select Color</h3>
-        <div className="flex flex-wrap gap-3">
-          {options.map((opt) => {
-            const isOos = productSettings?.colorOutOfStock?.[opt.id];
-            const isSelected = colorId === opt.id;
-            return (
-              <div key={opt.id} className="relative group">
-                <button
-                  type="button"
-                  onClick={() => handleColorChange(opt.id)}
-                  disabled={isOos}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-full border transition-all duration-200 ${
-                    isOos 
-                      ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed' 
-                      : isSelected 
-                        ? 'border-[#29b6f6] bg-[#29b6f6]/10 ring-2 ring-[#29b6f6]/20' 
-                        : 'border-gray-300 bg-white hover:border-[#29b6f6]/50 hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="relative">
-                    <span
-                      className={`block w-6 h-6 rounded-full border ${isSelected ? 'border-[#29b6f6]' : 'border-gray-300'}`}
-                      style={{ backgroundColor: opt.hex || '#f3f4f6' }}
-                    />
-                    {isOos && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-full h-[2px] bg-red-500 rotate-45 transform origin-center rounded"></div>
-                      </div>
-                    )}
-                  </div>
-                  <span className={`text-sm font-medium ${isOos ? 'text-gray-400 line-through' : isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
-                    {opt.name}
-                  </span>
-                </button>
-                {isOos && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                    Out of Stock
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        
+        <div className="relative w-full sm:w-2/3 md:w-1/2">
+          <select
+            value={colorId || ''}
+            onChange={(e) => handleColorChange(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[#29b6f6] focus:border-[#29b6f6] appearance-none bg-white text-gray-900 font-medium"
+          >
+            <option value="" disabled>-- Choose a color --</option>
+            {options.map((opt) => {
+              const isOos = productSettings?.colorOutOfStock?.[opt.id];
+              return (
+                <option key={opt.id} value={opt.id} disabled={isOos}>
+                  {opt.name} {isOos ? '(Out of Stock)' : ''}
+                </option>
+              );
+            })}
+          </select>
+          {/* Custom dropdown arrow */}
+          <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
         </div>
+
+        {/* Selected Color Preview Swatch */}
+        {selectedColor && (
+          <div className="flex items-center gap-3 mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100 inline-flex">
+            <span className="text-sm font-medium text-gray-700">Selected:</span>
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-6 h-6 rounded-full border border-gray-300 shadow-sm"
+                style={{ backgroundColor: selectedColor.hex || '#f3f4f6' }}
+              />
+              <span className="text-sm font-semibold text-gray-900">{selectedColor.name}</span>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
