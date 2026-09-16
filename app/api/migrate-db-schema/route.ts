@@ -47,8 +47,8 @@ export async function GET() {
 
     // 5. orders table ENUM update for workflow_status
     try {
-      await query(`ALTER TABLE orders MODIFY COLUMN workflow_status ENUM('pending','in_production','proof_pending','proof_approved','artwork_approval_pending','completed','shipped','cancelled','on_hold','order_review','artwork_pending','artwork_approved','ready_for_pickup','ready_for_shipping') NOT NULL DEFAULT 'order_review'`);
-      log.push("Updated orders.workflow_status ENUM to include 'ready_for_pickup'");
+      await query(`ALTER TABLE orders MODIFY COLUMN workflow_status ENUM('pending','in_production','proof_pending','proof_approved','artwork_approval_pending','completed','shipped','cancelled','on_hold','order_review','artwork_pending','artwork_approved','ready_for_pickup','ready_for_shipping','delivered') NOT NULL DEFAULT 'order_review'`);
+      log.push("Updated orders.workflow_status ENUM to include 'delivered'");
     } catch (e: any) {
       log.push(`Error updating workflow_status ENUM: ${e.message}`);
     }

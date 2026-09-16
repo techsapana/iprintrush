@@ -321,6 +321,7 @@ export default function AdminOrderDetailPage() {
                 <option value="ready_for_pickup">Ready for Store Pickup</option>
                 <option value="ready_for_shipping">Ready for Shipping</option>
                 <option value="shipped">Shipped</option>
+                <option value="delivered">Delivered to customer</option>
               </select>
             </div>
           </div>
