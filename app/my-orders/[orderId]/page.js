@@ -505,7 +505,20 @@ export default function OrderDetailPage() {
                           <strong>Customizations:</strong>
                           {entries.map(([k, v]) => (
                             <div key={k}>
-                              <span className="font-semibold capitalize">{k.replace(/([A-Z])/g, ' $1').trim()}:</span> {String(v)}
+                              <span className="font-semibold capitalize">{k.replace(/([A-Z])/g, ' $1').trim()}:</span>{' '}
+                              {String(v).startsWith('http') ? (
+                                <a
+                                  href={String(v)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#29b6f6] hover:underline hover:text-[#0288d1]"
+                                  download
+                                >
+                                  {String(v)}
+                                </a>
+                              ) : (
+                                String(v)
+                              )}
                             </div>
                           ))}
                         </div>

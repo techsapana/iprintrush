@@ -925,7 +925,20 @@ export default function AdminOrderDetailPage() {
                                 <ul className="text-gray-700 space-y-0.5">
                                   {entries.map(([k, v]) => (
                                     <li key={k}>
-                                      <span className="font-medium capitalize">{k.replace(/([A-Z])/g, ' $1').trim()}:</span> {String(v)}
+                                      <span className="font-medium capitalize">{k.replace(/([A-Z])/g, ' $1').trim()}:</span>{' '}
+                                      {String(v).startsWith('http') ? (
+                                        <a
+                                          href={String(v)}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-[#29b6f6] hover:underline hover:text-[#0288d1]"
+                                          download
+                                        >
+                                          {String(v)}
+                                        </a>
+                                      ) : (
+                                        String(v)
+                                      )}
                                     </li>
                                   ))}
                                 </ul>
