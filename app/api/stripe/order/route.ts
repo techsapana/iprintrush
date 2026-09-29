@@ -142,27 +142,35 @@ export async function GET(req: NextRequest) {
   </div>
 </body></html>`;
 
-            await sendEmail({
-              to: order.customer_email,
-              subject: `Order Confirmed – ${order.order_number} | iPrintRush`,
-              text: `Hi ${order.customer_name || 'Valued Customer'},\n\nThank you for your order ${order.order_number}!\n\n${itemRowsText}\n\nTotal Paid: ${fmt(order.amount_total)}\n\nQuestions? support@iprintrush.com`,
-              html,
-            });
+            try {
+              await sendEmail({
+                to: order.customer_email,
+                subject: `Order Confirmed – ${order.order_number} | iPrintRush`,
+                text: `Hi ${order.customer_name || 'Valued Customer'},\n\nThank you for your order ${order.order_number}!\n\n${itemRowsText}\n\nTotal Paid: ${fmt(order.amount_total)}\n\nQuestions? support@iprintrush.com`,
+                html,
+              });
+            } catch (err) {
+              console.error('Failed fallback email to customer:', err);
+            }
 
             // Notify Admin
             const adminEmail = process.env.ADMIN_EMAIL || 'order@iprintrush.com';
-            await sendEmail({
-              to: adminEmail,
-              subject: `NEW ORDER RECEIVED: ${order.order_number}`,
-              text: `A new order has been placed by ${order.customer_name || order.customer_email}.\n\nOrder Number: ${order.order_number}\nTotal: ${fmt(order.amount_total)}\n\nPlease log in to the admin dashboard to view the details.`,
-              html: `<div style="font-family:sans-serif;padding:20px;">
-                <h2 style="color:#d97706;">New Order Received!</h2>
-                <p><strong>Customer:</strong> ${order.customer_name || order.customer_email}</p>
-                <p><strong>Order Number:</strong> ${order.order_number}</p>
-                <p><strong>Total Paid:</strong> ${fmt(order.amount_total)}</p>
-                <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://iprintrush.com'}/admin/orders" style="display:inline-block;padding:10px 15px;background:#29b6f6;color:#fff;text-decoration:none;border-radius:4px;margin-top:10px;">View Order in Admin Panel</a></p>
-              </div>`
-            });
+            try {
+              await sendEmail({
+                to: adminEmail,
+                subject: `NEW ORDER RECEIVED: ${order.order_number}`,
+                text: `A new order has been placed by ${order.customer_name || order.customer_email}.\n\nOrder Number: ${order.order_number}\nTotal: ${fmt(order.amount_total)}\n\nPlease log in to the admin dashboard to view the details.`,
+                html: `<div style="font-family:sans-serif;padding:20px;">
+                  <h2 style="color:#d97706;">New Order Received!</h2>
+                  <p><strong>Customer:</strong> ${order.customer_name || order.customer_email}</p>
+                  <p><strong>Order Number:</strong> ${order.order_number}</p>
+                  <p><strong>Total Paid:</strong> ${fmt(order.amount_total)}</p>
+                  <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://iprintrush.com'}/admin/orders" style="display:inline-block;padding:10px 15px;background:#29b6f6;color:#fff;text-decoration:none;border-radius:4px;margin-top:10px;">View Order in Admin Panel</a></p>
+                </div>`
+              });
+            } catch (err) {
+              console.error('Failed fallback email to admin:', err);
+            }
           } catch (emailErr) {
             // Don't fail the response if email fails
             console.error('Failed to send order confirmation email (fallback):', emailErr);
