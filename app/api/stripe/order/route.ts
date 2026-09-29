@@ -154,7 +154,7 @@ export async function GET(req: NextRequest) {
             }
 
             // Notify Admin
-            const adminEmail = process.env.ADMIN_EMAIL || 'order@iprintrush.com';
+            const adminEmail = process.env.ORDER_EMAIL || 'order@iprintrush.com';
             try {
               await sendEmail({
                 to: adminEmail,
