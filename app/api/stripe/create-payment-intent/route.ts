@@ -154,6 +154,21 @@ export async function POST(req: NextRequest) {
           finalArtworkFiles.push(...item.options.artworkFiles);
         }
 
+        const linkedArtworkUrl =
+          item.options?.quotePayload?.artworkLink ||
+          item.options?.customizationsDisplay?.['Artwork Link'] ||
+          item.options?.quotePayload?.customizationsDisplay?.['Artwork Link'] ||
+          '';
+        if (typeof linkedArtworkUrl === 'string' && linkedArtworkUrl.trim()) {
+          const uploadMatch = linkedArtworkUrl.match(/\/api\/uploads\/([^?#]+)/i);
+          if (uploadMatch?.[1]) {
+            const relPath = uploadMatch[1].replace(/^\/+/, '');
+            if (!finalArtworkFiles.includes(relPath)) {
+              finalArtworkFiles.push(relPath);
+            }
+          }
+        }
+
         // Move temp artwork files to permanent order directory
         if (
           Array.isArray(item.options?.tempArtworkFiles) &&

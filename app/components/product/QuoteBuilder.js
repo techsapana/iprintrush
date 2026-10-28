@@ -216,6 +216,23 @@ const [availableMethods, setAvailableMethods] = useState([]);
             }
           }
         }
+
+        // Apply Gang Sheet URL parameter on top of restored draft
+        const gsUrl = searchParams?.get('gs_url');
+        if (gsUrl) {
+          setArtworkReadyChoice('link');
+          setArtworkLink(gsUrl);
+          setArtworkConfirmed(true);
+          const match = gsUrl.match(/\/api\/uploads\/([^?#]+)/);
+          const relPath = match && match[1] ? decodeURIComponent(match[1]) : null;
+          if (relPath) {
+            setArtworkFiles((prev) => (prev.includes(relPath) ? prev : [...prev, relPath]));
+          }
+          setQuoteSummary(null);
+          setHasCalculated(false);
+          setStep(isCustomApparels ? 6 : 5);
+        }
+
         hydratedRef.current = true;
       } catch (err) {
         if (!cancelled) {
@@ -250,7 +267,9 @@ const [availableMethods, setAvailableMethods] = useState([]);
       });
       setQuantities(next);
     }
-    if (p.artworkReady) setArtworkReadyChoice('ready');
+    if (p.artworkReadyChoice) setArtworkReadyChoice(p.artworkReadyChoice);
+    else if (p.artworkLink) setArtworkReadyChoice('link');
+    else if (p.artworkReady === true) setArtworkReadyChoice('ready');
     else if (p.artworkReady === false) setArtworkReadyChoice('not_ready');
     if (p.artworkLink) setArtworkLink(p.artworkLink);
     if (Array.isArray(p.tempArtworkFiles)) setTempArtworkFiles(p.tempArtworkFiles);
@@ -258,12 +277,13 @@ const [availableMethods, setAvailableMethods] = useState([]);
     if (Array.isArray(p.artworkFiles)) setArtworkFiles(p.artworkFiles);
     if (p.customSizeNote) setCustomSizeNote(p.customSizeNote);
     // If we have restored artworkFiles, treat artwork as already available
-    if (Array.isArray(p.artworkFiles) && p.artworkFiles.length > 0) {
+    if (!p.artworkReadyChoice && !p.artworkLink && Array.isArray(p.artworkFiles) && p.artworkFiles.length > 0) {
       setArtworkReadyChoice('ready');
     }
     if (
       (Array.isArray(p.tempArtworkFiles) && p.tempArtworkFiles.length > 0) ||
-      (Array.isArray(p.artworkFiles) && p.artworkFiles.length > 0)
+      (Array.isArray(p.artworkFiles) && p.artworkFiles.length > 0) ||
+      Boolean(p.artworkLink)
     ) {
       setArtworkConfirmed(true);
     }
@@ -308,7 +328,13 @@ const [availableMethods, setAvailableMethods] = useState([]);
     deliveryMethod,
     isCustomApparels,
     useMyCloth: fabricChoice === 'own',
-    artworkReady: artworkReadyChoice === 'ready',
+    artworkReadyChoice,
+    artworkReady:
+      artworkReadyChoice === 'ready' || artworkReadyChoice === 'link'
+        ? true
+        : artworkReadyChoice === 'not_ready'
+          ? false
+          : undefined,
     artworkLink,
     tempArtworkFiles,
     artworkFiles,
@@ -334,7 +360,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
     return () => clearTimeout(t);
   }, [
     decorationId, colorId, quantities, printLocationIds, turnaroundId, designerHelpId,
-    deliveryMethod, fabricChoice, artworkReadyChoice, tempArtworkFiles, artworkFiles,
+    deliveryMethod, fabricChoice, artworkReadyChoice, artworkLink, tempArtworkFiles, artworkFiles,
     customSizeNote, shippingZip, quoteSummary, configMode,
   ]);
 
@@ -352,7 +378,7 @@ const [availableMethods, setAvailableMethods] = useState([]);
     };
   }, [
     productId, decorationId, colorId, quantities, printLocationIds, turnaroundId, designerHelpId,
-    deliveryMethod, fabricChoice, artworkReadyChoice, tempArtworkFiles, artworkFiles,
+    deliveryMethod, fabricChoice, artworkReadyChoice, artworkLink, tempArtworkFiles, artworkFiles,
     customSizeNote, shippingZip, quoteSummary, configMode,
   ]);
 
@@ -468,6 +494,12 @@ const [availableMethods, setAvailableMethods] = useState([]);
     const requestId = ++latestCalcRequestIdRef.current;
     try {
       setCalculating(true);
+      const linkedUploadMatch = typeof artworkLink === 'string' ? artworkLink.match(/\/api\/uploads\/([^?#]+)/i) : null;
+      const linkedUploadPath = linkedUploadMatch ? linkedUploadMatch[1].replace(/^\/+/, '') : null;
+      const mergedArtworkFiles = linkedUploadPath && !artworkFiles.includes(linkedUploadPath)
+        ? [...artworkFiles, linkedUploadPath]
+        : artworkFiles;
+
       const payload = {
         mode: 'apparel',
         productId,
@@ -482,9 +514,11 @@ const [availableMethods, setAvailableMethods] = useState([]);
         deliveryMethod,
         isCustomApparels,
         useMyCloth: fabricChoice === 'own',
-        artworkReady: artworkReadyChoice === 'ready',
+        artworkReady: artworkReadyChoice === 'ready' || artworkReadyChoice === 'link',
+        artworkReadyChoice,
+        artworkLink: artworkLink || '',
         tempArtworkFiles,
-        artworkFiles,
+        artworkFiles: mergedArtworkFiles,
         customSizeNote,
         shippingZip: shippingZip.trim(),
       };
@@ -529,7 +563,8 @@ const [availableMethods, setAvailableMethods] = useState([]);
                         : "I don't have my own fabric",
                   }
                 : {}),
-              Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+              Artwork: artworkReadyChoice === 'link' ? 'Gang Sheet Attached' : artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+              ...(artworkLink ? { 'Artwork Link': artworkLink } : {}),
             }
           : {};
         onQuoteReady({ mode: 'apparel', payload, summary: json, customizationsDisplay });
@@ -792,7 +827,7 @@ const handleDeliveryMethodChange = (method) => {
     if (!designerHelpId) return 'Please select a Designer Help option.';
     if (!deliveryMethod) return 'Please select a Delivery Method.';
     if (!artworkReadyChoice) return 'Please select an Artwork option.';
-    if (artworkReadyChoice === 'ready' && tempArtworkFiles.length === 0 && artworkFiles.length === 0 && !artworkLink?.trim()) {
+    if ((artworkReadyChoice === 'ready' || artworkReadyChoice === 'link') && tempArtworkFiles.length === 0 && artworkFiles.length === 0 && !artworkLink?.trim()) {
       return 'Please upload at least one artwork file or provide a cloud link.';
     }
     return null;
@@ -816,6 +851,12 @@ const handleDeliveryMethodChange = (method) => {
     try {
       setCalculating(true);
 
+      const linkedUploadMatch = typeof artworkLink === 'string' ? artworkLink.match(/\/api\/uploads\/([^?#]+)/i) : null;
+      const linkedUploadPath = linkedUploadMatch ? linkedUploadMatch[1].replace(/^\/+/, '') : null;
+      const mergedArtworkFiles = linkedUploadPath && !artworkFiles.includes(linkedUploadPath)
+        ? [...artworkFiles, linkedUploadPath]
+        : artworkFiles;
+
       // Add dimension data if available
       const payload = {
         mode: 'apparel',
@@ -831,9 +872,11 @@ const handleDeliveryMethodChange = (method) => {
         deliveryMethod,
         isCustomApparels,
         useMyCloth: fabricChoice === 'own',
-        artworkReady: artworkReadyChoice === 'ready',
+        artworkReady: artworkReadyChoice === 'ready' || artworkReadyChoice === 'link',
+        artworkReadyChoice,
+        artworkLink: artworkLink || '',
         tempArtworkFiles,
-        artworkFiles,
+        artworkFiles: mergedArtworkFiles,
         customSizeNote,
         shippingZip: shippingZip.trim(),
       };
@@ -879,7 +922,7 @@ const handleDeliveryMethodChange = (method) => {
                         : "I don't have my own fabric",
                   }
                 : {}),
-              Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+              Artwork: artworkReadyChoice === 'link' ? 'Gang Sheet Attached' : artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
             }
           : {};
 
@@ -945,6 +988,7 @@ const handleDeliveryMethodChange = (method) => {
       <DynamicQuoteBuilder
         productId={productId}
         productName={productName}
+        productCategory={productCategory}
         minQuantity={quantityMin}
         maxQuantity={quantityMax}
         prefillQuote={prefillQuote}
@@ -1330,7 +1374,8 @@ const renderDeliveryStep = () => {
               : "I don't have my own fabric",
           }
         : {}),
-      Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+      Artwork: artworkReadyChoice === 'link' ? 'Gang Sheet Attached' : artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+      ...(artworkLink ? { 'Artwork Link': artworkLink } : {}),
     };
     
     const quoteForInvoice = { ...quoteSummary, ...customizationsDisplay, productName, deliveryMethod };
@@ -1377,7 +1422,8 @@ const renderDeliveryStep = () => {
         'Size Breakdown': availableSizes.filter((s) => (quantities[s.id] || 0) > 0).map((s) => `${s.label}: ${quantities[s.id] || 0}`).join(', '),
         Delivery: getShippingDisplayLabel(deliveryMethod),
         ...(isCustomApparels ? { Fabric: fabricChoice === 'own' ? 'I have my own fabric' : "I don't have my own fabric" } : {}),
-        Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+        Artwork: artworkReadyChoice === 'link' ? 'Gang Sheet Attached' : artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+        ...(artworkLink ? { 'Artwork Link': artworkLink } : {}),
         productName,
       };
       const quoteForInvoice = { ...quoteSummary, ...customizationsDisplay, deliveryMethod, productName };
@@ -1398,7 +1444,8 @@ const renderDeliveryStep = () => {
         'Size Breakdown': availableSizes.filter((s) => (quantities[s.id] || 0) > 0).map((s) => `${s.label}×${quantities[s.id]}`).join(', '),
         Delivery: getShippingDisplayLabel(deliveryMethod),
         ...(isCustomApparels ? { Fabric: fabricChoice === 'own' ? 'I have my own fabric' : "I don't have my own fabric" } : {}),
-        Artwork: artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+        Artwork: artworkReadyChoice === 'link' ? 'Gang Sheet Attached' : artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later',
+        ...(artworkLink ? { 'Artwork Link': artworkLink } : {}),
         productName,
       };
       const quoteForInvoice = { ...quoteSummary, ...customizationsDisplay, deliveryMethod };
@@ -1697,7 +1744,9 @@ const renderDeliveryStep = () => {
   };
 
   const renderStepContent = () => {
-    const isDTFGangSheet = productName && (productName.toLowerCase().includes('gang sheet') || productName.toLowerCase().includes('dtf'));
+    const isDTFGangSheet =
+      (productName && (productName.toLowerCase().includes('gang sheet') || productName.toLowerCase().includes('dtf'))) ||
+      (productCategory && (productCategory.toLowerCase().includes('gang sheet') || productCategory.toLowerCase().includes('dtf')));
 
     const artworkStep = (
       <div className="space-y-4">
@@ -1713,15 +1762,18 @@ const renderDeliveryStep = () => {
               Need to build your Gang Sheet?
             </h4>
             <ol className="list-decimal ml-5 text-gray-700 text-[14px] space-y-1 mb-4">
-              <li>Click the button below to use the free Gang Sheet Maker.</li>
-              <li>Auto-pack your designs and click <b>Download</b>.</li>
-              <li>Come back here and upload the downloaded file below!</li>
+              <li>Click the button below to open our interactive Gang Sheet Builder.</li>
+              <li>Auto-pack your designs and click <b>UPLOAD TO WEBSITE</b>.</li>
+              <li>Your gang sheet will be automatically attached to this order!</li>
             </ol>
-            <a href="https://freegangsheetmaker.com/" target="_blank" rel="noopener noreferrer" className="inline-block">
+            <a
+              href={`/dtf-builder?returnUrl=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`}
+              className="inline-block"
+            >
               <Button type="button" className="bg-[#29b6f6] hover:bg-[#1e8fc4] text-white">
                 Open Free Gang Sheet Maker
                 <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </Button>
             </a>
@@ -1733,7 +1785,7 @@ const renderDeliveryStep = () => {
             <input
               type="radio"
               name="quote-artwork-ready"
-              checked={artworkReadyChoice === 'ready'}
+              checked={artworkReadyChoice === 'ready' || artworkReadyChoice === 'link'}
               onChange={() => handleArtworkReadyChange('ready')}
             />
             Upload file now
@@ -1753,12 +1805,37 @@ const renderDeliveryStep = () => {
             Upload file later
           </label>
         </div>
+        {artworkReadyChoice === 'link' && artworkLink && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between">
+            <div className="text-sm text-emerald-800">
+              <span className="font-bold block mb-1">✓ Gang Sheet Attached Successfully</span>
+              <a href={artworkLink} target="_blank" rel="noreferrer" className="underline text-emerald-600 break-all">
+                {artworkLink}
+              </a>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const relMatch = typeof artworkLink === 'string' ? artworkLink.match(/\/api\/uploads\/([^?#]+)/i) : null;
+                const relPath = relMatch ? relMatch[1].replace(/^\/+/, '') : null;
+                setArtworkLink('');
+                if (relPath) {
+                  setArtworkFiles((prev) => prev.filter((p) => p !== relPath));
+                }
+                handleArtworkReadyChange('ready');
+              }}
+              className="text-xs font-semibold text-red-600 hover:text-red-800 ml-4 px-2 py-1 rounded bg-white border border-red-200"
+            >
+              Remove
+            </button>
+          </div>
+        )}
         {artworkFiles.length > 0 && (
           <div className="text-xs text-gray-600">
             {artworkFiles.length} existing artwork file(s) will be reused.
           </div>
         )}
-        {artworkReadyChoice === 'ready' && (
+        {(artworkReadyChoice === 'ready' || artworkReadyChoice === 'link') && (
           <div className="space-y-4">
             <div className="text-sm text-gray-600 bg-blue-50 border border-blue-100 p-3 rounded-lg">
               <p><strong>Maximum file size:</strong> 100 MB per file and 300 MB per order.</p>
@@ -1937,7 +2014,9 @@ const renderDeliveryStep = () => {
          case 6:
            return (
              Boolean(artworkReadyChoice) &&
-             (artworkReadyChoice === 'not_ready' || (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && artworkConfirmed)
+             (artworkReadyChoice === 'not_ready' ||
+               (artworkReadyChoice === 'link' && Boolean(artworkLink)) ||
+               ((tempArtworkFiles.length > 0 || artworkFiles.length > 0 || Boolean(artworkLink)) && artworkConfirmed))
            );
         case 7:
           return Boolean(designerHelpId);
@@ -1969,7 +2048,9 @@ case 8:
        case 5:
          return (
            Boolean(artworkReadyChoice) &&
-           (artworkReadyChoice === 'not_ready' || (tempArtworkFiles.length > 0 || artworkFiles.length > 0) && artworkConfirmed)
+           (artworkReadyChoice === 'not_ready' ||
+             (artworkReadyChoice === 'link' && Boolean(artworkLink)) ||
+             ((tempArtworkFiles.length > 0 || artworkFiles.length > 0 || Boolean(artworkLink)) && artworkConfirmed))
          );
       case 6:
         return Boolean(designerHelpId);

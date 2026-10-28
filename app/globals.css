@@ -2,8 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
 body {
   font-family: Arial, Helvetica, sans-serif;
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 @layer utilities {

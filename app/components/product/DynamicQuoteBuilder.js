@@ -38,9 +38,16 @@ function normalizeSelectionType(value) {
   return 'unknown';
 }
 
+function extractUploadRelPath(url) {
+  if (!url || typeof url !== 'string') return null;
+  const match = url.match(/\/api\/uploads\/([^?#]+)/);
+  return match && match[1] ? decodeURIComponent(match[1]) : null;
+}
+
 export function DynamicQuoteBuilder({
   productId,
   productName,
+  productCategory,
   minQuantity: productMin = null,
   maxQuantity: productMax = null,
   minOrderValue: productMinValue = null,
@@ -177,60 +184,37 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
           }
         }
 
-        // Apply URL parameters on top for Gang Sheet integration
-        const gsSize = searchParams.get('gs_size');
-        if (gsSize) {
-           const printSizeGroup = (json.schema?.groups || []).find(g => {
-             const poolKeyLower = g.poolKey.toLowerCase();
-             const poolName = (g.name || '').toLowerCase();
-             return poolKeyLower.includes('size') || poolName.includes('size');
-           });
-           if (printSizeGroup) {
-             const pool = (json.pools || []).find(p => p.key === printSizeGroup.poolKey);
-             if (pool && pool.options) {
-               const normalize = str => str.toLowerCase().replace(/[^a-z0-9]/g, '');
-               const option = pool.options.find(o => normalize(o.label) === normalize(gsSize));
-               if (option) {
-                 const selectionType = normalizeSelectionType(pool.selectionType);
-                 mergedSelections[printSizeGroup.poolKey] = selectionType === 'multi' ? [option.id] : option.id;
-               }
-             }
-           }
-        }
-        
         setSelections(mergedSelections);
 
         if (prefillPayload?.deliveryMethod) setDeliveryMethod(prefillPayload.deliveryMethod);
-        
-        const gsUrl = searchParams.get('gs_url');
-        if (gsUrl) {
+
+        if (prefillPayload?.artworkReadyChoice) {
+          setArtworkReadyChoice(prefillPayload.artworkReadyChoice);
+        } else if (prefillPayload?.artworkLink) {
           setArtworkReadyChoice('link');
-          setArtworkLink(gsUrl);
+        } else if (prefillPayload?.artworkReady === true) {
+          setArtworkReadyChoice('ready');
+        } else if (prefillPayload?.artworkReady === false) {
+          setArtworkReadyChoice('not_ready');
+        }
+        if (prefillPayload?.artworkLink) {
+          setArtworkLink(prefillPayload.artworkLink);
+        }
+        if (Array.isArray(prefillPayload?.tempArtworkFiles)) {
+          setTempArtworkFiles(prefillPayload.tempArtworkFiles);
+        }
+        if (Array.isArray(prefillPayload?.artworkFiles)) {
+          setArtworkFiles(prefillPayload.artworkFiles);
+          if (!prefillPayload?.artworkReadyChoice && !prefillPayload?.artworkLink) {
+            setArtworkReadyChoice('ready');
+          }
+        }
+        if (
+          (Array.isArray(prefillPayload?.tempArtworkFiles) && prefillPayload.tempArtworkFiles.length > 0) ||
+          (Array.isArray(prefillPayload?.artworkFiles) && prefillPayload.artworkFiles.length > 0) ||
+          prefillPayload?.artworkLink
+        ) {
           setArtworkConfirmed(true);
-          // Jump to the Artwork step automatically
-          const groupsCount = (json.schema?.groups || []).filter((g) => (json.pools || []).some((pl) => pl.key === g.poolKey)).length;
-          setStep(groupsCount);
-        } else {
-          if (prefillPayload?.artworkReady) setArtworkReadyChoice('ready');
-          else if (prefillPayload?.artworkReady === false) setArtworkReadyChoice('not_ready');
-          else if (prefillPayload?.artworkLink) {
-            setArtworkReadyChoice('link');
-            setArtworkLink(prefillPayload.artworkLink);
-          }
-          if (Array.isArray(prefillPayload?.tempArtworkFiles)) {
-            setTempArtworkFiles(prefillPayload.tempArtworkFiles);
-          }
-          if (Array.isArray(prefillPayload?.artworkFiles)) {
-            setArtworkFiles(prefillPayload.artworkFiles);
-            if (!artworkReadyChoice) setArtworkReadyChoice('ready');
-          }
-          if (
-            (Array.isArray(prefillPayload?.tempArtworkFiles) && prefillPayload.tempArtworkFiles.length > 0) ||
-            (Array.isArray(prefillPayload?.artworkFiles) && prefillPayload.artworkFiles.length > 0) ||
-            prefillPayload?.artworkLink
-          ) {
-            setArtworkConfirmed(true);
-          }
         }
 
         if (typeof prefillPayload?.customSizeNote === 'string') {
@@ -242,9 +226,8 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
           // Let the main step-sync effect handle jumping to targetStep
         }
 
-        // Restore product draft (independent of the Edit-Product prefill flow).
-        // Only when there is no active Edit-Product prefill, and only after
-        // schema/pools have loaded (so selections can be validated).
+        // Restore product draft FIRST (when there is no active Edit-Product prefill),
+        // so Gang Sheet URL parameters below can override the draft cleanly.
         if (!prefillPayload) {
           const draft = readQuoteDraft(productId);
           if (draft?.payload) {
@@ -256,6 +239,58 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
             }
           }
         }
+
+        // Apply URL parameters ON TOP for Gang Sheet integration (overrides draft)
+        const gsSize = searchParams.get('gs_size');
+        if (gsSize) {
+          const printSizeGroup = (json.schema?.groups || []).find((g) => {
+            const poolKeyLower = g.poolKey.toLowerCase();
+            const poolName = (g.name || '').toLowerCase();
+            return poolKeyLower.includes('size') || poolName.includes('size');
+          });
+          let matchedPreset = false;
+          if (printSizeGroup) {
+            const pool = (json.pools || []).find((p) => p.key === printSizeGroup.poolKey);
+            if (pool && pool.options) {
+              const normalize = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+              const option = pool.options.find((o) => {
+                if (normalize(o.label) === normalize(gsSize)) return true;
+                const dims = parseDimensionsFromValue(o.value || o.label);
+                return dims && Number(dims.height) === Number(gsSize);
+              });
+              if (option) {
+                matchedPreset = true;
+                const selectionType = normalizeSelectionType(pool.selectionType);
+                const nextVal = selectionType === 'multi' ? [option.id] : option.id;
+                setSelections((prev) => ({ ...prev, [printSizeGroup.poolKey]: nextVal }));
+              }
+            }
+          }
+          if (!matchedPreset && json.allowCustomDimensions) {
+            setWidthIn((prev) => (prev && parseFloat(prev) > 0 ? prev : '23'));
+            setHeightIn(String(gsSize));
+          }
+        }
+
+        const gsUrl = searchParams.get('gs_url');
+        if (gsUrl) {
+          setArtworkReadyChoice('link');
+          setArtworkLink(gsUrl);
+          setArtworkConfirmed(true);
+          const relPath = extractUploadRelPath(gsUrl);
+          if (relPath) {
+            setArtworkFiles((prev) => (prev.includes(relPath) ? prev : [...prev, relPath]));
+          }
+          // Force fresh quote calculation with the newly attached gang sheet
+          setQuoteSummary(null);
+          setHasCalculated(false);
+          // Jump to the Artwork step automatically
+          const groupsCount = (json.schema?.groups || []).filter((g) =>
+            (json.pools || []).some((pl) => pl.key === g.poolKey),
+          ).length;
+          setStep(groupsCount);
+        }
+
         hydratedRef.current = true;
       } catch (err) {
         if (!cancelled) {
@@ -276,17 +311,27 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
       if (p.selections.height_in != null) setHeightIn(String(p.selections.height_in));
     }
     if (p.deliveryMethod) setDeliveryMethod(p.deliveryMethod);
-    if (p.artworkReady) setArtworkReadyChoice('ready');
-    else if (p.artworkReady === false) setArtworkReadyChoice('not_ready');
+    if (p.artworkReadyChoice) {
+      setArtworkReadyChoice(p.artworkReadyChoice);
+    } else if (p.artworkLink) {
+      setArtworkReadyChoice('link');
+    } else if (p.artworkReady === true) {
+      setArtworkReadyChoice('ready');
+    } else if (p.artworkReady === false) {
+      setArtworkReadyChoice('not_ready');
+    }
     if (p.artworkLink) setArtworkLink(p.artworkLink);
     if (Array.isArray(p.tempArtworkFiles)) setTempArtworkFiles(p.tempArtworkFiles);
     if (Array.isArray(p.artworkFiles)) {
       setArtworkFiles(p.artworkFiles);
-      if (!artworkReadyChoice) setArtworkReadyChoice('ready');
+      if (!p.artworkReadyChoice && !p.artworkLink && p.artworkFiles.length > 0) {
+        setArtworkReadyChoice('ready');
+      }
     }
     if (
       (Array.isArray(p.tempArtworkFiles) && p.tempArtworkFiles.length > 0) ||
-      (Array.isArray(p.artworkFiles) && p.artworkFiles.length > 0)
+      (Array.isArray(p.artworkFiles) && p.artworkFiles.length > 0) ||
+      Boolean(p.artworkLink)
     ) {
       setArtworkConfirmed(true);
     }
@@ -307,7 +352,9 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
     if (!poolKeys.size) return null;
     const sanitizedSelections = {};
     for (const [k, v] of Object.entries(p.selections)) {
-      if (poolKeys.has(k)) sanitizedSelections[k] = v;
+      if (poolKeys.has(k) || k === 'width_in' || k === 'height_in') {
+        sanitizedSelections[k] = v;
+      }
     }
     if (Object.keys(sanitizedSelections).length === 0) return null;
     return { ...p, selections: sanitizedSelections };
@@ -323,7 +370,14 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
       selections: { ...selections, ...dimensionSelections },
       deliveryMethod,
       shippingZip: shippingZip.trim(),
-      artworkReady: artworkReadyChoice === 'ready',
+      artworkReadyChoice,
+      artworkReady:
+        artworkReadyChoice === 'ready' || artworkReadyChoice === 'link'
+          ? true
+          : artworkReadyChoice === 'not_ready'
+            ? false
+            : undefined,
+      artworkLink,
       tempArtworkFiles,
       artworkFiles,
       customSizeNote,
@@ -342,7 +396,7 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
     return () => clearTimeout(t);
   }, [
     selections, widthIn, heightIn, deliveryMethod, shippingZip,
-    artworkReadyChoice, tempArtworkFiles, artworkFiles, customSizeNote, quoteSummary,
+    artworkReadyChoice, artworkLink, tempArtworkFiles, artworkFiles, customSizeNote, quoteSummary,
   ]);
 
   // Flush pending edits on tab hide / unload so the last <500ms changes survive.
@@ -359,7 +413,7 @@ const [zipCheckStatus, setZipCheckStatus] = useState('idle');
     };
   }, [
     productId, selections, widthIn, heightIn, deliveryMethod, shippingZip,
-    artworkReadyChoice, tempArtworkFiles, artworkFiles, customSizeNote, quoteSummary,
+    artworkReadyChoice, artworkLink, tempArtworkFiles, artworkFiles, customSizeNote, quoteSummary,
   ]);
 
   const poolMap = useMemo(() => new Map(pools.map((p) => [p.key, p])), [pools]);
@@ -679,7 +733,12 @@ const handleDeliveryMethodChange = (method) => {
       setCalcError('Please indicate whether your artwork is ready.');
       return;
     }
-    if (artworkReadyChoice === 'ready' && artworkFiles.length === 0 && tempArtworkFiles.length === 0 && !artworkLink?.trim()) {
+    if (
+      (artworkReadyChoice === 'ready' || artworkReadyChoice === 'link') &&
+      artworkFiles.length === 0 &&
+      tempArtworkFiles.length === 0 &&
+      !artworkLink?.trim()
+    ) {
       setCalcError('Please upload at least one artwork file or provide a cloud link.');
       return;
     }
@@ -912,6 +971,11 @@ const handleDeliveryMethodChange = (method) => {
       }
     }
 
+    const gangSheetRelPath = extractUploadRelPath(artworkLink);
+    const mergedArtworkFiles = gangSheetRelPath && !artworkFiles.includes(gangSheetRelPath)
+      ? [...artworkFiles, gangSheetRelPath]
+      : artworkFiles;
+
     const payload = {
         productId,
         mode: 'print_product',
@@ -921,10 +985,11 @@ const handleDeliveryMethodChange = (method) => {
         shippingZip: shippingZip.trim(),
         shippingState: '',
         shippingCity: '',
-        artworkReady: artworkReadyChoice === 'ready',
+        artworkReadyChoice,
+        artworkReady: artworkReadyChoice === 'ready' || artworkReadyChoice === 'link',
         artworkLink,
         tempArtworkFiles,
-        artworkFiles,
+        artworkFiles: mergedArtworkFiles,
         customSizeNote,
       };
 
@@ -977,7 +1042,12 @@ const handleDeliveryMethodChange = (method) => {
         }
 
         customizationsDisplay.Delivery = getShippingDisplayLabel(deliveryMethod);
-        customizationsDisplay.Artwork = artworkReadyChoice === 'ready' ? 'Upload file now' : 'Upload file later';
+        customizationsDisplay.Artwork =
+          artworkReadyChoice === 'link'
+            ? 'Gang Sheet Attached'
+            : artworkReadyChoice === 'ready'
+              ? 'Upload file now'
+              : 'Upload file later';
         if (artworkLink) customizationsDisplay['Artwork Link'] = artworkLink;
         
         const artworkNotes = uploadedArtworkDetails
@@ -1561,8 +1631,19 @@ const renderDimensionStep = (group, pool, value) => {
     }
     selectionLines.push(`- Delivery: ${getShippingMethodLabel(deliveryMethod)}`);
     selectionLines.push(
-      `- Artwork: ${artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—'}`,
+      `- Artwork: ${
+        artworkReadyChoice === 'link'
+          ? 'Gang Sheet Attached'
+          : artworkReadyChoice === 'ready'
+            ? 'Upload file now'
+            : artworkReadyChoice === 'not_ready'
+              ? 'Upload file later'
+              : '—'
+      }`,
     );
+    if (artworkLink) {
+      selectionLines.push(`- Artwork Link: ${artworkLink}`);
+    }
 
     const quoteLines = [
       `Quote for: ${productName}`,
@@ -1637,7 +1718,15 @@ const renderDimensionStep = (group, pool, value) => {
         }
       }
       quoteForInvoice.selections['Delivery'] = getShippingMethodLabel(deliveryMethod);
-      quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
+      quoteForInvoice.selections['Artwork'] =
+        artworkReadyChoice === 'link'
+          ? 'Gang Sheet Attached'
+          : artworkReadyChoice === 'ready'
+            ? 'Upload file now'
+            : artworkReadyChoice === 'not_ready'
+              ? 'Upload file later'
+              : '—';
+      if (artworkLink) quoteForInvoice.selections['Artwork Link'] = artworkLink;
       const encoded = btoa(encodeURIComponent(JSON.stringify(quoteForInvoice)));
       window.open(`/quote/print?data=${encoded}`, '_blank');
     };
@@ -1672,7 +1761,15 @@ const renderDimensionStep = (group, pool, value) => {
         }
       }
       quoteForInvoice.selections['Delivery'] = getShippingMethodLabel(deliveryMethod);
-      quoteForInvoice.selections['Artwork'] = artworkReadyChoice === 'ready' ? 'Upload file now' : artworkReadyChoice === 'not_ready' ? 'Upload file later' : '—';
+      quoteForInvoice.selections['Artwork'] =
+        artworkReadyChoice === 'link'
+          ? 'Gang Sheet Attached'
+          : artworkReadyChoice === 'ready'
+            ? 'Upload file now'
+            : artworkReadyChoice === 'not_ready'
+              ? 'Upload file later'
+              : '—';
+      if (artworkLink) quoteForInvoice.selections['Artwork Link'] = artworkLink;
       const payload = buildInvoiceSharePayload(quoteForInvoice, { productName });
       try {
         if (navigator.share) {
@@ -1823,7 +1920,14 @@ const renderDimensionStep = (group, pool, value) => {
    };
 
   const renderArtworkStep = () => {
-    const isDTFGangSheet = productName && (productName.toLowerCase().includes('gang sheet') || productName.toLowerCase().includes('dtf'));
+    const isDTFGangSheet =
+      (productName &&
+        (productName.toLowerCase().includes('gang sheet') ||
+          productName.toLowerCase().includes('gangsheet') ||
+          productName.toLowerCase().includes('dtf'))) ||
+      (productCategory &&
+        (productCategory.toLowerCase().includes('dtf') ||
+          productCategory.toLowerCase().includes('gang')));
 
     let builderW = parseFloat(widthIn);
     let builderH = parseFloat(heightIn);
@@ -1847,7 +1951,18 @@ const renderDimensionStep = (group, pool, value) => {
       }
     }
     
-    let builderUrl = `/dtf-builder?returnUrl=${typeof window !== 'undefined' ? encodeURIComponent(window.location.href) : ''}`;
+    let cleanReturnUrl = '';
+    if (typeof window !== 'undefined') {
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('gs_url');
+        u.searchParams.delete('gs_size');
+        cleanReturnUrl = u.toString();
+      } catch {
+        cleanReturnUrl = window.location.href;
+      }
+    }
+    let builderUrl = `/dtf-builder?returnUrl=${encodeURIComponent(cleanReturnUrl)}`;
     if (Number.isFinite(builderW) && builderW > 0 && Number.isFinite(builderH) && builderH > 0) {
       builderUrl += `&max_width=${builderW}&max_height=${builderH}`;
     }
@@ -1893,7 +2008,11 @@ const renderDimensionStep = (group, pool, value) => {
             type="radio"
             name="dq-artwork-ready"
             checked={artworkReadyChoice === 'ready' || artworkReadyChoice === 'link'}
-            onChange={() => handleArtworkReadyChange('ready')}
+            onChange={() => {
+              if (artworkReadyChoice !== 'link') {
+                handleArtworkReadyChange('ready');
+              }
+            }}
           />
           Upload file now
         </label>
@@ -1903,7 +2022,12 @@ const renderDimensionStep = (group, pool, value) => {
             name="dq-artwork-ready"
             checked={artworkReadyChoice === 'not_ready'}
             onChange={() => {
+              const gsRel = extractUploadRelPath(artworkLink);
               handleArtworkReadyChange('not_ready');
+              setArtworkLink('');
+              if (gsRel) {
+                setArtworkFiles((prev) => prev.filter((f) => f !== gsRel));
+              }
               setTempArtworkFiles([]);
               setTotalArtworkSize(0);
               setUploadedArtworkDetails([]);
@@ -1917,7 +2041,33 @@ const renderDimensionStep = (group, pool, value) => {
             
             {artworkReadyChoice === 'link' && artworkLink ? (
               <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
-                <strong>✓ Gang Sheet Attached Successfully</strong>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <strong>✓ Gang Sheet Attached Successfully</strong>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={artworkLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-[#0288d1] hover:underline"
+                    >
+                      View Attached Gang Sheet ↗
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const gsRel = extractUploadRelPath(artworkLink);
+                        setArtworkLink('');
+                        if (gsRel) {
+                          setArtworkFiles((prev) => prev.filter((f) => f !== gsRel));
+                        }
+                        handleArtworkReadyChange('ready');
+                      }}
+                      className="text-xs font-semibold text-red-600 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
                 <p className="mt-1">Your gang sheet layout has been saved and attached to this order.</p>
               </div>
             ) : (
@@ -2030,18 +2180,20 @@ const renderDimensionStep = (group, pool, value) => {
               )}
             </div>
 
-            <div className="pt-2 border-t border-gray-100">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                For larger files (over 100MB), provide a cloud link:
-              </label>
-              <input
-                type="text"
-                placeholder="Google Drive, Dropbox, or WeTransfer link..."
-                value={artworkLink}
-                onChange={(e) => setArtworkLink(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#29b6f6] focus:border-transparent outline-none"
-              />
-            </div>
+            {artworkReadyChoice !== 'link' && (
+              <div className="pt-2 border-t border-gray-100">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  For larger files (over 100MB), provide a cloud link:
+                </label>
+                <input
+                  type="text"
+                  placeholder="Google Drive, Dropbox, or WeTransfer link..."
+                  value={artworkLink}
+                  onChange={(e) => setArtworkLink(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-[#29b6f6] focus:border-transparent outline-none"
+                />
+              </div>
+            )}
           </div>
       )}
       <div className="mt-4 space-y-2">

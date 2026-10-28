@@ -481,7 +481,14 @@ export default function Builder() {
           const returnUrl = urlParams.get("returnUrl");
           if (returnUrl) {
             const absoluteUrl = data.url.startsWith('http') ? data.url : window.location.origin + data.url;
-            window.location.href = `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}gs_url=${encodeURIComponent(absoluteUrl)}&gs_size=${length}`;
+            try {
+              const targetUrl = new URL(returnUrl, window.location.origin);
+              targetUrl.searchParams.set("gs_url", absoluteUrl);
+              targetUrl.searchParams.set("gs_size", String(length));
+              window.location.href = targetUrl.toString();
+            } catch {
+              window.location.href = `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}gs_url=${encodeURIComponent(absoluteUrl)}&gs_size=${length}`;
+            }
           } else {
             toast.success("Your gang sheet has been uploaded successfully! You can now close this window.");
           }

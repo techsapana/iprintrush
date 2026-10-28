@@ -498,6 +498,24 @@ export async function POST(req: NextRequest) {
         // Append size/split label to the stored item name so admin can distinguish
         const storedName = sizeLabel ? `${productName} - ${sizeLabel}` : productName;
 
+        const itemArtworkFiles = Array.isArray(item.artworkFiles)
+          ? item.artworkFiles.filter((x) => typeof x === 'string' && x.trim().length > 0)
+          : [];
+        const linkedArtworkUrl =
+          (item.quotePayload as any)?.artworkLink ||
+          (item.customizationsDisplay as any)?.['Artwork Link'] ||
+          (item.quotePayload as any)?.customizationsDisplay?.['Artwork Link'] ||
+          '';
+        if (typeof linkedArtworkUrl === 'string' && linkedArtworkUrl.trim()) {
+          const uploadMatch = linkedArtworkUrl.match(/\/api\/uploads\/([^?#]+)/i);
+          if (uploadMatch?.[1]) {
+            const relPath = uploadMatch[1].replace(/^\/+/, '');
+            if (!itemArtworkFiles.includes(relPath)) {
+              itemArtworkFiles.push(relPath);
+            }
+          }
+        }
+
         orderItemRows.push({
           productId: item.id,
           name: storedName,
@@ -509,9 +527,7 @@ export async function POST(req: NextRequest) {
           tempArtworkFiles: Array.isArray(item.tempArtworkFiles)
             ? item.tempArtworkFiles.filter((x) => typeof x === 'string' && x.trim().length > 0)
             : [],
-          artworkFiles: Array.isArray(item.artworkFiles)
-            ? item.artworkFiles.filter((x) => typeof x === 'string' && x.trim().length > 0)
-            : [],
+          artworkFiles: itemArtworkFiles,
           customSizeNote: typeof item.customSizeNote === 'string' ? item.customSizeNote : '',
         });
 
@@ -776,7 +792,8 @@ export async function POST(req: NextRequest) {
         const finalArtworkFiles: string[] = [];
         if (row.artworkFiles.length > 0) {
           finalArtworkFiles.push(...row.artworkFiles);
-        } else if (row.artworkReady && row.tempArtworkFiles.length > 0) {
+        }
+        if (row.artworkReady && row.tempArtworkFiles.length > 0) {
           const targetDir = path.join(privateRoot, `order-${orderId}`);
           if (!existsSync(targetDir)) {
             await mkdir(targetDir, { recursive: true });

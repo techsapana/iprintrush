@@ -222,17 +222,17 @@ export function Navbar() {
   return (
     <>
       <nav className="sticky top-0 z-50 bg-[#29b6f6] shadow-lg print:hidden">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1400px] mx-auto px-3 sm:px-6 lg:px-8">
 
           {/* ── Top Bar ── */}
-          <div className="flex items-center justify-between gap-4 py-2 md:py-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-4 py-2 md:py-4">
             <Link href="/" className="flex-shrink-0">
               {logoImgError ? (
-                <span className="text-white font-bold text-3xl lowercase tracking-tight hover:scale-105 transition-transform block">
+                <span className="text-white font-bold text-2xl sm:text-3xl lowercase tracking-tight hover:scale-105 transition-transform block">
                   iprint
                 </span>
               ) : (
-                <div className="h-9 sm:h-10 md:h-16 flex items-center justify-start w-[120px] sm:w-[140px] md:w-[200px]">
+                <div className="h-8 sm:h-10 md:h-16 flex items-center justify-start w-[100px] sm:w-[140px] md:w-[200px]">
                   <img
                     src={logoImageUrl || '/logo.png'}
                     alt="iPrintRush"
@@ -283,10 +283,10 @@ export function Navbar() {
               </form>
             </div>
 
-            <div className="flex items-center gap-4 flex-shrink-0">
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <Link
                 href="/request-quote"
-                className="flex items-center justify-center bg-[#ffffff] hover:bg-gray-100 text-[#29b6f6] font-bold text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded-full shadow-sm transition-all hover:scale-105 whitespace-nowrap"
+                className="flex items-center justify-center bg-[#ffffff] hover:bg-gray-100 text-[#29b6f6] font-bold text-[11px] sm:text-sm px-2.5 py-1 sm:px-4 sm:py-2 rounded-full shadow-sm transition-all hover:scale-105 whitespace-nowrap"
               >
                 Request a Quote
               </Link>
@@ -309,7 +309,7 @@ export function Navbar() {
                     </span>
                   )}
                 </button>
-                <span className="text-white text-xs font-bold">Saved</span>
+                <span className="text-white text-[10px] sm:text-xs font-bold leading-none">Saved</span>
               </Link>
               <Link href={isAuthenticated ? "/profile" : "/login"} className="hidden sm:flex flex-col items-center gap-0.5 md:gap-1">
                 <button className="relative w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-all hover:-translate-y-0.5">
@@ -333,11 +333,11 @@ export function Navbar() {
                     </span>
                   )}
                 </button>
-                <span className="text-white text-xs font-bold">Cart</span>
+                <span className="text-white text-[10px] sm:text-xs font-bold leading-none">Cart</span>
               </Link>
 
               <button
-                className="md:hidden text-white"
+                className="md:hidden text-white p-1 flex-shrink-0"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 aria-label="Toggle menu"
               >
