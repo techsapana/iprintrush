@@ -116,7 +116,8 @@ export default function InvoiceTemplate({ order }) {
     order.deliveryMethod !== 'pickup' ||
     isLocalDelivery ||
     order.shippingService === 'standard_shipping' ||
-    order.shippingService === 'review_required';
+    order.shippingService === 'review_required' ||
+    hasAddrFields(order.shippingAddress);
   const billingSource = hasAddrFields(order.billingAddress)
     ? order.billingAddress
     : order.shippingAddress;
@@ -191,7 +192,7 @@ export default function InvoiceTemplate({ order }) {
         </div>
 
         {/* Addresses & Payment Info */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-3 print:grid-cols-3 gap-6 mb-10">
           <div className="bg-gray-50 p-5 rounded-lg border border-gray-100">
             <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
               Payment Method
@@ -225,18 +226,42 @@ export default function InvoiceTemplate({ order }) {
             <div className="text-sm text-gray-700">
               {order.customerName && <div className="font-semibold text-gray-900 mb-1">{order.customerName}</div>}
               {formatAddress(billingSource)}
+              {(order.customerEmail || order.customerPhone) && (
+                <div className="mt-2 pt-2 border-t border-gray-200 space-y-0.5 text-xs text-gray-600">
+                  {order.customerEmail && (
+                    <div className="break-all">
+                      <span className="font-medium text-gray-700">Email:</span> {order.customerEmail}
+                    </div>
+                  )}
+                  {order.customerPhone && (
+                    <div>
+                      <span className="font-medium text-gray-700">Phone:</span> {order.customerPhone}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="bg-gray-50 p-5 rounded-lg border border-gray-100">
             <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-              {isDeliveryOrder ? (isLocalDelivery ? 'Local Delivery' : 'Shipping Address') : 'Local Pickup'}
+              {isDeliveryOrder ? (isLocalDelivery ? 'Local Delivery Address' : 'Shipping Address') : 'Local Pickup'}
             </div>
             <div className="text-sm text-gray-700">
               <div className="font-semibold text-gray-900 mb-1">
                 {isDeliveryOrder ? (isLocalDelivery ? 'Local Delivery' : 'Standard Shipping') : 'Store Pickup'}
               </div>
-              {isDeliveryOrder && formatAddress(shippingSource)}
+              {isDeliveryOrder && (
+                <>
+                  {order.customerName && <div className="font-medium text-gray-800">{order.customerName}</div>}
+                  {formatAddress(shippingSource)}
+                  {order.customerPhone && (
+                    <div className="mt-2 text-xs text-gray-600">
+                      <span className="font-medium text-gray-700">Phone:</span> {order.customerPhone}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
