@@ -335,6 +335,9 @@ function ShippingZonesAdminPageInner() {
                     onChange={(e) => setFormData({ ...formData, free_delivery_minimum: parseFloat(e.target.value) || 0 })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Set to 0 to disable free delivery (always charge the delivery fee).
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -435,7 +438,11 @@ function ShippingZonesAdminPageInner() {
                       <tr className="hover:bg-gray-50">
                         <td className="px-6 py-4 font-medium text-gray-900">{zone.zone_name}</td>
                         <td className="px-6 py-4 text-gray-600">${Number(zone.delivery_fee || 0).toFixed(2)}</td>
-                        <td className="px-6 py-4 text-gray-600">${Number(zone.free_delivery_minimum || 0).toFixed(2)}</td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {Number(zone.free_delivery_minimum || 0) > 0
+                            ? `$${Number(zone.free_delivery_minimum).toFixed(2)}`
+                            : 'Disabled ($0.00)'}
+                        </td>
                         <td className="px-6 py-4 text-gray-600">{zone.delivery_window || '—'}</td>
                         <td className="px-6 py-4 text-gray-600">{zone.zipCount || 0}</td>
                         <td className="px-6 py-4">

@@ -348,6 +348,26 @@ export default function OrderDetailPage() {
     );
   }
 
+  const hasAddrFields = (a) =>
+    Boolean(a && (a.address || a.apt || a.apartmentOrSuite || a.city || a.state || a.zip));
+  const isLocalDelivery =
+    order?.deliveryMethod === 'local_delivery' ||
+    order?.shippingService === 'local_delivery';
+  const isDeliveryOrder = Boolean(
+    order &&
+      (order.deliveryMethod !== 'pickup' ||
+        isLocalDelivery ||
+        order.shippingService === 'standard_shipping' ||
+        order.shippingService === 'review_required')
+  );
+  const displayShip = order
+    ? hasAddrFields(order.shippingAddress)
+      ? order.shippingAddress
+      : isDeliveryOrder && hasAddrFields(order.billingAddress)
+        ? order.billingAddress
+        : null
+    : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
@@ -436,32 +456,46 @@ export default function OrderDetailPage() {
               </div>
             )}
 
-            {order.billingAddress && (
+            {hasAddrFields(order.billingAddress) && (
               <div className="border-t pt-4">
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Billing Address</h3>
                 <div className="text-sm text-gray-600">
-                  {order.billingAddress.address && <div>{order.billingAddress.address}</div>}
-                  {order.billingAddress.city && order.billingAddress.state && (
-                    <div>{order.billingAddress.city}, {order.billingAddress.state} {order.billingAddress.zip}</div>
+                  {order.billingAddress.address && (
+                    <div>
+                      {order.billingAddress.address}
+                      {order.billingAddress.apt || order.billingAddress.apartmentOrSuite
+                        ? `, ${order.billingAddress.apt || order.billingAddress.apartmentOrSuite}`
+                        : ''}
+                    </div>
+                  )}
+                  {(order.billingAddress.city || order.billingAddress.state || order.billingAddress.zip) && (
+                    <div>
+                      {[order.billingAddress.city, order.billingAddress.state].filter(Boolean).join(', ')}
+                      {order.billingAddress.zip ? ` ${order.billingAddress.zip}` : ''}
+                    </div>
                   )}
                 </div>
               </div>
             )}
 
-            {order.deliveryMethod === 'shipping' && order.shippingAddress && (
+            {(isDeliveryOrder || hasAddrFields(order.shippingAddress)) && displayShip && (
               <div className="border-t pt-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Shipping Address</h3>
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                  {isLocalDelivery ? 'Delivery Address (Local Delivery)' : 'Shipping Address'}
+                </h3>
                 <div className="text-sm text-gray-600">
-                  {order.shippingAddress.address && (
+                  {displayShip.address && (
                     <div>
-                      {order.shippingAddress.address}
-                      {order.shippingAddress.apt ? `, ${order.shippingAddress.apt}` : ''}
+                      {displayShip.address}
+                      {displayShip.apt || displayShip.apartmentOrSuite
+                        ? `, ${displayShip.apt || displayShip.apartmentOrSuite}`
+                        : ''}
                     </div>
                   )}
-                  {order.shippingAddress.city && order.shippingAddress.state && (
+                  {(displayShip.city || displayShip.state || displayShip.zip) && (
                     <div>
-                      {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
-                      {order.shippingAddress.zip}
+                      {[displayShip.city, displayShip.state].filter(Boolean).join(', ')}
+                      {displayShip.zip ? ` ${displayShip.zip}` : ''}
                     </div>
                   )}
                 </div>

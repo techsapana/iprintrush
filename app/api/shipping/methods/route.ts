@@ -5,6 +5,7 @@ import {
   getOversizedDetails,
   getShippingTierSubtotalFromCartItems,
   getShippingCost,
+  computeLocalDeliveryCost,
   buildShippingConfig,
   getShippingDecision,
 } from "@/app/lib/shippingEngine";
@@ -101,15 +102,12 @@ export async function POST(req: Request) {
       if (allEligible) {
         if (zone) {
           // ZIP provided and zone found - show with pricing
-          let localCost = 0;
-          let deliveryWindow: string | null = null;
-
-          if (shippingTierSubtotal >= zone.free_delivery_minimum) {
-            localCost = 0;
-          } else {
-            localCost = zone.delivery_fee;
-          }
-          deliveryWindow = zone.delivery_window;
+          const localCost = computeLocalDeliveryCost(
+            shippingTierSubtotal,
+            zone.delivery_fee,
+            zone.free_delivery_minimum,
+          );
+          const deliveryWindow: string | null = zone.delivery_window;
 
           methods.push({
             type: 'local_delivery',

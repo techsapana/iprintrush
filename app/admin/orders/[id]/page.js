@@ -260,15 +260,37 @@ export default function AdminOrderDetailPage() {
     );
   }
 
+  const formatAddr = (a) =>
+    a
+      ? [a.address, a.apt || a.apartmentOrSuite, a.city, a.state, a.zip]
+          .filter(Boolean)
+          .join(', ')
+      : '';
+
   const addr = order.billingAddress || {};
-  const fullAddress = [addr.address, addr.apartmentOrSuite, addr.city, addr.state, addr.zip]
-    .filter(Boolean)
-    .join(', ');
+  const fullAddress = formatAddr(addr);
 
   const ship = order.shippingAddress || {};
-  const fullShipping = [ship.address, ship.city, ship.state, ship.zip]
-    .filter(Boolean)
-    .join(', ');
+  const rawFullShipping = formatAddr(ship);
+  const isLocalDelivery =
+    order.deliveryMethod === 'local_delivery' ||
+    order.shippingService === 'local_delivery';
+  const isDeliveryOrder =
+    order.deliveryMethod !== 'pickup' ||
+    isLocalDelivery ||
+    order.shippingService === 'standard_shipping' ||
+    order.shippingService === 'review_required';
+  const fullShipping = rawFullShipping || (isDeliveryOrder ? fullAddress : '');
+  const shippingZip = ship.zip || (isDeliveryOrder ? addr.zip : '');
+  const deliveryMethodLabel = isLocalDelivery
+    ? 'Local Delivery'
+    : order.shippingService === 'standard_shipping'
+      ? 'Standard Shipping'
+      : order.shippingService === 'review_required'
+        ? 'Shipping Review Required'
+        : order.deliveryMethod === 'shipping'
+          ? order.shippingServiceName || 'Shipping'
+          : 'Store Pickup';
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -437,15 +459,22 @@ export default function AdminOrderDetailPage() {
                   <div className="font-medium">{fullAddress}</div>
                 </div>
               )}
-{fullShipping && (
-                 <div>
-                   <span className="text-gray-500">Shipping Address</span>
-                   <div className="font-medium">{fullShipping}</div>
-                   {ship.zip && (
-                     <div className="text-xs text-gray-500 mt-1">Shipping ZIP: {ship.zip}</div>
-                   )}
-                 </div>
-               )}
+              {(rawFullShipping || isDeliveryOrder) && (
+                <div>
+                  <span className="text-gray-500">
+                    {isLocalDelivery ? 'Delivery Address (Local Delivery)' : 'Shipping Address'}
+                  </span>
+                  <div className="font-medium">{fullShipping || 'Not provided'}</div>
+                  {!rawFullShipping && fullAddress && isDeliveryOrder && (
+                    <div className="text-xs text-gray-400">Same as billing address</div>
+                  )}
+                  {shippingZip && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {isLocalDelivery ? 'Delivery ZIP' : 'Shipping ZIP'}: {shippingZip}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           {order.orderNotes && (
@@ -461,6 +490,20 @@ export default function AdminOrderDetailPage() {
         {/* Shipping / Delivery */}
         <div className="bg-white rounded-lg shadow p-6 space-y-4">
           <h2 className="font-semibold text-gray-900">Shipping & Delivery</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-gray-50 p-3 rounded-md border border-gray-100">
+            <div>
+              <span className="text-gray-500">Method</span>
+              <div className="font-medium text-gray-900">{deliveryMethodLabel}</div>
+            </div>
+            {isDeliveryOrder && (
+              <div>
+                <span className="text-gray-500">
+                  {isLocalDelivery ? 'Delivery Address' : 'Shipping Address'}
+                </span>
+                <div className="font-medium text-gray-900">{fullShipping || 'Not provided'}</div>
+              </div>
+            )}
+          </div>
           {order.shippingReviewRequired && (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
               <div className="flex items-center gap-2">
@@ -639,14 +682,19 @@ export default function AdminOrderDetailPage() {
               </div>
             </div>
           </div>
-          {/* Shipping row - only show if shipping was charged */}
-          {order.shippingAmount > 0 && (
+          {/* Shipping / delivery row */}
+          {(order.shippingAmount > 0 || isDeliveryOrder) && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">
-                Shipping{order.shippingServiceName ? ` (${order.shippingServiceName})` : ''}
+                {isLocalDelivery ? 'Local Delivery' : 'Shipping'}
+                {order.shippingServiceName && order.shippingServiceName !== (isLocalDelivery ? 'Local Delivery' : 'Shipping')
+                  ? ` (${order.shippingServiceName})`
+                  : ''}
                 {order.shippingCarrier ? ` via ${order.shippingCarrier}` : ''}
               </span>
-              <span>${order.shippingAmount.toFixed(2)}</span>
+              <span>
+                {order.shippingAmount > 0 ? `$${order.shippingAmount.toFixed(2)}` : 'FREE ($0.00)'}
+              </span>
             </div>
           )}
           <div className="flex justify-between pt-2 border-t mt-2 text-base font-semibold">

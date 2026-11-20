@@ -10,16 +10,32 @@ function formatDate(dateString) {
   });
 }
 
+function hasAddrFields(addressObj) {
+  return Boolean(
+    addressObj &&
+      (addressObj.address ||
+        addressObj.apt ||
+        addressObj.apartmentOrSuite ||
+        addressObj.city ||
+        addressObj.state ||
+        addressObj.zip)
+  );
+}
+
 function formatAddress(addressObj) {
-  if (!addressObj) return 'N/A';
+  if (!hasAddrFields(addressObj)) return 'N/A';
+  const apt = addressObj.apt || addressObj.apartmentOrSuite;
+  const cityState = [addressObj.city, addressObj.state].filter(Boolean).join(', ');
+  const cityStateZip = [cityState, addressObj.zip].filter(Boolean).join(' ');
   const parts = [
     addressObj.name,
     addressObj.address,
-    addressObj.apartmentOrSuite,
-    addressObj.city && addressObj.state ? `${addressObj.city}, ${addressObj.state} ${addressObj.zip || ''}` : '',
-    addressObj.country
-  ];
-  return parts.filter(Boolean).map((p, i) => <div key={i}>{p}</div>);
+    apt,
+    cityStateZip,
+    addressObj.country,
+  ].filter(Boolean);
+  if (parts.length === 0) return 'N/A';
+  return parts.map((p, i) => <div key={i}>{p}</div>);
 }
 
 // Helper to render card brand logos based on payment method string
@@ -92,6 +108,21 @@ export default function InvoiceTemplate({ order }) {
   }, []);
 
   if (!order) return null;
+
+  const isLocalDelivery =
+    order.deliveryMethod === 'local_delivery' ||
+    order.shippingService === 'local_delivery';
+  const isDeliveryOrder =
+    order.deliveryMethod !== 'pickup' ||
+    isLocalDelivery ||
+    order.shippingService === 'standard_shipping' ||
+    order.shippingService === 'review_required';
+  const billingSource = hasAddrFields(order.billingAddress)
+    ? order.billingAddress
+    : order.shippingAddress;
+  const shippingSource = hasAddrFields(order.shippingAddress)
+    ? order.shippingAddress
+    : order.billingAddress;
 
   return (
     <div className="bg-gray-100 text-gray-900 min-h-screen py-8 print:py-0 print:bg-white">
@@ -193,21 +224,19 @@ export default function InvoiceTemplate({ order }) {
             </div>
             <div className="text-sm text-gray-700">
               {order.customerName && <div className="font-semibold text-gray-900 mb-1">{order.customerName}</div>}
-              {formatAddress(
-                order.billingAddress && Object.keys(order.billingAddress).length > 0 
-                  ? order.billingAddress 
-                  : order.shippingAddress
-              )}
+              {formatAddress(billingSource)}
             </div>
           </div>
 
           <div className="bg-gray-50 p-5 rounded-lg border border-gray-100">
             <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-              {order.deliveryMethod === 'pickup' ? 'Local Pickup' : 'Shipping Drop Ship'}
+              {isDeliveryOrder ? (isLocalDelivery ? 'Local Delivery' : 'Shipping Address') : 'Local Pickup'}
             </div>
             <div className="text-sm text-gray-700">
-              <div className="font-semibold text-gray-900 mb-1">{order.deliveryMethod === 'pickup' ? 'Local Pickup' : 'Shipping'}</div>
-              {order.deliveryMethod !== 'pickup' && formatAddress(order.shippingAddress)}
+              <div className="font-semibold text-gray-900 mb-1">
+                {isDeliveryOrder ? (isLocalDelivery ? 'Local Delivery' : 'Standard Shipping') : 'Store Pickup'}
+              </div>
+              {isDeliveryOrder && formatAddress(shippingSource)}
             </div>
           </div>
         </div>
@@ -313,7 +342,7 @@ export default function InvoiceTemplate({ order }) {
               </div>
             )}
             <div className="flex justify-between text-gray-600">
-              <span>Shipping</span>
+              <span>{isLocalDelivery ? 'Local Delivery' : 'Shipping'}</span>
               <span className="font-medium">${parseFloat(order.shippingAmount || 0).toFixed(2)}</span>
             </div>
             {parseFloat(order.amountTax || 0) > 0 && (

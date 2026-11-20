@@ -52,23 +52,46 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const isDeliveryOrder =
+      shippingMethod === 'local_delivery' ||
+      shippingMethod === 'standard_shipping' ||
+      shippingMethod === 'review_required' ||
+      formData.deliveryMethod === 'shipping';
+    const dbDeliveryMethod = isDeliveryOrder ? 'shipping' : 'pickup';
+
+    const hasAddr = (a: {
+      address: string;
+      apt: string;
+      city: string;
+      state: string;
+      zip: string;
+    }) => Boolean(a.address || a.city || a.state || a.zip);
+
     // Build shipping address object
-    const shippingAddress = {
+    let shippingAddress = {
       address: formData.shippingAddress || '',
       apt: formData.shippingApt || '',
       city: formData.shippingCity || '',
       state: formData.shippingState || '',
       zip: formData.shippingZip || '',
     };
-    
+
     // Build billing address object
-    const billingAddress = {
+    let billingAddress = {
       address: formData.billingAddress || '',
       apt: formData.billingApt || '',
       city: formData.billingCity || '',
       state: formData.billingState || '',
       zip: formData.billingZip || '',
     };
+
+    if (isDeliveryOrder) {
+      if (!hasAddr(shippingAddress) && hasAddr(billingAddress)) {
+        shippingAddress = { ...billingAddress };
+      } else if (!hasAddr(billingAddress) && hasAddr(shippingAddress)) {
+        billingAddress = { ...shippingAddress };
+      }
+    }
 
     const customerName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim();
     const safeDiscount = Number(discountAmount) || 0;
@@ -118,7 +141,7 @@ export async function POST(req: NextRequest) {
         JSON.stringify(shippingAddress),                      // shipping_address_json
         JSON.stringify(billingAddress),                       // billing_address_json
         formData.notes || null,                               // order_notes
-        formData.deliveryMethod || 'pickup',                  // delivery_method
+        dbDeliveryMethod,                                     // delivery_method
         shippingMethod || null,                               // shipping_service
         paymentIntent.id,                                     // stripe_payment_intent_id
         shippingMethod === 'review_required' ? 1 : 0,         // shipping_review_required

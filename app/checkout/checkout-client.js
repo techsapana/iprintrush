@@ -14,6 +14,8 @@ import {
   clearBuyNowItems,
   computeItemsSubtotal,
   computeItemsMerchandiseSubtotal,
+  computeItemShippingTierSubtotal,
+  computeItemsShippingTierSubtotal,
   computeLineTotal,
   requireLoginForCheckout,
 } from '../lib/checkoutFlow';
@@ -350,48 +352,113 @@ const [oversizedDetails, setOversizedDetails] = useState(null);
    loadCoupons();
     }, [checkoutItems]);
 
-useEffect(() => {
+  const buildShippingMethodItems = useCallback(
+    () =>
+      checkoutItems.map((i) => ({
+        id: i.id,
+        quantity: i.quantity,
+        price: Number(i.price || 0),
+        quotePayload: i.options?.quotePayload || null,
+        shippingTierSubtotal: computeItemShippingTierSubtotal(i),
+        product: {
+          weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
+          package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),
+          localDeliveryEligible: i.product?.localDeliveryEligible ?? true,
+        },
+      })),
+    [checkoutItems]
+  );
+
+  useEffect(() => {
     if (!sessionReady || checkoutItems.length === 0) return;
+    let cancelled = false;
+
+    const preferredItem = checkoutItems.find((i) => {
+      const m = i.options?.quotePayload?.deliveryMethod || i.options?.deliveryMethod;
+      return m && m !== 'pickup';
+    });
+    const preferredMethod =
+      preferredItem?.options?.quotePayload?.deliveryMethod ||
+      preferredItem?.options?.deliveryMethod ||
+      null;
+    const preferredZip = String(
+      preferredItem?.options?.quotePayload?.shippingZip ||
+      preferredItem?.options?.shippingZip ||
+      ''
+    ).trim();
+    const hasValidPreferredZip = /^\d{5}$/.test(preferredZip);
+
     const fetchMethods = async () => {
       try {
         const res = await fetch('/api/shipping/methods', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            items: checkoutItems.map((i) => ({
-              id: i.id,
-              quantity: i.quantity,
-              quotePayload: i.options?.quotePayload || null,
-              shippingTierSubtotal:
-                i.options?.quoteSummary?.shippingTierSubtotal ??
-                i.options?.shippingTierSubtotal ??
-                null,
-              product: {
-                weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
-                package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),
-                localDeliveryEligible: i.product?.localDeliveryEligible ?? true,
-              },
-            })),
-            shippingAddress: {},
+            items: buildShippingMethodItems(),
+            shippingTierSubtotal: computeItemsShippingTierSubtotal(checkoutItems),
+            shippingAddress:
+              preferredMethod === 'local_delivery' && hasValidPreferredZip
+                ? { zip: preferredZip }
+                : {},
           }),
         });
         const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
         if (data?.success && Array.isArray(data.methods)) {
           setShippingMethods(data.methods);
-          if (data.oversizedDetails) {
-            setOversizedDetails(data.oversizedDetails);
-          }
-          if (data.methods.some((m) => m.type === 'pickup')) {
+          setOversizedDetails(data.oversizedDetails || null);
+
+          if (preferredMethod === 'local_delivery' && hasValidPreferredZip) {
+            const localMethod = data.methods.find((m) => m.type === 'local_delivery');
+            if (localMethod && localMethod.available !== false) {
+              setZipCheckStatus('success');
+              setZipCheckResult({
+                available: true,
+                cost: localMethod.cost || 0,
+                deliveryWindow: localMethod.deliveryWindow || null,
+              });
+              setSelectedMethod('local_delivery');
+              setFormData((prev) => ({ ...prev, deliveryMethod: 'shipping', shippingZip: preferredZip }));
+            } else if (data.methods.some((m) => m.type === 'review_required')) {
+              setSelectedMethod('review_required');
+              setFormData((prev) => ({ ...prev, deliveryMethod: 'shipping', shippingZip: preferredZip }));
+            } else {
+              setZipCheckStatus('success');
+              setZipCheckResult({ available: false, cost: 0, deliveryWindow: null });
+              setSelectedMethod('local_delivery');
+              setFormData((prev) => ({ ...prev, deliveryMethod: 'shipping', shippingZip: '' }));
+            }
+          } else if (preferredMethod === 'local_delivery' && data.methods.some((m) => m.type === 'local_delivery')) {
+            setSelectedMethod('local_delivery');
+            setFormData((prev) => ({ ...prev, deliveryMethod: 'shipping' }));
+          } else if (preferredMethod === 'standard_shipping' && data.methods.some((m) => m.type === 'standard_shipping')) {
+            setSelectedMethod('standard_shipping');
+            setFormData((prev) => ({
+              ...prev,
+              deliveryMethod: 'shipping',
+              shippingZip: hasValidPreferredZip ? preferredZip : prev.shippingZip,
+            }));
+          } else if (preferredMethod && preferredMethod !== 'pickup' && data.methods.some((m) => m.type === 'review_required')) {
+            setSelectedMethod('review_required');
+            setFormData((prev) => ({
+              ...prev,
+              deliveryMethod: 'shipping',
+              shippingZip: hasValidPreferredZip ? preferredZip : prev.shippingZip,
+            }));
+          } else if (data.methods.some((m) => m.type === 'pickup')) {
             setSelectedMethod('pickup');
+            setFormData((prev) => ({ ...prev, deliveryMethod: 'pickup' }));
           }
         }
       } catch {
         // ignore
-      } finally {
       }
     };
     fetchMethods();
-  }, [sessionReady, checkoutItems]);
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionReady, checkoutItems, buildShippingMethodItems]);
 
   const handleZipCheck = async (zip) => {
     if (!zip || zip.length !== 5) {
@@ -405,20 +472,8 @@ useEffect(() => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: checkoutItems.map((i) => ({
-            id: i.id,
-            quantity: i.quantity,
-            quotePayload: i.options?.quotePayload || null,
-            shippingTierSubtotal:
-              i.options?.quoteSummary?.shippingTierSubtotal ??
-              i.options?.shippingTierSubtotal ??
-              null,
-            product: {
-              weight_lb: Number(i.weightLb ?? i.product?.weightLb ?? 0),
-              package_width_in: Number(i.packageWidthIn ?? i.product?.packageWidthIn ?? 0),
-              localDeliveryEligible: i.product?.localDeliveryEligible ?? true,
-            },
-          })),
+          items: buildShippingMethodItems(),
+          shippingTierSubtotal: computeItemsShippingTierSubtotal(checkoutItems),
           shippingAddress: { zip },
         }),
       });
@@ -434,32 +489,16 @@ useEffect(() => {
         const localDeliveryAvailable = data.methods.some(
           (m) => m.type === 'local_delivery' && m.available !== false
         );
-        console.log(
-          "[ZIP VERIFY]",
-          {
-            backendMethods: data.methods,
-            localDeliveryMethod: data.methods.find((m) => m.type === "local_delivery"),
-            localDeliveryAvailable,
-            zipCheckStatusBeforeSet: zipCheckStatus,
-            zipCheckResultBeforeSet: zipCheckResult,
-          }
-        );
         setZipCheckStatus('success');
-        console.log(
-          "[SET ZIP RESULT]",
-          {
-            available: localDeliveryAvailable,
-            cost: data.methods.find((m) => m.type === "local_delivery")?.cost || 0,
-            deliveryWindow: data.methods.find((m) => m.type === "local_delivery")?.deliveryWindow || null,
-          }
-        );
         setZipCheckResult({
           available: localDeliveryAvailable,
           cost: data.methods.find((m) => m.type === 'local_delivery')?.cost || 0,
           deliveryWindow: data.methods.find((m) => m.type === 'local_delivery')?.deliveryWindow || null,
         });
-        if (hasLocal) {
+        if (hasLocal && localDeliveryAvailable) {
           setFormData((prev) => ({ ...prev, shippingZip: zip }));
+        } else {
+          setFormData((prev) => ({ ...prev, shippingZip: '' }));
         }
       } else {
         setZipCheckStatus('error');
@@ -471,6 +510,12 @@ useEffect(() => {
       setZipCheckResult(null);
       setPayError('Unable to verify ZIP code. Please try again.');
     }
+  };
+
+  const handleZipReset = () => {
+    setZipCheckStatus('idle');
+    setZipCheckResult(null);
+    setFormData((prev) => ({ ...prev, shippingZip: '' }));
   };
 
   useEffect(() => {
@@ -570,7 +615,10 @@ const handleApplyCoupon = (e) => {
     setIsPaying(true);
     try {
       // Prepare final form data
-      const finalFormData = { ...formData };
+      const finalFormData = {
+        ...formData,
+        deliveryMethod: selectedMethod === 'pickup' ? 'pickup' : 'shipping',
+      };
       if (needsShippingAddress && formData.sameAsShipping) {
         finalFormData.billingAddress = formData.shippingAddress;
         finalFormData.billingApt = formData.shippingApt;
@@ -655,7 +703,7 @@ const handleApplyCoupon = (e) => {
   
   const shippingAmount =
     selectedMethod && selectedMethod !== 'pickup'
-      ? Number(shippingMethods.find((m) => m.type === selectedMethod)?.cost || 0)
+      ? Number(shippingMethods?.find((m) => m.type === selectedMethod)?.cost || 0)
       : 0;
   const shippingCents = Math.round(shippingAmount * 100);
   
@@ -753,9 +801,9 @@ const handleApplyCoupon = (e) => {
                 zipCheckStatus={zipCheckStatus}
                 zipCheckResult={zipCheckResult}
                 onZipCheck={handleZipCheck}
+                onZipReset={handleZipReset}
                 methods={shippingMethods}
                 zipValue={formData.shippingZip}
-                commitLocalDeliveryOnVerify
               />
             </div>
 
@@ -794,7 +842,9 @@ const handleApplyCoupon = (e) => {
 
               {needsShippingAddress && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Shipping Address</h2>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                    {selectedMethod === 'local_delivery' ? 'Delivery Address' : 'Shipping Address'}
+                  </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="sm:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Street address</label>
@@ -838,7 +888,9 @@ const handleApplyCoupon = (e) => {
                       onChange={(e) => setFormData(p => ({ ...p, sameAsShipping: e.target.checked }))} 
                       className="w-4 h-4 text-[#29b6f6] rounded border-gray-300 focus:ring-[#29b6f6]"
                     />
-                    <span className="text-sm font-medium text-gray-700">Same as shipping address</span>
+                    <span className="text-sm font-medium text-gray-700">
+                      {selectedMethod === 'local_delivery' ? 'Same as delivery address' : 'Same as shipping address'}
+                    </span>
                   </label>
                 )}
                 
@@ -982,13 +1034,19 @@ const handleApplyCoupon = (e) => {
                 {selectedMethod && selectedMethod !== 'pickup' && (
                   <div className="flex justify-between items-center text-sm text-gray-600 gap-2">
                     <span className="min-w-0 truncate">
-                      {shippingMethods.find((m) => m.type === selectedMethod)
-                        ? `Shipping (${shippingMethods.find((m) => m.type === selectedMethod)?.label})`
+                      {shippingMethods?.find((m) => m.type === selectedMethod)
+                        ? `${selectedMethod === 'local_delivery' ? 'Delivery' : 'Shipping'} (${shippingMethods?.find((m) => m.type === selectedMethod)?.label})`
                         : 'Shipping'}
                     </span>
-                    {shippingMethods.find((m) => m.type === selectedMethod) ? (
+                    {shippingMethods?.find((m) => m.type === selectedMethod) ? (
                       <span className="shrink-0 font-medium">
-                        {selectedMethod === 'review_required' ? 'Under review' : shippingAmount === 0 ? 'FREE' : `$${shippingAmount.toFixed(2)}`}
+                        {selectedMethod === 'review_required'
+                          ? 'Under review'
+                          : selectedMethod === 'local_delivery' && !(zipCheckStatus === 'success' && zipCheckResult?.available)
+                            ? 'Verify ZIP'
+                            : shippingAmount === 0
+                              ? 'FREE'
+                              : `$${shippingAmount.toFixed(2)}`}
                       </span>
                     ) : (
                       <span className="shrink-0 text-amber-600">Pending</span>

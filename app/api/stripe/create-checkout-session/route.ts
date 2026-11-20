@@ -8,7 +8,7 @@ import { mkdir, rename } from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
 import crypto from 'crypto';
-import { buildShippingConfig, getShippingCost, getShippingDecision, getOversizedDetails, type CartItem } from '@/app/lib/shippingEngine';
+import { buildShippingConfig, computeLocalDeliveryCost, getShippingCost, getShippingDecision, getOversizedDetails, type CartItem } from '@/app/lib/shippingEngine';
 import { normalizeDeliveryMethod, type ValidDeliveryMethod } from '@/app/lib/quoteEngine';
 import { lookupZoneByZip } from '@/app/lib/shipping/zipZoneService';
 
@@ -615,7 +615,7 @@ export async function POST(req: NextRequest) {
               { status: 400 },
             );
           }
-          const localCost = tierSubtotal >= zone.free_delivery_minimum ? 0 : zone.delivery_fee;
+          const localCost = computeLocalDeliveryCost(tierSubtotal, zone.delivery_fee, zone.free_delivery_minimum);
           shippingCents = toCents(localCost);
           shippingMeta = {
             carrier: 'Local Delivery',

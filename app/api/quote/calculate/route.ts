@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/app/lib/db';
 import { calculateUnifiedQuote, normalizeDeliveryMethod, resolveShippingDecisionForQuote } from '@/app/lib/quoteEngine';
 import { normalizeQuoteRequest } from '@/app/lib/quote/QuoteNormalizer';
-import { buildShippingConfig } from '@/app/lib/shippingEngine';
+import { buildShippingConfig, computeLocalDeliveryCost } from '@/app/lib/shippingEngine';
 import { lookupZoneByZip } from '@/app/lib/shipping/zipZoneService';
 import {
   getProductQuantityBounds,
@@ -181,7 +181,7 @@ async function handleSimpleQuote(payload: SimpleQuoteRequestPayload) {
 
   // Apply zone-based local delivery if applicable
   if (zoneResult.available && normalizeDeliveryMethod(payload.deliveryMethod) === 'local_delivery') {
-    const shippingAmount = summary.subtotal >= zoneResult.freeMinimum ? 0 : zoneResult.fee;
+    const shippingAmount = computeLocalDeliveryCost(summary.subtotal, zoneResult.fee, zoneResult.freeMinimum);
     summary.shipping = shippingAmount;
     summary.grandTotal = summary.subtotal + shippingAmount;
     summary.localDeliveryZone = {
@@ -310,7 +310,7 @@ async function handleApparelQuote(payload: QuoteRequestPayload) {
   );
 
   if (zoneResult.available && normalizeDeliveryMethod(payload.deliveryMethod) === 'local_delivery') {
-    const shippingAmount = summary.subtotal >= zoneResult.freeMinimum ? 0 : zoneResult.fee;
+    const shippingAmount = computeLocalDeliveryCost(summary.subtotal, zoneResult.fee, zoneResult.freeMinimum);
     summary.shipping = shippingAmount;
     summary.grandTotal = summary.subtotal + shippingAmount;
     summary.localDeliveryZone = {
@@ -435,7 +435,7 @@ async function handlePrintProductQuote(payload: DynamicQuoteRequestPayload) {
   });
 
   if (zoneResult.available && normalizedDeliveryMethod === 'local_delivery') {
-    const shippingAmount = summary.subtotal >= zoneResult.freeMinimum ? 0 : zoneResult.fee;
+    const shippingAmount = computeLocalDeliveryCost(summary.subtotal, zoneResult.fee, zoneResult.freeMinimum);
     summary.shipping = shippingAmount;
     summary.grandTotal = summary.subtotal + shippingAmount;
     summary.localDeliveryZone = {

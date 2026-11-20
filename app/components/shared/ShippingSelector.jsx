@@ -28,21 +28,30 @@ export function ShippingSelector({
   zipValue,
   hideMethods = false,
   commitLocalDeliveryOnVerify = false,
+  onZipReset,
 }) {
-  const [zipInputValue, setZipInputValue] = useState('');
+  const [zipInputValue, setZipInputValue] = useState(zipValue || '');
   const [localDeliveryArmed, setLocalDeliveryArmed] = useState(false);
+
+  useEffect(() => {
+    if (zipValue !== undefined) {
+      setZipInputValue(zipValue || '');
+    }
+  }, [zipValue]);
 
   const isLocalDeliverySelected = selectedMethod === 'local_delivery';
   const isZipChecking = zipCheckStatus === 'checking';
   const isZipAvailable = zipCheckStatus === 'success' && zipCheckResult?.available;
-  console.log("[SHIPPING SELECTOR]", { zipCheckStatus, zipCheckResult, isZipAvailable });
   const isZipError = zipCheckStatus === 'error';
 
-  const activeZip = zipValue || zipInputValue;
+  const activeZip = zipInputValue || zipValue || '';
 
   const handleZipInputChange = (e) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 5);
     setZipInputValue(value);
+    if (zipCheckStatus !== 'idle' && onZipReset) {
+      onZipReset();
+    }
   };
 
   const handleCheckClick = () => {
@@ -71,7 +80,10 @@ export function ShippingSelector({
   }, [commitLocalDeliveryOnVerify, localDeliveryArmed, zipCheckStatus, isZipAvailable, zipCheckResult, onMethodChange]);
 
   const showZipInput = isLocalDeliverySelected || localDeliveryArmed;
-  const canCheckZip = activeZip.length === 5 && zipCheckStatus !== 'success';
+  const canCheckZip =
+    activeZip.length === 5 &&
+    !isZipChecking &&
+    !(zipCheckStatus === 'success' && isZipAvailable);
   const showZipCheckButton = isLocalDeliverySelected && activeZip.length >= 5;
 
   const localDeliveryDisabled = isLocalDeliverySelected && !isZipAvailable && zipCheckStatus !== 'idle';
@@ -83,6 +95,9 @@ export function ShippingSelector({
     const methodWindow = method.deliveryWindow;
 
     const disabled = methodType === 'local_delivery' && localDeliveryDisabled && !isZipAvailable;
+    const isMethodActive =
+      selectedMethod === methodType ||
+      (methodType === 'local_delivery' && localDeliveryArmed);
 
     return (
       <button
@@ -91,7 +106,7 @@ export function ShippingSelector({
         onClick={() => handleMethodButtonClick(methodType)}
         disabled={disabled}
         className={`rounded-xl border px-4 py-3 text-left transition relative ${
-          selectedMethod === methodType
+          isMethodActive
             ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
             : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
         } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
@@ -99,7 +114,9 @@ export function ShippingSelector({
         <div className="font-semibold text-gray-900">{methodLabel}</div>
         {methodType === 'local_delivery' && isZipAvailable && zipCheckResult && (
           <div className="text-sm text-gray-600">
-            ${Number(zipCheckResult.cost || methodCost || 0).toFixed(2)} delivery fee
+            {Number(zipCheckResult.cost ?? methodCost ?? 0) === 0
+              ? 'Free delivery'
+              : `$${Number(zipCheckResult.cost ?? methodCost ?? 0).toFixed(2)} delivery fee`}
             {zipCheckResult.deliveryWindow || methodWindow ? ` • Delivery: ${zipCheckResult.deliveryWindow || methodWindow}` : ''}
           </div>
         )}
@@ -146,7 +163,7 @@ export function ShippingSelector({
         onClick={() => handleMethodButtonClick('local_delivery')}
         disabled={localDeliveryDisabled && !isZipAvailable}
         className={`rounded-xl border px-4 py-3 text-left transition relative ${
-          selectedMethod === 'local_delivery'
+          selectedMethod === 'local_delivery' || localDeliveryArmed
             ? 'border-[#29b6f6] bg-[#29b6f6]/5 shadow-sm'
             : 'border-gray-200 hover:border-[#29b6f6]/60 hover:bg-gray-50'
         } ${localDeliveryDisabled && !isZipAvailable ? 'opacity-60 cursor-not-allowed' : ''}`}
@@ -215,7 +232,7 @@ export function ShippingSelector({
 
       {(isLocalDeliverySelected || localDeliveryArmed) && (
         <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-          {!zipValue && (
+          {!isZipAvailable ? (
             <div className="flex items-center gap-3">
               <input
                 type="text"
@@ -238,22 +255,19 @@ export function ShippingSelector({
                 {isZipChecking ? 'Checking...' : 'Check Availability'}
               </button>
             </div>
-          )}
-          {zipValue && (
+          ) : (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600">ZIP: {zipValue}</span>
-              {zipCheckStatus !== 'success' && (
+              <span className="text-sm text-gray-600">ZIP: {activeZip}</span>
+              {onZipReset && (
                 <button
                   type="button"
-                  onClick={handleCheckClick}
-                  disabled={isZipChecking}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                    isZipChecking
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-[#29b6f6] text-white hover:bg-[#1e8fc4]'
-                  }`}
+                  onClick={() => {
+                    setZipInputValue('');
+                    onZipReset();
+                  }}
+                  className="text-xs font-medium text-[#29b6f6] hover:underline"
                 >
-                  {isZipChecking ? 'Checking...' : 'Check Availability'}
+                  Change
                 </button>
               )}
             </div>

@@ -314,14 +314,43 @@ export default function MyOrdersPage() {
                     ) : (
                       <div className="text-xs text-gray-500 mt-1">Tracking: Pending shipment</div>
                     )}
-                    {order.deliveryMethod === 'shipping' && order.shippingAddress && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        Ship to:{' '}
-                        {order.shippingAddress.address
-                          ? `${order.shippingAddress.address}${order.shippingAddress.apt ? `, ${order.shippingAddress.apt}` : ''}`
-                          : `${order.shippingAddress.city || ''}${order.shippingAddress.state ? `, ${order.shippingAddress.state}` : ''} ${order.shippingAddress.zip || ''}`.trim()}
-                      </div>
-                    )}
+                    {(() => {
+                      const hasAddrFields = (a) =>
+                        Boolean(a && (a.address || a.apt || a.apartmentOrSuite || a.city || a.state || a.zip));
+                      const isLocalDelivery =
+                        order.deliveryMethod === 'local_delivery' ||
+                        order.shippingService === 'local_delivery';
+                      const isDeliveryOrder =
+                        order.deliveryMethod !== 'pickup' ||
+                        isLocalDelivery ||
+                        order.shippingService === 'standard_shipping' ||
+                        order.shippingService === 'review_required';
+                      const displayShip = hasAddrFields(order.shippingAddress)
+                        ? order.shippingAddress
+                        : isDeliveryOrder && hasAddrFields(order.billingAddress)
+                          ? order.billingAddress
+                          : null;
+                      if ((!isDeliveryOrder && !hasAddrFields(order.shippingAddress)) || !displayShip) {
+                        return null;
+                      }
+                      const streetPart = displayShip.address
+                        ? `${displayShip.address}${displayShip.apt || displayShip.apartmentOrSuite ? `, ${displayShip.apt || displayShip.apartmentOrSuite}` : ''}`
+                        : '';
+                      const cityStateZip = [
+                        [displayShip.city, displayShip.state].filter(Boolean).join(', '),
+                        displayShip.zip,
+                      ]
+                        .filter(Boolean)
+                        .join(' ');
+                      const formatted = [streetPart, cityStateZip].filter(Boolean).join(', ');
+                      if (!formatted) return null;
+                      return (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {isLocalDelivery ? 'Deliver to: ' : 'Ship to: '}
+                          {formatted}
+                        </div>
+                      );
+                    })()}
                     <div className="text-xs text-gray-500 mt-1 capitalize flex items-center gap-1">
                       <span>Payment:</span>
                       <span className="font-medium text-gray-700">{order.paymentMethod ? order.paymentMethod.replace(/_/g, ' ') : (order.paidAt ? 'Credit Card' : 'Pending')}</span>

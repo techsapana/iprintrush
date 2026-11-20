@@ -12,13 +12,13 @@ async function sendOrderConfirmationEmail(orderId: string | null, orderNumber: s
     let order: any = null;
     if (orderId) {
       order = await queryOne(
-        `SELECT id, order_number, customer_name, customer_email, amount_total, amount_subtotal, amount_tax, shipping_amount, discount_amount, delivery_method, payment_method, created_at
+        `SELECT id, order_number, customer_name, customer_email, amount_total, amount_subtotal, amount_tax, shipping_amount, discount_amount, delivery_method, shipping_service, shipping_address_json, billing_address_json, payment_method, created_at
          FROM orders WHERE id = ? LIMIT 1`,
         [orderId]
       );
     } else if (orderNumber) {
       order = await queryOne(
-        `SELECT id, order_number, customer_name, customer_email, amount_total, amount_subtotal, amount_tax, shipping_amount, discount_amount, delivery_method, payment_method, created_at
+        `SELECT id, order_number, customer_name, customer_email, amount_total, amount_subtotal, amount_tax, shipping_amount, discount_amount, delivery_method, shipping_service, shipping_address_json, billing_address_json, payment_method, created_at
          FROM orders WHERE order_number = ? LIMIT 1`,
         [orderNumber]
       );
@@ -32,6 +32,68 @@ async function sendOrderConfirmationEmail(orderId: string | null, orderNumber: s
     ) as any[];
 
     const formatCurrency = (v: number) => `$${Number(v || 0).toFixed(2)}`;
+    const escapeHtml = (str: string) =>
+      String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const parseAddr = (raw: any) => {
+      if (!raw) return null;
+      try {
+        return typeof raw === 'string' ? JSON.parse(raw) : raw;
+      } catch {
+        return null;
+      }
+    };
+    const hasAddr = (a: any) =>
+      Boolean(a && (a.address || a.apt || a.apartmentOrSuite || a.city || a.state || a.zip));
+    const formatAddrLine = (a: any) => {
+      if (!hasAddr(a)) return '';
+      const street = [a.address, a.apt || a.apartmentOrSuite].filter(Boolean).join(', ');
+      const region = [
+        [a.city, a.state].filter(Boolean).join(', '),
+        a.zip,
+      ]
+        .filter(Boolean)
+        .join(' ');
+      return [street, region].filter(Boolean).join(', ');
+    };
+
+    const isLocalDelivery =
+      order.delivery_method === 'local_delivery' ||
+      order.shipping_service === 'local_delivery';
+    const isDeliveryOrder =
+      order.delivery_method !== 'pickup' ||
+      isLocalDelivery ||
+      order.shipping_service === 'standard_shipping' ||
+      order.shipping_service === 'review_required';
+    const deliveryLabel = isLocalDelivery
+      ? 'Local Delivery'
+      : order.shipping_service === 'review_required'
+        ? 'Shipping Review Required'
+        : isDeliveryOrder
+          ? 'Standard Shipping'
+          : 'Store Pickup';
+
+    const parsedBilling = parseAddr(order.billing_address_json);
+    const parsedShipping = parseAddr(order.shipping_address_json);
+    const billingText = formatAddrLine(parsedBilling);
+    const shippingText = isDeliveryOrder
+      ? formatAddrLine(hasAddr(parsedShipping) ? parsedShipping : parsedBilling)
+      : '';
+
+    const shippingDisplay =
+      Number(order.shipping_amount) > 0
+        ? formatCurrency(order.shipping_amount)
+        : !isDeliveryOrder
+          ? 'Store Pickup'
+          : isLocalDelivery
+            ? 'Local Delivery (Free)'
+            : order.shipping_service === 'review_required'
+              ? 'TBD'
+              : 'Free';
 
     const itemRows = items.map((i: any) =>
       `<tr>
@@ -65,6 +127,9 @@ async function sendOrderConfirmationEmail(orderId: string | null, orderNumber: s
       <div style="background:#f8f9fa;border-radius:6px;padding:16px 20px;margin-bottom:24px;">
         <p style="margin:0 0 4px;font-size:13px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Order Number</p>
         <p style="margin:0;font-size:20px;font-weight:700;color:#29b6f6;">${order.order_number}</p>
+        <p style="margin:8px 0 0;font-size:13px;color:#555;"><strong>Delivery Method:</strong> ${deliveryLabel}</p>
+        ${billingText ? `<p style="margin:4px 0 0;font-size:13px;color:#555;"><strong>Billing Address:</strong> ${escapeHtml(billingText)}</p>` : ''}
+        ${isDeliveryOrder && shippingText ? `<p style="margin:4px 0 0;font-size:13px;color:#555;"><strong>${isLocalDelivery ? 'Delivery Address' : 'Shipping Address'}:</strong> ${escapeHtml(shippingText)}</p>` : ''}
       </div>
 
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
@@ -81,7 +146,7 @@ async function sendOrderConfirmationEmail(orderId: string | null, orderNumber: s
       <div style="border-top:2px solid #f0f0f0;padding-top:16px;">
         ${Number(order.discount_amount) > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:6px;color:#555;"><span>Discount</span><span style="color:#16a34a;">-${formatCurrency(order.discount_amount)}</span></div>` : ''}
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:#555;"><span>Subtotal</span><span>${formatCurrency(order.amount_subtotal)}</span></div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:#555;"><span>Shipping</span><span>${Number(order.shipping_amount) > 0 ? formatCurrency(order.shipping_amount) : (order.delivery_method === 'pickup' ? 'Local Pickup' : 'TBD')}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:#555;"><span>${isLocalDelivery ? 'Local Delivery' : 'Shipping'}</span><span>${shippingDisplay}</span></div>
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:#555;"><span>Tax</span><span>${formatCurrency(order.amount_tax)}</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid #e5e5e5;font-size:18px;font-weight:700;color:#111;">
           <span>Total Paid</span><span style="color:#29b6f6;">${formatCurrency(order.amount_total)}</span>
@@ -113,8 +178,10 @@ Thank you for your order! Your order ${order.order_number} has been confirmed.
 Order Summary:
 ${itemRowsText}
 
+Delivery Method: ${deliveryLabel}
+${billingText ? `Billing Address: ${billingText}\n` : ''}${isDeliveryOrder && shippingText ? `${isLocalDelivery ? 'Delivery Address' : 'Shipping Address'}: ${shippingText}\n` : ''}
 Subtotal: ${formatCurrency(order.amount_subtotal)}
-Shipping: ${Number(order.shipping_amount) > 0 ? formatCurrency(order.shipping_amount) : 'TBD'}
+${isLocalDelivery ? 'Local Delivery' : 'Shipping'}: ${shippingDisplay}
 Tax: ${formatCurrency(order.amount_tax)}
 Total Paid: ${formatCurrency(order.amount_total)}
 
@@ -140,11 +207,15 @@ Questions? Contact us at support@iprintrush.com
       await sendEmail({
         to: adminEmail,
         subject: `NEW ORDER RECEIVED: ${order.order_number}`,
-        text: `A new order has been placed by ${order.customer_name || order.customer_email}.\n\nOrder Number: ${order.order_number}\nTotal: ${formatCurrency(order.amount_total)}\n\nPlease log in to the admin dashboard to view the details.`,
+        text: `A new order has been placed by ${order.customer_name || order.customer_email}.\n\nOrder Number: ${order.order_number}\nDelivery Method: ${deliveryLabel}\nShipping/Delivery Charge: ${shippingDisplay}\n${billingText ? `Billing Address: ${billingText}\n` : ''}${isDeliveryOrder && shippingText ? `${isLocalDelivery ? 'Delivery Address' : 'Shipping Address'}: ${shippingText}\n` : ''}Total: ${formatCurrency(order.amount_total)}\n\nPlease log in to the admin dashboard to view the details.`,
         html: `<div style="font-family:sans-serif;padding:20px;">
           <h2 style="color:#d97706;">New Order Received!</h2>
           <p><strong>Customer:</strong> ${order.customer_name || order.customer_email}</p>
           <p><strong>Order Number:</strong> ${order.order_number}</p>
+          <p><strong>Delivery Method:</strong> ${deliveryLabel}</p>
+          <p><strong>Shipping/Delivery Charge:</strong> ${shippingDisplay}</p>
+          ${billingText ? `<p><strong>Billing Address:</strong> ${escapeHtml(billingText)}</p>` : ''}
+          ${isDeliveryOrder && shippingText ? `<p><strong>${isLocalDelivery ? 'Delivery Address' : 'Shipping Address'}:</strong> ${escapeHtml(shippingText)}</p>` : ''}
           <p><strong>Total Paid:</strong> ${formatCurrency(order.amount_total)}</p>
           <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://iprintrush.com'}/admin/orders" style="display:inline-block;padding:10px 15px;background:#29b6f6;color:#fff;text-decoration:none;border-radius:4px;margin-top:10px;">View Order in Admin Panel</a></p>
         </div>`

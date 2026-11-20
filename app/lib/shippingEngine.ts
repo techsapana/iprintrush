@@ -198,7 +198,11 @@ function calculateShippingTierSubtotalFromCartItems(cartItems: CartItem[]): numb
       ?? item.options?.merchandiseSubtotal
       ?? item.options?.quoteSummary?.merchandiseSubtotal;
 
-    if (Number.isFinite(Number(explicitSubtotal))) {
+    if (
+      explicitSubtotal != null &&
+      String(explicitSubtotal).trim() !== '' &&
+      Number.isFinite(Number(explicitSubtotal))
+    ) {
       return sum + Math.max(0, Number(explicitSubtotal));
     }
 
@@ -255,6 +259,20 @@ export function getShippingCost(
   }
 
   return 0;
+}
+
+export function computeLocalDeliveryCost(
+  subtotal: number,
+  deliveryFee: number,
+  freeDeliveryMinimum: number,
+): number {
+  const safeSubtotal = Math.max(0, Number(subtotal) || 0);
+  const safeFee = Math.max(0, Number(deliveryFee) || 0);
+  const safeFreeMin = Number(freeDeliveryMinimum) || 0;
+  if (safeFreeMin > 0 && safeSubtotal >= safeFreeMin) {
+    return 0;
+  }
+  return safeFee;
 }
 
 // ============================================================
