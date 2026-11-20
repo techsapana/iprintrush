@@ -37,6 +37,7 @@ export function SimpleQuoteBuilder({
 
   const hydratedRef = useRef(false);
   const latestDraftRef = useRef(null);
+  const lastSubtotalRef = useRef(null);
 
   const applyQuotePrefill = (stored, summary) => {
     if (typeof stored.quantity === 'number') {
@@ -51,6 +52,9 @@ export function SimpleQuoteBuilder({
     if (summary) {
       setQuoteSummary(summary);
       setHasCalculated(true);
+      if (summary?.subtotal != null && Number.isFinite(Number(summary.subtotal))) {
+        lastSubtotalRef.current = Number(summary.subtotal);
+      }
     }
     if (summary?.shippingDecision) {
       const decision = summary.shippingDecision;
@@ -148,6 +152,7 @@ export function SimpleQuoteBuilder({
     setZipCheckStatus('checking');
     setZipCheckResult(null);
     try {
+      const knownSubtotal = quoteSummary?.subtotal ?? lastSubtotalRef.current;
       const res = await fetch('/api/shipping/methods', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -162,6 +167,9 @@ export function SimpleQuoteBuilder({
               localDeliveryEligible: localDeliveryEligible ?? true,
             },
           }],
+          ...(knownSubtotal != null && Number.isFinite(Number(knownSubtotal))
+            ? { shippingTierSubtotal: Number(knownSubtotal) }
+            : {}),
           shippingAddress: { zip },
         }),
       });
@@ -171,19 +179,40 @@ export function SimpleQuoteBuilder({
         if (data.oversizedDetails) {
           setOversizedDetails(data.oversizedDetails);
         }
+        const available = data.methods.some(
+          (m) => m.type === 'local_delivery' && m.available !== false,
+        );
         setZipCheckResult({
-          available: data.methods.some(m => m.type === 'local_delivery' && m.available !== false) || false,
-          cost: data.methods.find(m => m.type === 'local_delivery')?.cost || 0,
-          deliveryWindow: data.methods.find(m => m.type === 'local_delivery')?.deliveryWindow || null,
+          available,
+          cost: data.methods.find((m) => m.type === 'local_delivery')?.cost || 0,
+          deliveryWindow: data.methods.find((m) => m.type === 'local_delivery')?.deliveryWindow || null,
         });
         setZipCheckStatus('success');
+        if (available) {
+          setShippingZip(zip);
+          await handleCalculate({ deliveryMethod: 'local_delivery', shippingZip: zip });
+        } else {
+          setShippingZip('');
+        }
       } else {
-        setZipCheckStatus('unavailable');
-        setZipCheckResult({ available: false, cost: 0, deliveryWindow: null });
+        setZipCheckStatus('error');
+        setZipCheckResult(null);
+        setShippingZip('');
       }
     } catch {
       setZipCheckStatus('error');
       setZipCheckResult(null);
+    }
+  };
+
+  const handleZipReset = () => {
+    setZipCheckStatus('idle');
+    setZipCheckResult(null);
+    setShippingZip('');
+    if (deliveryMethod === 'local_delivery') {
+      setQuoteSummary(null);
+      setHasCalculated(false);
+      if (onQuoteReady) onQuoteReady(null);
     }
   };
 
@@ -202,14 +231,23 @@ export function SimpleQuoteBuilder({
   };
 
   const handleDeliveryMethodChange = (method) => {
-    invalidateQuote();
     setDeliveryMethod(method);
     if (method !== 'local_delivery') {
       setShippingZip('');
+      setZipCheckStatus('idle');
+      setZipCheckResult(null);
+      handleCalculate({ deliveryMethod: method, shippingZip: '' });
+    } else {
+      setQuoteSummary(null);
+      setHasCalculated(false);
+      if (onQuoteReady) onQuoteReady(null);
     }
   };
 
-  const handleCalculate = async () => {
+  const handleCalculate = async (overrides = null) => {
+    const effectiveDeliveryMethod = overrides?.deliveryMethod ?? deliveryMethod;
+    const effectiveZip = String(overrides?.shippingZip ?? shippingZip).trim();
+
     if (!quantity || quantity < 1) {
       setError('Please enter a valid quantity.');
       return;
@@ -230,8 +268,8 @@ export function SimpleQuoteBuilder({
       productId,
       mode: 'simple',
       quantity,
-      deliveryMethod,
-      shippingZip: shippingZip.trim(),
+      deliveryMethod: effectiveDeliveryMethod,
+      shippingZip: effectiveZip,
     };
 
     try {
@@ -246,6 +284,9 @@ export function SimpleQuoteBuilder({
       }
       setQuoteSummary(json);
       setHasCalculated(true);
+      if (json?.subtotal != null && Number.isFinite(Number(json.subtotal))) {
+        lastSubtotalRef.current = Number(json.subtotal);
+      }
       if (json.shippingDecision) {
         const shippingDecision = json.shippingDecision;
         if (shippingDecision.isOversized && shippingDecision.details) {
@@ -265,7 +306,7 @@ export function SimpleQuoteBuilder({
           summary: json,
           customizationsDisplay: {
             Quantity: String(quantity),
-            Delivery: getShippingDisplayLabel(deliveryMethod),
+            Delivery: getShippingDisplayLabel(effectiveDeliveryMethod),
           },
         });
       }
@@ -309,6 +350,8 @@ export function SimpleQuoteBuilder({
           zipCheckStatus={zipCheckStatus}
           zipCheckResult={zipCheckResult}
           onZipCheck={handleZipCheck}
+          onZipReset={handleZipReset}
+          zipValue={shippingZip}
           deliveryMethod={deliveryMethod}
           methods={shippingMethods}
         />
@@ -340,7 +383,7 @@ export function SimpleQuoteBuilder({
         <div className="mt-4">
           <button
             type="button"
-            onClick={handleCalculate}
+            onClick={() => handleCalculate()}
             disabled={calculating}
             className="w-full bg-[#0f172a] hover:bg-[#020617] text-white font-semibold py-2 text-sm rounded-lg transition disabled:opacity-60"
           >

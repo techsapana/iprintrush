@@ -682,10 +682,10 @@ const invalidateQuote = () => {
       product: {
         weight_lb: Number(weightLb) || 0,
         package_width_in: Number(packageWidthIn) || 0,
-        localDeliveryEligible: true,
+        localDeliveryEligible: localDeliveryEligible ?? true,
       },
     }],
-    [productId, totalQuantity, weightLb, packageWidthIn],
+    [productId, totalQuantity, weightLb, packageWidthIn, localDeliveryEligible],
   );
 
 const fetchShippingMethods = async (items, zip = '') => {
@@ -696,6 +696,9 @@ const fetchShippingMethods = async (items, zip = '') => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             items,
+            ...(quoteSummary?.subtotal != null && Number.isFinite(Number(quoteSummary.subtotal))
+              ? { shippingTierSubtotal: Number(quoteSummary.subtotal) }
+              : {}),
             shippingAddress: zip ? { zip } : {},
           }),
         });
@@ -726,20 +729,36 @@ const fetchShippingMethods = async (items, zip = '') => {
        const items = buildShippingItems();
        const data = await fetchShippingMethods(items, zip);
          if (data) {
+           const available = data.methods.some(m => m.type === 'local_delivery' && m.available !== false) || false;
            setZipCheckStatus('success');
-           setShippingZip(zip);
+           setShippingZip(available ? zip : '');
            setZipCheckResult({
-             available: data.methods.some(m => m.type === 'local_delivery' && m.available !== false) || false,
+             available,
              cost: data.methods.find(m => m.type === 'local_delivery')?.cost || 0,
              deliveryWindow: data.methods.find(m => m.type === 'local_delivery')?.deliveryWindow || null,
            });
+           if (hasCalculated) {
+             setQuoteSummary(null);
+             setHasCalculated(false);
+           }
         } else {
-         setZipCheckStatus('unavailable');
-         setZipCheckResult({ available: false, cost: 0, deliveryWindow: null });
+         setZipCheckStatus('error');
+         setZipCheckResult(null);
+         setShippingZip('');
        }
      } catch {
        setZipCheckStatus('error');
        setZipCheckResult(null);
+     }
+   };
+
+   const handleZipReset = () => {
+     setZipCheckStatus('idle');
+     setZipCheckResult(null);
+     setShippingZip('');
+     if (hasCalculated) {
+       setQuoteSummary(null);
+       setHasCalculated(false);
      }
    };
 
@@ -1313,6 +1332,8 @@ const renderDeliveryStep = () => {
           zipCheckStatus={zipCheckStatus}
           zipCheckResult={zipCheckResult}
           onZipCheck={handleZipCheck}
+          onZipReset={handleZipReset}
+          zipValue={shippingZip}
           deliveryMethod={deliveryMethod}
           methods={availableMethods}
           decision={shippingDecision}

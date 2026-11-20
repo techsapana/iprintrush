@@ -33,23 +33,25 @@ export function ShippingSelector({
   const [zipInputValue, setZipInputValue] = useState(zipValue || '');
   const [localDeliveryArmed, setLocalDeliveryArmed] = useState(false);
 
-  useEffect(() => {
-    if (zipValue !== undefined) {
-      setZipInputValue(zipValue || '');
-    }
-  }, [zipValue]);
-
   const isLocalDeliverySelected = selectedMethod === 'local_delivery';
   const isZipChecking = zipCheckStatus === 'checking';
   const isZipAvailable = zipCheckStatus === 'success' && zipCheckResult?.available;
   const isZipError = zipCheckStatus === 'error';
 
-  const activeZip = zipInputValue || zipValue || '';
+  useEffect(() => {
+    if (zipValue) {
+      setZipInputValue(zipValue);
+    } else if (!isLocalDeliverySelected && !localDeliveryArmed) {
+      setZipInputValue('');
+    }
+  }, [zipValue, isLocalDeliverySelected, localDeliveryArmed]);
+
+  const activeZip = isZipAvailable ? (zipValue || zipInputValue) : zipInputValue;
 
   const handleZipInputChange = (e) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 5);
     setZipInputValue(value);
-    if (zipCheckStatus !== 'idle' && onZipReset) {
+    if ((zipCheckStatus !== 'idle' || zipValue) && onZipReset) {
       onZipReset();
     }
   };
